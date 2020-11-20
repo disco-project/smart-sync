@@ -1,7 +1,6 @@
 const SimpleContract = artifacts.require("SimpleContract");
 const ProofContract = artifacts.require("ProofContract");
 const RelayContract = artifacts.require("RelayContract");
-const EventProof = artifacts.require("EventProof");
 const Proofs = require("../src/proofs");
 const EthereumBlock = require("ethereumjs-block/from-rpc");
 const rlp = require('rlp');
