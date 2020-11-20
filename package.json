@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "test" : "truffle test test/*",
     "start": "concurrently \"npm run ganache\" \"npm run migrate\"",
     "ganache": "ganache-cli --networkId $npm_package_config_ganache_networkId --allowUnlimitedContractSize",
     "migrate": "rm -rf build && truffle migrate --reset --compile-all --network development",
-    "test" : "truffle test test/*"
   },
   "config": {
     "ganache": {
