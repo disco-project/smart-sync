@@ -1,0 +1,13 @@
+version: '3.7'
+services:
+  openethereum:
+    container_name: disco
+    image: openethereum/openethereum
+    volumes:
+      - ./config:/home/openethereum/.local/share/openethereum
+    command: --config /home/openethereum/.local/share/openethereum/config.toml --base-path /home/openethereum/.local/share/openethereum/data --keys-path /home/openethereum/.local/share/openethereum/keys --no-ipc
+    ports:
+      - 8545:8545
+      - 8546:8546
+      - 30303:30303
+      - 30303:30303/udp
