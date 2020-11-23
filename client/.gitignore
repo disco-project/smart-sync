@@ -2,6 +2,13 @@
 logs
 *.log
 build
+dist
 node_modules/
 *.tsbuildinfo
 .env
+node_modules
+src/types
+
+#Hardhat files
+cache
+artifacts
