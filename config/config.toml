@@ -3,7 +3,7 @@
 chain = "/home/openethereum/.local/share/openethereum/disco-spec.json"
 # Use the following lines instead for running `openethereum --config config.toml` and change the password path in `account`
 #chain = "disco-spec.json"
-#base_path = "./data"
+#base_path = "./chain-data"
 #keys_path = "./keys"
 
 [account]
@@ -26,3 +26,7 @@ origins = ["all"]
 [mining]
 reseal_min_period = 0
 min_gas_price = 0
+
+[footprint]
+# Enables Fat DB
+fat_db = "on"
