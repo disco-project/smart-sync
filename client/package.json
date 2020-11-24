@@ -5,14 +5,13 @@
   "main": "index.js",
   "scripts": {
     "compile": "npx hardhat compile",
-    "build": "tsc --build",
-    "test": "npx hardhat test",
-    "start": "npm run build && node build/index.js"
+    "test": "npx hardhat test"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "hardhat-typechain": "^0.3.3",
+    "merkle-patricia-tree": "^4.0.0",
     "ts-generator": "^0.1.1",
     "typechain": "^4.0.0"
   },
