@@ -2,6 +2,9 @@ import {SimpleStorage, SimpleStorage__factory,} from "../src-gen/types";
 import * as hre from "hardhat";
 import {ethers} from "hardhat";
 import {expect} from "chai";
+import {BaseTrie as Trie} from "merkle-patricia-tree";
+import {GetProof, verify_eth_getProof} from "../src/verify-proof";
+import {Proof} from "merkle-patricia-tree/dist.browser/baseTrie";
 
 describe("Storage", function () {
     let deployer;
@@ -84,5 +87,31 @@ describe("Storage", function () {
 
         const storedValue = await provider.getStorageAt(storage.address, storageKey);
         expect(ethers.BigNumber.from(storedValue).toNumber()).to.equal(value);
+    })
+
+    async function verifyProof(rootHash: Buffer, key: Buffer, proof: Proof): Promise<Buffer | null> {
+        let proofTrie = new Trie(null, rootHash)
+        try {
+            proofTrie = await Trie.fromProof(proof, proofTrie)
+        } catch (e) {
+            throw new Error('Invalid proof nodes given')
+        }
+        return proofTrie.get(key)
+    }
+
+    it("Should return a valid proof", async function () {
+        const provider = new hre.ethers.providers.JsonRpcProvider();
+        const keys = await provider.send("parity_listStorageKeys", [
+            storage.address, 5, null
+        ]);
+        // [`eth_getProof`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1186.md) implemented at
+        // https://github.com/openethereum/openethereum/blob/27a0142af14730bcb50eeacc84043dc6f49395e8/rpc/src/v1/impls/eth.rs#L677
+        const proof = <GetProof>await provider.send("eth_getProof", [storage.address, keys]);
+
+        // get the latest block
+        const block = await provider.send('eth_getBlockByNumber', ["latest", true]);
+
+        // verify the proof against the block's state root
+        expect(await verify_eth_getProof(proof, block.stateRoot)).to.be.true;
     })
 });
