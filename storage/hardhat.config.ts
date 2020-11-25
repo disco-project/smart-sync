@@ -25,7 +25,7 @@ export default {
     }
   },
   typechain: {
-    outDir: "src/types",
+    outDir: "src-gen/types",
     target: "ethers-v5",
   },
   solidity: "0.7.3",

@@ -1,4 +1,4 @@
-import {SimpleStorage, SimpleStorage__factory,} from "../src/types";
+import {SimpleStorage, SimpleStorage__factory,} from "../src-gen/types";
 import * as hre from "hardhat";
 import {ethers} from "hardhat";
 import {expect} from "chai";
@@ -71,7 +71,7 @@ describe("Storage", function () {
         const keys = await provider.send("parity_listStorageKeys", [
             storage.address, 5, null
         ]);
-        // after setting `a` and insert a value in the mapping there should be 4 storage keys
+        // after setting `a` and inserting a value in the mapping there should be 4 storage keys
         expect(keys.length).to.equal(4);
 
         const valuePos = ethers.BigNumber.from(keys[1]);

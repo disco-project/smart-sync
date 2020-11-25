@@ -3,6 +3,7 @@ logs
 *.log
 build
 dist
+src-gen
 node_modules/
 *.tsbuildinfo
 .env

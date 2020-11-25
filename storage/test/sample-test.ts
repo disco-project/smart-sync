@@ -1,6 +1,6 @@
 import {ethers} from "hardhat";
 import {expect} from "chai";
-import {Greeter, Greeter__factory,} from "../src/types";
+import {Greeter, Greeter__factory,} from "../src-gen/types";
 
 describe("Greeter", function () {
     let deployer;
