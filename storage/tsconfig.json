@@ -5,6 +5,7 @@
     "strict": true,
     "esModuleInterop": true,
     "noImplicitAny": false,
+    "strictPropertyInitialization": false,
     "outDir": "dist"
   },
   "include": ["./scripts", "./test", "./src"],
