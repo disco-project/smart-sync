@@ -73,11 +73,16 @@ describe("Storage", function () {
         ]);
         // after setting `a` and inserting a value in the mapping there should be 4 storage keys
         expect(keys.length).to.equal(4);
+        const storageKey = ethers.BigNumber.from(keys[1]);
 
-        const valuePos = ethers.BigNumber.from(keys[1]);
-        const slot = ethers.utils.hexZeroPad("0x03", 32);
+        // the `storageKey` of the `value` is the hash of the `key` of `value` in the mapping
+        // concatenated with the slot of the mapping in the contract: `keccak256(key . slot)`
+        const location = ethers.utils.hexConcat([
+            ethers.utils.hexZeroPad(deployer.address, 32), ethers.utils.hexZeroPad("0x03", 32),
+        ]);
+        expect(ethers.utils.keccak256(location)).to.equal(keys[1]);
 
-        const storedValue = await provider.getStorageAt(storage.address, valuePos);
+        const storedValue = await provider.getStorageAt(storage.address, storageKey);
         expect(ethers.BigNumber.from(storedValue).toNumber()).to.equal(value);
     })
 });
