@@ -16,6 +16,8 @@ interface = "all"
 apis = ["all"]
 hosts = ["all"]
 cors = ["all"]
+# necessary for EIP1186 eth_getProof
+experimental_rpcs = true
 
 [websockets]
 interface = "all"
