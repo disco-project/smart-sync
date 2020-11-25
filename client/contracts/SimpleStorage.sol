@@ -2,11 +2,11 @@
 pragma solidity ^0.7.0;
 
 contract SimpleStorage {
-    uint a = 1;
+    uint a;
     uint b = 42;
     address owner;
     mapping(address => uint) values;
-//    address owner2;
+
     constructor() {
         owner = msg.sender;
     }
