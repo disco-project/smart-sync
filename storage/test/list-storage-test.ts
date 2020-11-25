@@ -45,4 +45,39 @@ describe("Storage", function () {
         const bValue = await provider.getStorageAt(storage.address, bSlot);
         expect(bValue).to.equal(ethers.BigNumber.from(42));
     })
+
+    it("Should read correct storage after transactions", async function () {
+        const provider = new hre.ethers.providers.JsonRpcProvider();
+
+        // assign a value to `a`
+        const newValue = 1337;
+        expect(await storage.setA(newValue)).to.exist;
+        const keys = await provider.send("parity_listStorageKeys", [
+            storage.address, 5, null
+        ]);
+        // now there should be 3 storage keys
+        expect(keys.length).to.equal(3);
+
+        // `a` is the first field of the contract and its value is stored at slot 0
+        const aValue = await provider.getStorageAt(storage.address, 0);
+        expect(aValue).to.equal(ethers.BigNumber.from(newValue));
+    })
+
+    it("Should read correct mapping storage", async function () {
+        const provider = new hre.ethers.providers.JsonRpcProvider();
+
+        const value = 1000;
+        expect(await storage.setValue(value)).to.exist;
+        const keys = await provider.send("parity_listStorageKeys", [
+            storage.address, 5, null
+        ]);
+        // after setting `a` and insert a value in the mapping there should be 4 storage keys
+        expect(keys.length).to.equal(4);
+
+        const valuePos = ethers.BigNumber.from(keys[1]);
+        const slot = ethers.utils.hexZeroPad("0x03", 32);
+
+        const storedValue = await provider.getStorageAt(storage.address, valuePos);
+        expect(ethers.BigNumber.from(storedValue).toNumber()).to.equal(value);
+    })
 });
