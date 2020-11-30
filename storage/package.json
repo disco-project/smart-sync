@@ -10,9 +10,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@openzeppelin/contracts": "^3.3.0",
     "hardhat-typechain": "^0.3.3",
     "merkle-patricia-tree": "^4.0.0",
     "rlp": "^2.2.6",
+    "solidity-rlp": "^2.0.2",
     "ts-generator": "^0.1.1",
     "typechain": "^4.0.0"
   },
