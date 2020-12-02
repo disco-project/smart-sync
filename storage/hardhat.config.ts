@@ -29,5 +29,15 @@ export default {
     outDir: "src-gen/types",
     target: "ethers-v5",
   },
-  solidity: "0.7.3",
+  solidity: {
+    compilers: [
+      {
+        version: "0.5.5"
+      },
+      {
+        version: "0.7.0",
+        settings: { }
+      }
+    ]
+  }
 };
