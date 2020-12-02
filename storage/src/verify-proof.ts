@@ -3,6 +3,26 @@ import {ethers} from "ethers";
 import * as rlp from "rlp";
 import {BaseTrie as Trie} from "merkle-patricia-tree";
 
+
+export async function verifyStorageProof(storageProof: StorageProof, root) {
+    const storageTrieKey = hexStringToBuffer(ethers.utils.keccak256(ethers.utils.hexZeroPad(storageProof.key, 32)));
+    const storageTrieRoot = hexStringToBuffer(root);
+
+    const proofValue = await Trie.verifyProof(storageTrieRoot, storageTrieKey, format_proof_nodes(storageProof.proof));
+
+    if (proofValue === null) {
+        throw new Error(`Invalid storage proof: No storage value found for key: ${storageTrieKey.toString("hex")}`);
+    }
+
+    const val = storageProof.value === "0x0" ? Buffer.from([]) : hexStringToBuffer(ethers.BigNumber.from(storageProof.value).toHexString());
+    const rlpValue = rlp.encode(val);
+
+    if (!rlpValue.equals(proofValue)) {
+        throw new Error("Invalid storage proof");
+    }
+    return true;
+}
+
 /**
  * Verifies inclusion proofs
  * @param proof, the proof as returned by `eth_getProof`
@@ -36,20 +56,8 @@ export async function verify_eth_getProof(proof: GetProof, root: string | Buffer
     }
 
     for (let storageProof of proof.storageProof) {
-        const storageTrieKey = hexStringToBuffer(ethers.utils.keccak256(ethers.utils.hexZeroPad(storageProof.key, 32)));
-        const storageTrieRoot = hexStringToBuffer(proof.storageHash);
-
-        const val = storageProof.value === "0x0" ? Buffer.from([]) : hexStringToBuffer(ethers.BigNumber.from(storageProof.value).toHexString());
-        const rlpValue = rlp.encode(val);
-
-        const proofValue = await Trie.verifyProof(storageTrieRoot, storageTrieKey, format_proof_nodes(storageProof.proof));
-
-        if (proofValue === null) {
-            throw new Error(`Invalid storage proof: No storage value found for key: ${storageTrieKey.toString("hex")}`);
-        }
-
-        if (!rlpValue.equals(proofValue)) {
-            throw new Error("Invalid storage proof");
+        if (!await verifyStorageProof(storageProof, proof.storageHash)) {
+            return false;
         }
     }
     return true;
