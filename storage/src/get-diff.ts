@@ -1,6 +1,6 @@
 import {ethers} from "hardhat";
 import assert from "assert";
-import {toParityQuantity} from "./utils";
+import {getAllKeys, toParityQuantity} from "./utils";
 
 export class StorageDiffer {
     /**
@@ -67,8 +67,8 @@ export class StorageDiffer {
         srcBlock = toParityQuantity(srcBlock);
         targetBlock = toParityQuantity(targetBlock);
 
-        let toKeys = await this.getAllKeys(targetAddress, targetBlock);
-        let fromKeys = await this.getAllKeys(srcAddress, srcBlock);
+        let toKeys = await getAllKeys(targetAddress, this.targetProvider, targetBlock, this.batchSize);
+        let fromKeys = await getAllKeys(srcAddress, this.srcProvider, srcBlock, this.batchSize);
 
         const diffs: StorageKeyDiff[] = [];
 
@@ -95,29 +95,6 @@ export class StorageDiffer {
             diffs.push(new Remove(key, await this.srcProvider.getStorageAt(srcAddress, key, srcBlock)))
         }
         return new StorageDiff(diffs);
-    }
-
-    /**
-     *
-     * @param address the address of the contract
-     * @param blockNum the block number to retrieve the storage keys from
-     * @returns all the storage keys of the contract with `address` at block `blockNum`
-     */
-    async getAllKeys(address, blockNum) {
-        let keys = [];
-        let batch = [];
-        let batchCounter = 1;
-
-        do {
-            let offset = (batchCounter > 1) ? keys[keys.length - 1] : null;
-
-            batch = await this.srcProvider.send("parity_listStorageKeys", [
-                address, this.batchSize * batchCounter, offset, blockNum
-            ]);
-            keys.push(...batch);
-            batchCounter += 1;
-        } while (batch.length >= this.batchSize);
-        return keys;
     }
 }
 
