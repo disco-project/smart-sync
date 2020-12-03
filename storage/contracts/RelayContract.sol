@@ -37,6 +37,7 @@ contract RelayContract {
     mapping(uint256 => BlockInfo) public blocks;
 
     constructor(uint256 _blockHash, address _origin, bytes32 _stateRoot, bytes32 _storageRoot) public {
+        // TODO insert adjusted stateroot?
         BlockInfo storage info = blocks[_blockHash];
         info.stateRoot = _stateRoot;
         info.storageRoot = _storageRoot;
@@ -71,16 +72,17 @@ contract RelayContract {
 
     /**
     * @dev verifies that The provided `storageRoot` is included in the merkle trie
-    * @param storageRoot The terminating value in the proof
+    * @param rlpAccount The terminating value in the proof
     * @param blockHash the hash of the block of the source chain to proof against
     * @param encodedPath The path in the trie leading to the `origin`'s `storageRoot`
     * @param rlpParentNodes The rlp encoded stack of nodes.
     * @return true if the proof wis valid, false otherwise
     */
-    function verifyAccountProof(bytes memory storageRoot, uint256 blockHash, bytes memory encodedPath, bytes memory rlpParentNodes) public view returns (bool) {
+    // TODO adjust rlpAccount?
+    function verifyAccountProof(bytes memory rlpAccount, uint256 blockHash, bytes memory encodedPath, bytes memory rlpParentNodes) public view returns (bool) {
 
         return MerklePatriciaProof.verify(
-            storageRoot,
+            rlpAccount,
             encodedPath,
             rlpParentNodes,
             blocks[blockHash].stateRoot
