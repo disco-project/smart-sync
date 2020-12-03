@@ -72,8 +72,12 @@ contract ProxyContract {
     * @param encodedAccountPath The path in the account proof leading to the new storageRoot
     * @param rlpAccountNodes The rlp encoded stack of account nodes
     */
-    function canUpdateState(bytes memory storageProof, bytes memory encodedKeyPath, uint256 blockHash, bytes memory storageRoot, bytes memory encodedAccountPath, bytes memory rlpAccountNodes) public view returns (bool) {
+    function canUpdateState(bytes memory storageProof, bytes memory encodedKeyPath, uint256 blockHash, bytes memory storageRoot, bytes memory encodedAccountPath, bytes memory rlpAccountNodes) public returns (bool) {
+
         require(getRelay().verifyAccountProof(storageRoot, blockHash, encodedAccountPath, rlpAccountNodes), "Could not verify account proof");
+
+        // check storage proof: validate that the `storageProof` is part of the storageRoot
+
 
         return false;
     }

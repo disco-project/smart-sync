@@ -2,8 +2,12 @@
 pragma solidity >=0.5.0 <0.8.0;
 
 import "solidity-rlp/contracts/RLPReader.sol";
+import "hardhat/console.sol";
 
 library MerklePatriciaProof {
+
+    event ReturnValue(string msg, uint num, bytes currentNode, bytes32 nodekey);
+
     /*
     * @dev Verifies a merkle patricia proof.
     * @param value The terminating value in the trie.
@@ -12,24 +16,29 @@ library MerklePatriciaProof {
     * @param root The root hash of the trie.
     * @return The boolean validity of the proof.
     */
-    function verify(bytes memory value, bytes memory encodedPath, bytes memory rlpParentNodes, bytes32 root) internal pure returns (bool) {
+    function verify(bytes memory value, bytes memory encodedPath, bytes memory rlpParentNodes, bytes32 root) internal returns (bool) {
         RLPReader.RLPItem memory item = RLPReader.toRlpItem(rlpParentNodes);
         RLPReader.RLPItem[] memory parentNodes = RLPReader.toList(item);
-
         bytes memory currentNode;
         RLPReader.RLPItem[] memory currentNodeList;
 
+        // stateRoot
         bytes32 nodeKey = root;
         uint pathPtr = 0;
 
         bytes memory path = _getNibbleArray(encodedPath);
-        if (path.length == 0) {return false;}
+        emit ReturnValue("rootkey", 0, path, nodeKey);
+        if (path.length == 0) {
+//            emit ReturnValue("path.length == 0", 0);
+            return false;
+        }
 
         for (uint i = 0; i < parentNodes.length; i++) {
             if (pathPtr > path.length) {return false;}
-
             currentNode = RLPReader.toRlpBytes(parentNodes[i]);
-            if (nodeKey != keccak256(currentNode)) {return false;}
+            if (nodeKey != keccak256(currentNode)) {
+                emit ReturnValue("nodeKey != keccak256(currentNode)", i, currentNode, nodeKey);
+                return false;}
             currentNodeList = RLPReader.toList(parentNodes[i]);
 
             if (currentNodeList.length == 17) {
@@ -37,6 +46,7 @@ library MerklePatriciaProof {
                     if (keccak256(RLPReader.toBytes(currentNodeList[16])) == keccak256(value)) {
                         return true;
                     } else {
+                        emit ReturnValue("keccak256(RLPReader.toBytes(currentNodeList[16])) != keccak256(value)", i, currentNode, nodeKey);
                         return false;
                     }
                 }

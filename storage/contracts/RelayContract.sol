@@ -2,8 +2,12 @@
 pragma solidity >=0.5.0 <0.8.0;
 
 import "./MerklePatriciaProof.sol";
+import "solidity-rlp/contracts/RLPReader.sol";
 
 contract RelayContract {
+    using RLPReader for RLPReader.RLPItem;
+    using RLPReader for RLPReader.Iterator;
+    using RLPReader for bytes;
 
     // TODO store the whole account instead?
     struct BlockInfo {
@@ -79,7 +83,7 @@ contract RelayContract {
     * @return true if the proof wis valid, false otherwise
     */
     // TODO adjust rlpAccount?
-    function verifyAccountProof(bytes memory rlpAccount, uint256 blockHash, bytes memory encodedPath, bytes memory rlpParentNodes) public view returns (bool) {
+    function verifyAccountProof(bytes memory rlpAccount, uint256 blockHash, bytes memory encodedPath, bytes memory rlpParentNodes) public returns (bool) {
 
         return MerklePatriciaProof.verify(
             rlpAccount,
@@ -87,5 +91,46 @@ contract RelayContract {
             rlpParentNodes,
             blocks[blockHash].stateRoot
         );
+    }
+
+    function verify(bytes memory value, bytes memory encodedPath, bytes memory rlpParentNodes, bytes32 root) public returns (bool) {
+        return MerklePatriciaProof.verify(
+            value,
+            encodedPath,
+            rlpParentNodes,
+            root
+        );
+    }
+
+
+    function parseAccount(bytes memory rlpAccount) public pure returns (bytes32 nonce, bytes32 balance, bytes32 storageHash, bytes32 codeHash) {
+        RLPReader.Iterator memory it =
+        rlpAccount.toRlpItem().iterator();
+
+        uint idx;
+        while (it.hasNext()) {
+            if (idx == 0) {
+                nonce = bytes32(it.next().toUint());
+            } else if (idx == 1) {
+                balance = bytes32(it.next().toUint());
+            } else if (idx == 2) {
+                storageHash = bytes32(it.next().toUint());
+            }  else if (idx == 3) {
+                codeHash = bytes32(it.next().toUint());
+            } else {
+                it.next();
+            }
+            idx++;
+        }
+        return (nonce, balance, storageHash, codeHash);
+    }
+
+
+    function getStateRoot(uint256 _blockHash) public view returns (bytes32) {
+        return blocks[_blockHash].stateRoot;
+    }
+
+    function getStorageRoot(uint256 _blockHash) public view returns (bytes32) {
+        return blocks[_blockHash].storageRoot;
     }
 }
