@@ -71,7 +71,7 @@ export function format_proof_nodes(proof: string[]): Proof {
     return proof.map(hexStringToBuffer);
 }
 
-function encodeAccount(element: Account): Buffer {
+export function encodeAccount(element: Account): Buffer {
     const keys = [
         // nonce and balance are returned as integer
         ethers.BigNumber.from(element.nonce).toNumber(),
@@ -92,7 +92,7 @@ function encodeStringObject(element): Buffer {
  * Leading `0x` is stripped
  * @param hexString
  */
-function hexStringToBuffer(hexString: string): Buffer {
+export function hexStringToBuffer(hexString: string): Buffer {
     if (ethers.utils.isHexString(hexString)) {
         hexString = hexString.substring(2);
     }
