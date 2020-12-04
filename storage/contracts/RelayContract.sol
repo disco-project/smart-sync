@@ -93,7 +93,7 @@ contract RelayContract {
         );
     }
 
-    function verify(bytes memory value, bytes memory encodedPath, bytes memory rlpParentNodes, bytes32 root) public returns (bool) {
+    function verify(bytes memory value, bytes memory encodedPath, bytes memory rlpParentNodes, bytes32 root) public pure returns (bool) {
         return MerklePatriciaProof.verify(
             value,
             encodedPath,

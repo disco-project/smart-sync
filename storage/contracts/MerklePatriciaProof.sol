@@ -16,7 +16,7 @@ library MerklePatriciaProof {
     * @param root The root hash of the trie.
     * @return The boolean validity of the proof.
     */
-    function verify(bytes memory value, bytes memory encodedPath, bytes memory rlpParentNodes, bytes32 root) internal returns (bool) {
+    function verify(bytes memory value, bytes memory encodedPath, bytes memory rlpParentNodes, bytes32 root) internal pure returns (bool) {
         RLPReader.RLPItem memory item = RLPReader.toRlpItem(rlpParentNodes);
         RLPReader.RLPItem[] memory parentNodes = RLPReader.toList(item);
         bytes memory currentNode;
@@ -27,7 +27,7 @@ library MerklePatriciaProof {
         uint pathPtr = 0;
 
         bytes memory path = _getNibbleArray(encodedPath);
-        emit ReturnValue("rootkey", 0, path, nodeKey);
+//        emit ReturnValue("rootkey", 0, path, nodeKey);
         if (path.length == 0) {
 //            emit ReturnValue("path.length == 0", 0);
             return false;
@@ -37,7 +37,7 @@ library MerklePatriciaProof {
             if (pathPtr > path.length) {return false;}
             currentNode = RLPReader.toRlpBytes(parentNodes[i]);
             if (nodeKey != keccak256(currentNode)) {
-                emit ReturnValue("nodeKey != keccak256(currentNode)", i, currentNode, nodeKey);
+//                emit ReturnValue("nodeKey != keccak256(currentNode)", i, currentNode, nodeKey);
                 return false;}
             currentNodeList = RLPReader.toList(parentNodes[i]);
 
@@ -46,7 +46,7 @@ library MerklePatriciaProof {
                     if (keccak256(RLPReader.toBytes(currentNodeList[16])) == keccak256(value)) {
                         return true;
                     } else {
-                        emit ReturnValue("keccak256(RLPReader.toBytes(currentNodeList[16])) != keccak256(value)", i, currentNode, nodeKey);
+//                        emit ReturnValue("keccak256(RLPReader.toBytes(currentNodeList[16])) != keccak256(value)", i, currentNode, nodeKey);
                         return false;
                     }
                 }
