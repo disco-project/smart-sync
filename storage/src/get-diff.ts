@@ -7,12 +7,12 @@ export class StorageDiffer {
      * The provider used to access the source chain
      * @private
      */
-    private srcProvider;
+    private readonly srcProvider;
     /**
      * The provider used to access the target chain
      * @private
      */
-    private targetProvider;
+    private readonly targetProvider;
     /**
      * How many keys to retrieve at once
      * @See [`eth_getProof`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1186.md)
