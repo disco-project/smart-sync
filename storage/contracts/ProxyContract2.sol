@@ -4,7 +4,7 @@ pragma solidity >=0.5.0 <0.8.0;
 import "./RelayContract.sol";
 import "solidity-rlp/contracts/RLPReader.sol";
 
-contract ProxyContract {
+contract ProxyContract2 {
     using RLPReader for RLPReader.RLPItem;
     using RLPReader for RLPReader.Iterator;
     using RLPReader for bytes;

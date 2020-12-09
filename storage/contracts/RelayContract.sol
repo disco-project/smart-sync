@@ -2,6 +2,7 @@
 pragma solidity >=0.5.0 <0.8.0;
 
 import "./MerklePatriciaProof.sol";
+import "./GetProofLib.sol";
 import "solidity-rlp/contracts/RLPReader.sol";
 
 contract RelayContract {
@@ -115,7 +116,7 @@ contract RelayContract {
                 balance = bytes32(it.next().toUint());
             } else if (idx == 2) {
                 storageHash = bytes32(it.next().toUint());
-            }  else if (idx == 3) {
+            } else if (idx == 3) {
                 codeHash = bytes32(it.next().toUint());
             } else {
                 it.next();
@@ -132,5 +133,24 @@ contract RelayContract {
 
     function getStorageRoot(uint256 _blockHash) public view returns (bytes32) {
         return blocks[_blockHash].storageRoot;
+    }
+
+    function getSource() public view returns (address) {
+        return origin;
+    }
+
+    function parseProofTest(bytes memory rlpProof) public view returns (bytes memory account, bytes memory accountProof, bytes memory storageProof) {
+        (account, accountProof, storageProof) = GetProofLib.parseProofTest(rlpProof);
+    }
+
+    function verifyEthGetProof(bytes memory rlpProof) public view returns (bool) {
+        bytes32 root = getStateRoot(currentBlockHash);
+        bytes memory path = GetProofLib.encodedAddress(getSource());
+        GetProofLib.GetProof memory getProof = GetProofLib.parseProof(rlpProof);
+        return GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root);
+    }
+
+    function verifyStorageProof(bytes memory rlpProof, bytes32 storageHash) public pure returns (bool) {
+        return GetProofLib.verifyStorageProof(rlpProof, storageHash);
     }
 }

@@ -27,9 +27,7 @@ library MerklePatriciaProof {
         uint pathPtr = 0;
 
         bytes memory path = _getNibbleArray(encodedPath);
-//        emit ReturnValue("rootkey", 0, path, nodeKey);
         if (path.length == 0) {
-//            emit ReturnValue("path.length == 0", 0);
             return false;
         }
 
@@ -37,7 +35,6 @@ library MerklePatriciaProof {
             if (pathPtr > path.length) {return false;}
             currentNode = RLPReader.toRlpBytes(parentNodes[i]);
             if (nodeKey != keccak256(currentNode)) {
-//                emit ReturnValue("nodeKey != keccak256(currentNode)", i, currentNode, nodeKey);
                 return false;}
             currentNodeList = RLPReader.toList(parentNodes[i]);
 
@@ -46,7 +43,6 @@ library MerklePatriciaProof {
                     if (keccak256(RLPReader.toBytes(currentNodeList[16])) == keccak256(value)) {
                         return true;
                     } else {
-//                        emit ReturnValue("keccak256(RLPReader.toBytes(currentNodeList[16])) != keccak256(value)", i, currentNode, nodeKey);
                         return false;
                     }
                 }
