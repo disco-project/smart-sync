@@ -7,15 +7,20 @@ export async function verify() {
 
 }
 
+/**
+ * Prepares the Merkle proof payload for on chain verification
+ * @param proof [`eth_getProof`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1186.md)
+ * @param stateRoot The state root of the block
+ */
 export async function buildAccountProof(proof: GetProof, stateRoot): Promise<MerkleProof> {
     await verify_eth_getProof(proof, stateRoot);
     const accountProofNodes = format_proof_nodes(proof.accountProof);
-    let trie = new Trie(null, hexStringToBuffer(stateRoot));
+    const trie = new Trie(null, hexStringToBuffer(stateRoot));
     const accountTrie = await Trie.fromProof(accountProofNodes, trie);
-    let accountKey = hexStringToBuffer(ethers.utils.keccak256(proof.address));
+    const accountKey = hexStringToBuffer(ethers.utils.keccak256(proof.address));
     const path = await accountTrie.findPath(accountKey) as any;
-    let parentNodes = formatPathStack(path);
-    let value = rlp.decode(path.node.value);
+    const parentNodes = formatPathStack(path);
+    const value = rlp.decode(path.node.value);
 
     return {
         value: '0x' + rlp.encode(value).toString('hex'),
@@ -26,20 +31,16 @@ export async function buildAccountProof(proof: GetProof, stateRoot): Promise<Mer
 }
 
 interface MerkleProof {
+    // The value inside the trie
     value,
+    // The HP encoded path leading to the value
     encodedPath,
+    // The rlp encoded stack of nodes
     parentNodes,
+    // The root hash of the trie
     root
 }
 
 export function formatPathStack(path) {
     return path.stack.map(node => node.raw())
-}
-
-var rawStack = (input) => {
-    let output:any[] = []
-    for (var i = 0; i < input.length; i++) {
-        output.push(input[i].raw())
-    }
-    return output
 }

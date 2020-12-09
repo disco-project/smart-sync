@@ -1,11 +1,23 @@
 import {ethers} from "ethers";
+import * as rlp from "rlp";
 
 export function toParityQuantity(val) {
     const tags = ["latest", "earliest", "pending"];
-    if(tags.indexOf(val) > -1) {
+    if (tags.indexOf(val) > -1) {
         return val;
     }
     return ethers.BigNumber.from(val).toHexString();
+}
+
+export function encode(input) {
+    return (input === '0x0')
+        ? rlp.encode(Buffer.alloc(0))
+        : rlp.encode(input)
+}
+
+export function hexlify(input) {
+    const val = ethers.utils.hexlify(input);
+    return (val === '0x') ? "0x0" : val;
 }
 
 /**
