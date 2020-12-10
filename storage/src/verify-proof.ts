@@ -192,7 +192,7 @@ export class GetProof implements IGetProof {
         const account = encodeAccount(this.account());
         const accountNodes = await this.encodeParentNodes(stateRoot);
         const storage = await Promise.all(this.storageProof.map(
-             (p) => {
+            (p) => {
                 return encodeStorageProof(p, this.storageHash);
             }));
         return utils.encode(

@@ -1,7 +1,6 @@
-
 export const PROXY_CONTRACT_NAME = "ProxyContract";
 
-export const PROXY_CONTRACT_FILE_NAME = PROXY_CONTRACT_NAME+ ".sol";
+export const PROXY_CONTRACT_FILE_NAME = PROXY_CONTRACT_NAME + ".sol";
 
 /**
  * The placeholder address used in the `ProxyContract.sol` for the relay contract

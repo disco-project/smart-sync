@@ -1,14 +1,12 @@
 import {RelayContract__factory, SyncCandidate, SyncCandidate__factory,} from "../src-gen/types";
 import {ethers} from "hardhat";
 import {expect} from "chai";
-import {encodeStorageProof, GetProof, hexStringToBuffer, testStorageProof} from "../src/verify-proof";
+import {encodeStorageProof, GetProof} from "../src/verify-proof";
 import {getAllKeys} from "../src/utils";
 import {StorageDiffer} from "../src/get-diff";
 import {buildAccountProof} from "../src/build-proof";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
-import * as rlp from "rlp";
-import * as utils from "../src/utils";
 
 describe("Deploy proxy and logic contract", async function () {
     let deployer;

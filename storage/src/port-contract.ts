@@ -1,7 +1,4 @@
-import {ethers} from "hardhat";
-
-
-async function createByteCode(srcAddress, provider){
+async function createByteCode(srcAddress, provider) {
     const code = await provider.getCode(srcAddress);
     // TODO adjust preamble etc see verismart
 }
@@ -14,6 +11,6 @@ async function createByteCode(srcAddress, provider){
  * @param block the number of the block from which the port should take place
  */
 export async function portContract(srcAddress, provider, factory, block = "latest") {
-     //  TODO
+    //  TODO
 
 }

@@ -2,7 +2,8 @@ import {getAllKeys} from "./utils";
 import {promises as fs, readFileSync} from 'fs';
 import {
     LOGIC_CONTRACT_PLACEHOLDER_ADDRESS,
-    PROXY_CONTRACT_FILE_NAME, PROXY_CONTRACT_NAME,
+    PROXY_CONTRACT_FILE_NAME,
+    PROXY_CONTRACT_NAME,
     RELAY_CONTRACT_PLACEHOLDER_ADDRESS
 } from "./config";
 import {ethers} from "ethers";
