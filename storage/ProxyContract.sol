@@ -10,13 +10,6 @@ contract ProxyContract {
     using RLPReader for RLPReader.Iterator;
     using RLPReader for bytes;
 
-    struct StorageEntry {
-        // storage key
-        bytes32 key;
-        // storage value
-        bytes32 value;
-    }
-
     /**
     * @dev address of the deployed relay contract.
     * The address in the file is a placeholder
@@ -62,7 +55,7 @@ contract ProxyContract {
 
 
     /**
-    * @dev Use to access the Relay's abi
+    * @dev Used to access the Relay's abi
     */
     function getRelay() internal view returns (RelayContract) {
         return RelayContract(RELAY_ADDRESS);
@@ -70,6 +63,8 @@ contract ProxyContract {
 
     /**
     * @dev Sets the contract's storage based on the encoded storage
+    * @param rlpStorage the rlp encoded list of storageproofs
+    * @param storageHash the hash of the contract's storage
     */
     function setStorage(bytes memory rlpStorage, bytes32 storageHash) internal {
         RLPReader.Iterator memory it =
@@ -96,6 +91,65 @@ contract ProxyContract {
             }
 
             idx++;
+        }
+    }
+
+    function _beforeFallback() internal {
+        bytes32 t1 = bytes32(uint256(123));
+        int32 val = -1;
+        assembly {
+            let p := add(msize(), 0x20)
+            mstore(p, t1)
+            log0(p, 0x20)
+            val := mload(msize())
+        }
+        if (val == 0)
+            revert();
+    }
+
+
+    /**
+     * @dev Delegates the current call to the address returned by `_implementation()`.
+     *
+     * This function does not return to its internall call site, it will return directly to the external caller.
+     */
+    function _fallback() internal {
+        _beforeFallback();
+        _delegateLogic();
+    }
+
+    /**
+     * @dev Fallback function that delegates calls to the address returned by `_implementation()`. Will run if no other
+     * function in the contract matches the call data.
+     */
+    fallback () external payable {
+        _fallback();
+    }
+
+    /**
+    * @dev Delegates the current call to `implementation`.
+    *
+    * This function does not return to its internal call site, it will return directly to the external caller.
+    */
+    function _delegateLogic() internal {
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+        // Copy msg.data. We take full control of memory in this inline assembly
+        // block because it will not return to Solidity code. We overwrite the
+        // Solidity scratch pad at memory position 0.
+            calldatacopy(0, 0, calldatasize())
+
+        // Call the implementation.
+        // out and outsize are 0 because we don't know the size yet.
+            let result := delegatecall(gas(), LOGIC_ADDRESS, 0, calldatasize(), 0, 0)
+
+        // Copy the returned data.
+            returndatacopy(0, 0, returndatasize())
+
+            switch result
+            // delegatecall returns 0 on error.
+            case 0 {revert(0, returndatasize())}
+            default {return (0, returndatasize())}
         }
     }
 }
