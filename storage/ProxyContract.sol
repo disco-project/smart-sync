@@ -22,11 +22,15 @@ contract ProxyContract {
     address internal constant LOGIC_ADDRESS = 0x0a911618A3dD806a5D14bf856cf355C4b9C84526;
 
     /**
-    * @dev initialized the storage this contract based on the provided proof.
-    * @param proof The rlpencoded EIP1186 proof
-    * @param blockHash The blockhash of the source chain
+    * @dev initialize the storage of this contract based on the provided proof.
+    * @param proof The rlp encoded EIP1186 proof
+    * @param blockHash The blockhash of the source chain the proof represents the state of
     */
     constructor(bytes memory proof, uint256 blockHash) public {
+        updateStorage(proof, blockHash);
+    }
+
+    function updateStorage(bytes memory proof, uint256 blockHash) public {
         RelayContract relay = getRelay();
         bytes32 root = relay.getStateRoot(blockHash);
         bytes memory path = GetProofLib.encodedAddress(relay.getSource());
@@ -36,21 +40,13 @@ contract ProxyContract {
 
         GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
 
+//        bytes32 storageRoot = relay.getStorageRoot(blockHash);
+//        require(account.storageHash == storageRoot, "Storage root mismatch");
+
         setStorage(getProof.storageProofs, account.storageHash);
-    }
 
-    /**
-    * @dev verifies that all the proofs are valid and it's safe to update the state of the logic contract
-    * @param storageProof rlp encoded `StorageProof`
-    * @param encodedKeyPath The path in the storage merkle trie leading to the key's new value
-    * @param blockHash the hash of the block from the source chain to sync
-    * @param storageRoot The storage root of the source contract to be synchronized
-    * @param encodedAccountPath The path in the account proof leading to the new storageRoot
-    * @param rlpAccountNodes The rlp encoded stack of account nodes
-    */
-    function canUpdateState(bytes memory storageProof, bytes memory encodedKeyPath, uint256 blockHash, bytes memory storageRoot, bytes memory encodedAccountPath, bytes memory rlpAccountNodes) public view returns (bool) {
-
-        return false;
+        // update the state in the relay
+        relay.setCurrentStateBlock(blockHash);
     }
 
 
@@ -69,11 +65,12 @@ contract ProxyContract {
     function setStorage(bytes memory rlpStorage, bytes32 storageHash) internal {
         RLPReader.Iterator memory it =
         rlpStorage.toRlpItem().iterator();
-        uint idx;
+
         while (it.hasNext()) {
             // parse the rlp encoded storage proof
             GetProofLib.StorageProof memory proof = GetProofLib.parseStorageProof(it.next().toBytes());
 
+            // get the path in the trie leading to the value
             bytes memory path = GetProofLib.triePath(abi.encodePacked(proof.key));
 
             // verify the storage proof
@@ -89,14 +86,12 @@ contract ProxyContract {
             assembly {
                 sstore(slot, value)
             }
-
-            idx++;
         }
     }
 
     function _beforeFallback() internal {
         bytes32 t1 = bytes32(uint256(123));
-        int32 val = -1;
+        int32 val = - 1;
         assembly {
             let p := add(msize(), 0x20)
             mstore(p, t1)
@@ -122,7 +117,7 @@ contract ProxyContract {
      * @dev Fallback function that delegates calls to the address returned by `_implementation()`. Will run if no other
      * function in the contract matches the call data.
      */
-    fallback () external payable {
+    fallback() external payable {
         _fallback();
     }
 
