@@ -8,7 +8,7 @@ import {buildAccountProof} from "../src/build-proof";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import * as rlp from "rlp";
-import * as utils from"../src/utils";
+import * as utils from "../src/utils";
 
 describe("Deploy proxy and logic contract", async function () {
     let deployer;
@@ -60,7 +60,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         const rlpStorage = await encodeStorageProof(storage, proof.storageHash);
 
-        const resp  = await relayContract.verifyStorageProof(rlpStorage, proof.storageHash);
+        const resp = await relayContract.verifyStorageProof(rlpStorage, proof.storageHash);
 
         console.log("storage verified: ", resp);
     })
@@ -68,11 +68,16 @@ describe("Deploy proxy and logic contract", async function () {
     it("Should compile the proxy", async function () {
         const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, srcContract.address);
 
+        // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
 
         const proxyContract = await proxyFactory.deploy(encodedProof, latestBlock.hash);
 
-        console.log(proxyContract);
+        // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
+        const differ = new StorageDiffer(provider);
+        const diff = await differ.getDiff(srcContract.address, proxyContract.address);
+
+        expect(diff.isEmpty()).to.be.true;
     })
 
 
