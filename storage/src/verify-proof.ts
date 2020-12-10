@@ -191,7 +191,6 @@ export class GetProof implements IGetProof {
     async encoded(stateRoot): Promise<Buffer> {
         const account = encodeAccount(this.account());
         const accountNodes = await this.encodeParentNodes(stateRoot);
-        // TODO encode storageproof properly
         const storage = await Promise.all(this.storageProof.map(
              (p) => {
                 return encodeStorageProof(p, this.storageHash);
@@ -236,9 +235,9 @@ export async function encodeStorageProof(storageProof: StorageProof, storageRoot
     const storageKey = hexStringToBuffer(ethers.utils.keccak256(ethers.utils.hexZeroPad(storageProof.key, 32)));
     const path = await storageTrie.findPath(storageKey) as any;
     let parentNodes = formatPathStack(path);
-    const key = Buffer.from("00" + storageKey.toString("hex"), "hex");
+    // const key = Buffer.from("00" + storageKey.toString("hex"), "hex");
     const entries = [
-        key,
+        hexStringToBuffer(ethers.utils.hexZeroPad(storageProof.key, 32)),
         utils.encode(storageProof.value),
         rlp.encode(parentNodes),
     ];

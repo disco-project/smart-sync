@@ -57,15 +57,6 @@ describe("Deploy proxy and logic contract", async function () {
         expect(await relayContract.verifyEthGetProof(encodedProof)).to.be.true;
 
         const storage = proof.storageProof[0];
-        // const encodedStorage = encodeStorageProof(storage);
-        //
-        // const encodedNodes = await testStorageProof(storage, proof.storageHash);
-        //
-        // console.log(storage.value);
-        // const value = utils.encode(storage.value);
-        // const storageKey = hexStringToBuffer(ethers.utils.keccak256(ethers.utils.hexZeroPad(storage.key, 32)));
-        //
-        // const resp = await relayContract.verify(value, "0x00" + storageKey.toString("hex"), encodedNodes, proof.storageHash);
 
         const rlpStorage = await encodeStorageProof(storage, proof.storageHash);
 
@@ -74,15 +65,15 @@ describe("Deploy proxy and logic contract", async function () {
         console.log("storage verified: ", resp);
     })
 
-    // it("Should compile the proxy", async function () {
-    //     const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, srcContract.address);
-    //
-    //     const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
-    //
-    //     const proxyContract = await proxyFactory.deploy(encodedProof, latestBlock.hash);
-    //
-    //     console.log(proxyContract);
-    // })
+    it("Should compile the proxy", async function () {
+        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, srcContract.address);
+
+        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
+
+        const proxyContract = await proxyFactory.deploy(encodedProof, latestBlock.hash);
+
+        console.log(proxyContract);
+    })
 
 
 })

@@ -35,8 +35,10 @@ library GetProofLib {
 
     function verifyStorageProof(bytes memory rlpProof, bytes32 storageHash) internal pure returns (bool) {
         StorageProof memory proof = parseStorageProof(rlpProof);
+        bytes memory path = triePath(proof.key);
+
         return MerklePatriciaProof.verify(
-            proof.value, proof.key, proof.proof, storageHash
+            proof.value, path, proof.proof, storageHash
         );
     }
 
@@ -118,10 +120,13 @@ library GetProofLib {
     * @dev Encodes the address `_a` as path leading to its account in the state trie
     * @return path The path in the state trie leading to the account
     */
-    function encodedAddress(address _a) internal view returns (bytes memory path) {
+    function encodedAddress(address _a) internal pure returns (bytes memory) {
+        return triePath(abi.encodePacked(_a));
+    }
+
+    function triePath(bytes memory _key) internal pure returns (bytes memory path) {
         bytes memory hp = hex"00";
-        bytes memory key = abi.encodePacked(keccak256(abi.encodePacked(_a)));
+        bytes memory key = abi.encodePacked(keccak256(_key));
         path = abi.encodePacked(hp, key);
-        return path;
     }
 }
