@@ -22,7 +22,7 @@ library GetProofLib {
     }
 
     struct StorageProof {
-        bytes key;
+        bytes32 key;
         bytes value;
         bytes proof;
     }
@@ -35,7 +35,7 @@ library GetProofLib {
 
     function verifyStorageProof(bytes memory rlpProof, bytes32 storageHash) internal pure returns (bool) {
         StorageProof memory proof = parseStorageProof(rlpProof);
-        bytes memory path = triePath(proof.key);
+        bytes memory path = triePath(abi.encodePacked(proof.key));
 
         return MerklePatriciaProof.verify(
             proof.value, path, proof.proof, storageHash
@@ -49,7 +49,7 @@ library GetProofLib {
         uint idx;
         while (it.hasNext()) {
             if (idx == 0) {
-                proof.key = it.next().toBytes();
+                proof.key = bytes32(it.next().toUint());
             } else if (idx == 1) {
                 proof.value = it.next().toBytes();
             } else if (idx == 2) {

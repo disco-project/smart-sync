@@ -79,7 +79,7 @@ contract ProxyContract {
             // parse the rlp encoded storage proof
             GetProofLib.StorageProof memory proof = GetProofLib.parseStorageProof(it.next().toBytes());
 
-            bytes memory path = GetProofLib.triePath(proof.key);
+            bytes memory path = GetProofLib.triePath(abi.encodePacked(proof.key));
 
             // verify the storage proof
             require(MerklePatriciaProof.verify(
@@ -87,13 +87,15 @@ contract ProxyContract {
                 ), "Invalid storage proof");
 
             // decode the value
-            // abi.encodePacked(_data)
-//            assembly {
-//                sstore(slot, newImplementation)
-//            }
+            bytes32 value = bytes32(proof.value.toRlpItem().toUint());
+
+            // store the value in the right slot
+            bytes32 slot = proof.key;
+            assembly {
+                sstore(slot, value)
+            }
 
             idx++;
         }
-        // set the value to slot
     }
 }
