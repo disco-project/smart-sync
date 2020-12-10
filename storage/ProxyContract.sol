@@ -29,14 +29,16 @@ contract ProxyContract {
     constructor(bytes memory proof, uint256 blockHash) public {
         updateStorage(proof, blockHash);
     }
-
+    // 1. Account Proof: proof vom source block -> account
+    // 2. old contract state proof: current value -> current storage root (address -> storage)
+    // 3. New contract state proof: ein oder mehrere (key -> value) -> source storage root
     function updateStorage(bytes memory proof, uint256 blockHash) public {
         RelayContract relay = getRelay();
         bytes32 root = relay.getStateRoot(blockHash);
         bytes memory path = GetProofLib.encodedAddress(relay.getSource());
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
 
-        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the");
+        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
 
         GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
 
@@ -76,9 +78,9 @@ contract ProxyContract {
             // verify the storage proof
             require(MerklePatriciaProof.verify(
                     proof.value, path, proof.proof, storageHash
-                ), "Invalid storage proof");
+                ), "Failed to verify the storage proof");
 
-            // decode the value
+            // decode the rlp encoded value
             bytes32 value = bytes32(proof.value.toRlpItem().toUint());
 
             // store the value in the right slot

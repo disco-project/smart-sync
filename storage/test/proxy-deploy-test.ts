@@ -71,6 +71,8 @@ describe("Deploy proxy and logic contract", async function () {
 
         const proxyContract = await proxyFactory.deploy(encodedProof, latestBlock.hash);
 
+        // TODO vorhalten externen node(addresse)
+
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         const differ = new StorageDiffer(provider);
         const diff = await differ.getDiff(srcContract.address, proxyContract.address);

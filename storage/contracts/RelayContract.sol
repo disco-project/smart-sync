@@ -11,6 +11,7 @@ contract RelayContract {
     using RLPReader for bytes;
 
     // TODO store the whole account instead?
+    // getBlock
     struct BlockInfo {
         // The root of state trie of the block.
         bytes32 stateRoot;
@@ -30,6 +31,12 @@ contract RelayContract {
      * @dev The address of the original contract on the source chain
      */
     address origin;
+
+    // TODO mapping addresse -> storageroot
+
+    // require ender = key (mapping-> storagerot); sender?
+    function updateStorage() {
+    }
 
     /**
      * @dev The owner of this contract
