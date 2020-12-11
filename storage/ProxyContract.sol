@@ -16,7 +16,7 @@ contract ProxyContract {
     */
     address internal constant RELAY_ADDRESS = 0xeBf794b5Cf0217CB806f48d2217D3ceE1e25A7C3;
     /**
-    * @dev address of the deployed logic contract.
+    * @dev address of the contract that is being mirrored.
     * The address in the file is a placeholder
     */
     address internal constant LOGIC_ADDRESS = 0x0a911618A3dD806a5D14bf856cf355C4b9C84526;
@@ -32,6 +32,15 @@ contract ProxyContract {
     // 1. Account Proof: proof vom source block -> account
     // 2. old contract state proof: current value -> current storage root (address -> storage)
     // 3. New contract state proof: ein oder mehrere (key -> value) -> source storage root
+
+    /**
+    * @dev Several steps happen before a storage update takes place:
+    * First verify that the provided proof was obtained for the account on the source chain (account proof)
+    * Secondly verify that the current value is part of the current storage root (old contract state proof)
+    * Third step is verifying the provided storage proofs provided in the `proof` (new contract state proof)
+    * @param proof The rlp encoded EIP1186 proof
+    * @param the hash of the block that contains the state of source contract we're trying to update to
+    */
     function updateStorage(bytes memory proof, uint256 blockHash) public {
         RelayContract relay = getRelay();
         bytes32 root = relay.getStateRoot(blockHash);
