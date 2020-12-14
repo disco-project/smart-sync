@@ -43,10 +43,11 @@ contract ProxyContract {
     */
     function updateStorage(bytes memory proof, uint256 blockHash) public {
         RelayContract relay = getRelay();
+        // get the state root of the at the provided block
         bytes32 root = relay.getStateRoot(blockHash);
-        bytes memory path = GetProofLib.encodedAddress(relay.getSource());
+        // validate that the proof was obtained for the logic contract and the account's storage is part of the block with `blockHash`
+        bytes memory path = GetProofLib.encodedAddress(LOGIC_ADDRESS);
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
-
         require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
 
         GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
@@ -54,6 +55,7 @@ contract ProxyContract {
 //        bytes32 storageRoot = relay.getStorageRoot(blockHash);
 //        require(account.storageHash == storageRoot, "Storage root mismatch");
 
+        // update the storage or revert on error
         setStorage(getProof.storageProofs, account.storageHash);
 
         // update the state in the relay
@@ -66,6 +68,13 @@ contract ProxyContract {
     */
     function getRelay() internal view returns (RelayContract) {
         return RelayContract(RELAY_ADDRESS);
+    }
+
+    /**
+    * @dev Validate that the key is part of the logic's storage
+    */
+    function oldContractStateProof() internal view {
+
     }
 
     /**

@@ -10,6 +10,15 @@ contract RelayContract {
     using RLPReader for RLPReader.Iterator;
     using RLPReader for bytes;
 
+    modifier isProxyFor(address _logic)
+    {
+//        require(
+//            msg.sender == _proxy,
+//            "Sender not authorized."
+//        );
+        _;
+    }
+
     // TODO store the whole account instead?
     // getBlock
     struct BlockInfo {
@@ -32,10 +41,17 @@ contract RelayContract {
      */
     address origin;
 
+
     // TODO mapping addresse -> storageroot
+    /**
+     * @dev mapping of the addresses to the storage roots
+     */
+    mapping(address => bytes32) logicStates;
+
 
     // require ender = key (mapping-> storagerot); sender?
-    function updateStorage() {
+    function updateStorage(address logicAddress) public isProxyFor(logicAddress) {
+
     }
 
     /**
