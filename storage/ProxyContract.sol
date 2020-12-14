@@ -19,7 +19,7 @@ contract ProxyContract {
     * @dev address of the contract that is being mirrored.
     * The address in the file is a placeholder
     */
-    address internal constant LOGIC_ADDRESS = 0x0a911618A3dD806a5D14bf856cf355C4b9C84526;
+    address internal constant SOURCE_ADDRESS = 0x0a911618A3dD806a5D14bf856cf355C4b9C84526;
 
     /**
     * @dev initialize the storage of this contract based on the provided proof.
@@ -45,8 +45,8 @@ contract ProxyContract {
         RelayContract relay = getRelay();
         // get the state root of the at the provided block
         bytes32 root = relay.getStateRoot(blockHash);
-        // validate that the proof was obtained for the logic contract and the account's storage is part of the block with `blockHash`
-        bytes memory path = GetProofLib.encodedAddress(LOGIC_ADDRESS);
+        // validate that the proof was obtained for the source contract and the account's storage is part of the block with `blockHash`
+        bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
         require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
 
@@ -56,7 +56,7 @@ contract ProxyContract {
 //        require(account.storageHash == storageRoot, "Storage root mismatch");
 
         // update the storage or revert on error
-        setStorage(getProof.storageProofs, account.storageHash);
+        updateStorageKeys(getProof.storageProofs, account.storageHash);
 
         // update the state in the relay
         relay.setCurrentStateBlock(blockHash);
@@ -71,10 +71,37 @@ contract ProxyContract {
     }
 
     /**
-    * @dev Validate that the key is part of the logic's storage
+    * @dev Validate that the key is part of the source contract's storage
     */
-    function oldContractStateProof() internal view {
+    function oldContractStateProof(bytes32 key) internal view {
+        // TODO
+    }
 
+    /**
+    * @dev Update a single storage key
+    */
+    function updateStorageKey(bytes memory rlpStorageKeyProof, bytes32 storageHash) internal {
+        RLPReader.RLPItem memory it = rlpStorageKeyProof.toRlpItem();
+
+        // parse the rlp encoded storage proof
+        GetProofLib.StorageProof memory proof = GetProofLib.parseStorageProof(it.toBytes());
+
+        // get the path in the trie leading to the value
+        bytes memory path = GetProofLib.triePath(abi.encodePacked(proof.key));
+
+        // verify the storage proof
+        require(MerklePatriciaProof.verify(
+                proof.value, path, proof.proof, storageHash
+            ), "Failed to verify the storage proof");
+
+        // decode the rlp encoded value
+        bytes32 value = bytes32(proof.value.toRlpItem().toUint());
+
+        // store the value in the right slot
+        bytes32 slot = proof.key;
+        assembly {
+            sstore(slot, value)
+        }
     }
 
     /**
@@ -82,9 +109,9 @@ contract ProxyContract {
     * @param rlpStorage the rlp encoded list of storageproofs
     * @param storageHash the hash of the contract's storage
     */
-    function setStorage(bytes memory rlpStorage, bytes32 storageHash) internal {
+    function updateStorageKeys(bytes memory rlpStorageKeyProofs, bytes32 storageHash) internal {
         RLPReader.Iterator memory it =
-        rlpStorage.toRlpItem().iterator();
+        rlpStorageKeyProofs.toRlpItem().iterator();
 
         while (it.hasNext()) {
             // parse the rlp encoded storage proof
