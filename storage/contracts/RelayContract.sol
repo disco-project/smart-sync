@@ -18,10 +18,10 @@ contract RelayContract {
     modifier isProxyFor(address _logic)
     {
         // TODO is modifier even required when we insert storage root by msg.sender?
-//        require(
-//            msg.sender == _proxy,
-//            "Not authorized."
-//        );
+        //        require(
+        //            msg.sender == _proxy,
+        //            "Not authorized."
+        //        );
         _;
     }
 
@@ -32,7 +32,8 @@ contract RelayContract {
         bytes32 stateRoot;
         // The storage Root of the account.
         bytes32 storageRoot;
-
+        // The number of this block
+        uint256 blockNumber;
         //         // The account's nonce.
         //        bytes32 nonce;
     }
@@ -49,12 +50,12 @@ contract RelayContract {
     mapping(address => BlockInfo) sourceStates;
 
     // alternatively track by block?
-//    mapping(address => mapping(address => BlockInfo)) sourceStates;
+    //    mapping(address => mapping(address => BlockInfo)) sourceStates;
 
     /**
      * @dev Called by the proxy to update its state
      */
-    function updateProxyStorage(bytes32 _newStorage) public  {
+    function updateProxyStorage(bytes32 _newStorage) public {
         proxyStates[msg.sender] = _newStorage;
     }
 
@@ -63,70 +64,24 @@ contract RelayContract {
      */
     address owner;
 
-//    /**
-//     * @dev The tracked blocks from the source chain, keyed by block hash
-//     */
-//    mapping(uint256 => BlockInfo) public blocks;
+    //    /**
+    //     * @dev The tracked blocks from the source chain, keyed by block hash
+    //     */
+    //    mapping(uint256 => BlockInfo) public blocks;
 
     constructor() public {
         owner = msg.sender;
     }
 
-    function relayAccount(address _contract, bytes memory info) public {
-        // TODO
-    }
-
-    /**
-    * @dev verifies that The provided `storageRoot` is included in the merkle trie
-    * @param rlpAccount The terminating value in the proof
-    * @param blockHash the hash of the block of the source chain to proof against
-    * @param encodedPath The path in the trie leading to the `origin`'s `storageRoot`
-    * @param rlpParentNodes The rlp encoded stack of nodes.
-    * @return true if the proof wis valid, false otherwise
-    */
-    // TODO adjust rlpAccount?
-    function verifyAccountProof(bytes memory rlpAccount, uint256 blockHash, bytes memory encodedPath, bytes memory rlpParentNodes) public returns (bool) {
-
-        return MerklePatriciaProof.verify(
-            rlpAccount,
-            encodedPath,
-            rlpParentNodes,
-            blocks[blockHash].stateRoot
-        );
-    }
-
-    function verify(bytes memory value, bytes memory encodedPath, bytes memory rlpParentNodes, bytes32 root) public pure returns (bool) {
-        return MerklePatriciaProof.verify(
-            value,
-            encodedPath,
-            rlpParentNodes,
-            root
-        );
-    }
-
-
-    function parseAccount(bytes memory rlpAccount) public pure returns (bytes32 nonce, bytes32 balance, bytes32 storageHash, bytes32 codeHash) {
-        RLPReader.Iterator memory it =
-        rlpAccount.toRlpItem().iterator();
-
-        uint idx;
-        while (it.hasNext()) {
-            if (idx == 0) {
-                nonce = bytes32(it.next().toUint());
-            } else if (idx == 1) {
-                balance = bytes32(it.next().toUint());
-            } else if (idx == 2) {
-                storageHash = bytes32(it.next().toUint());
-            } else if (idx == 3) {
-                codeHash = bytes32(it.next().toUint());
-            } else {
-                it.next();
-            }
-            idx++;
+    // TODO this currently simply replaces the currently stored block info for this contract, should this store by the block's hash instead?
+    function relayAccount(address _contract, bytes32 _stateRoot, bytes32 _storageRoot, uint256 _blockNumber) public {
+        BlockInfo memory info = sourceStates[_contract];
+        if (_blockNumber > info.blockNumber) {
+            info.storageRoot = _storageRoot;
+            info.stateRoot = _stateRoot;
+            info.blockNumber = _blockNumber;
         }
-        return (nonce, balance, storageHash, codeHash);
     }
-
 
     /**
     * @dev return the contracts relayed state root
@@ -140,20 +95,5 @@ contract RelayContract {
     */
     function getStorageRoot(address _contract) public view returns (bytes32) {
         return sourceStates[_contract].storageRoot;
-    }
-
-    function parseProofTest(bytes memory rlpProof) public view returns (bytes memory account, bytes memory accountProof, bytes memory storageProof) {
-        (account, accountProof, storageProof) = GetProofLib.parseProofTest(rlpProof);
-    }
-
-    function verifyEthGetProof(bytes memory rlpProof) public view returns (bool) {
-        bytes32 root = getStateRoot(currentBlockHash);
-        bytes memory path = GetProofLib.encodedAddress(getSource());
-        GetProofLib.GetProof memory getProof = GetProofLib.parseProof(rlpProof);
-        return GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root);
-    }
-
-    function verifyStorageProof(bytes memory rlpProof, bytes32 storageHash) public pure returns (bool) {
-        return GetProofLib.verifyStorageProof(rlpProof, storageHash);
     }
 }
