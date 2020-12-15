@@ -10,11 +10,17 @@ contract RelayContract {
     using RLPReader for RLPReader.Iterator;
     using RLPReader for bytes;
 
+    struct Proxy {
+        address logicAddress;
+        bytes32 stateRoot;
+    }
+
     modifier isProxyFor(address _logic)
     {
+        // TODO is modifier even required when we insert storage root by msg.sender?
 //        require(
 //            msg.sender == _proxy,
-//            "Sender not authorized."
+//            "Not authorized."
 //        );
         _;
     }
@@ -31,27 +37,25 @@ contract RelayContract {
         //        bytes32 nonce;
     }
 
-    /**
-     * @dev The hash of the block of the source chain that was last synchronized
-     */
-    uint256 currentBlockHash;
 
     /**
-     * @dev The address of the original contract on the source chain
+     * @dev mapping of the proxie's storage roots
      */
-    address origin;
+    mapping(address => bytes32) proxyStates;
 
-
-    // TODO mapping addresse -> storageroot
     /**
-     * @dev mapping of the addresses to the storage roots
+   * @dev mapping of the source addresses and their info
+   */
+    mapping(address => BlockInfo) sourceStates;
+
+    // alternatively track by block?
+//    mapping(address => mapping(address => BlockInfo)) sourceStates;
+
+    /**
+     * @dev Called by the proxy to update its state
      */
-    mapping(address => bytes32) logicStates;
-
-
-    // require ender = key (mapping-> storagerot); sender?
-    function updateStorage(address logicAddress) public isProxyFor(logicAddress) {
-
+    function updateProxyStorage(bytes32 _newStorage) public  {
+        proxyStates[msg.sender] = _newStorage;
     }
 
     /**
@@ -59,43 +63,17 @@ contract RelayContract {
      */
     address owner;
 
-    /**
-     * @dev The tracked blocks from the source chain, keyed by blockhash
-     */
-    mapping(uint256 => BlockInfo) public blocks;
+//    /**
+//     * @dev The tracked blocks from the source chain, keyed by block hash
+//     */
+//    mapping(uint256 => BlockInfo) public blocks;
 
-    constructor(uint256 _blockHash, address _origin, bytes32 _stateRoot, bytes32 _storageRoot) public {
-        // TODO insert adjusted stateroot?
-        BlockInfo storage info = blocks[_blockHash];
-        info.stateRoot = _stateRoot;
-        info.storageRoot = _storageRoot;
-        currentBlockHash = _blockHash;
-        origin = _origin;
+    constructor() public {
         owner = msg.sender;
     }
 
-    // TODO restrict access to proxy? proxy should deploy the relay after init?
-    /**
-    * @dev replaces the currently synced block
-    * @return The block hash of the old state
-    */
-    function setCurrentStateBlock(uint256 _currentBlockHash) public returns (uint256) {
-        (_currentBlockHash, currentBlockHash) = (currentBlockHash, _currentBlockHash);
-        return _currentBlockHash;
-    }
-
-    /**
-    * @return The state root of the currently synced block from the source chain
-    */
-    function getCurrentStateRoot() public view returns (bytes32) {
-        return blocks[currentBlockHash].stateRoot;
-    }
-
-    /**
-    * @return The storage root of the synced contract (`origin`) of the source chain at block with block hash `currentBlockHash`
-    */
-    function getCurrentStorageRoot() public view returns (bytes32) {
-        return blocks[currentBlockHash].storageRoot;
+    function relayAccount(address _contract, bytes memory info) public {
+        // TODO
     }
 
     /**
@@ -150,16 +128,18 @@ contract RelayContract {
     }
 
 
-    function getStateRoot(uint256 _blockHash) public view returns (bytes32) {
-        return blocks[_blockHash].stateRoot;
+    /**
+    * @dev return the contracts relayed state root
+    */
+    function getStateRoot(address _contract) public view returns (bytes32) {
+        return sourceStates[_contract].stateRoot;
     }
 
-    function getStorageRoot(uint256 _blockHash) public view returns (bytes32) {
-        return blocks[_blockHash].storageRoot;
-    }
-
-    function getSource() public view returns (address) {
-        return origin;
+    /**
+    * @dev return the contracts relayed storage root
+    */
+    function getStorageRoot(address _contract) public view returns (bytes32) {
+        return sourceStates[_contract].storageRoot;
     }
 
     function parseProofTest(bytes memory rlpProof) public view returns (bytes memory account, bytes memory accountProof, bytes memory storageProof) {
