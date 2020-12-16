@@ -2,6 +2,8 @@
 
 This project uses [hardhat](https://hardhat.org/getting-started/) and [ethers](https://docs.ethers.io/v5/). 
 
+To start the chain [see](../README.md)
+
 To compile all the contracts and files run.
 
 ```bash
