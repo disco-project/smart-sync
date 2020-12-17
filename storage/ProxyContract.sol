@@ -34,10 +34,13 @@ contract ProxyContract {
     * @dev Several steps happen before a storage update takes place:
     * First verify that the provided proof was obtained for the account on the source chain (account proof)
     * Secondly verify that the current value is part of the current storage root (old contract state proof)
-    * // TODO check if is this necessary? we already check in step 3 that only valid values are inserted?
     * Third step is verifying the provided storage proofs provided in the `proof` (new contract state proof)
     * @param proof The rlp encoded EIP1186 proof
     */
+    // NOTE 1: check if this second step (old contract state proof) is even necessary?
+    // if I understood correctly we need to validate that the value stored at the key's location in this proxy contract is also part of the storage root currently tracked for this proxy in the relay?
+    // But we already check in step 3 that only valid values are inserted
+    // NOTE 2: order of second and third step could be changed
     function updateStorage(bytes memory proof) public {
         RelayContract relay = getRelay();
         // get the current state root of the source chain as relayed in the relay contract
@@ -72,7 +75,15 @@ contract ProxyContract {
     */
     function oldContractStateProof(bytes32 key) internal view {
         // TODO validating the current value of the key via merkle proof would require its parent nodes in the trie
-        // This would require the key's storageProof (the encoded merkle tree nodes) as input alternatively construct the merkle trie on chain
+        // This would require the key's storageProof (the encoded merkle tree nodes) as input, meaning an additional proof as input.
+
+        // alternatively we construct the merkle trie on chain and then derive the storage proof:
+        // 1. validate every provided storageProof ([key, value (new value), nodes]) against the storage root of the source contract retrieved from the relay
+        // 2. construct a merkle trie from all those storageProofs, similar to `Trie.fromProof` in the nodejs rlp library
+        // 3. update each key's value in the trie with the storage of this proxy (sload(key) == oldValue)
+        // 4. construct a new proof for each key: get the path via `Trie.path(key)` and validate this proof.
+        //    comparing the root of this new trie against the storage root stored in the relay might not succeed,
+        //    since it's not guaranteed the provided `rlpStorageProof` contains every key currently stored in the account's storage trie, but merely a subset,
     }
 
     /**
