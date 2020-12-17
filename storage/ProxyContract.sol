@@ -23,29 +23,26 @@ contract ProxyContract {
 
     /**
     * @dev initialize the storage of this contract based on the provided proof.
-    * @param proof The rlp encoded EIP1186 proof
-    * @param blockHash The blockhash of the source chain the proof represents the state of
+    * @param proof rlp encoded EIP1186 proof
     */
-    constructor(bytes memory proof, uint256 blockHash) public {
-        updateStorage(proof, blockHash);
+    constructor(bytes memory proof) public {
+        // initialize the contract's storage
+        updateStorage(proof);
     }
-    // 1. Account Proof: proof vom source block -> account
-    // 2. old contract state proof: current value -> current storage root (address -> storage)
-    // 3. New contract state proof: ein oder mehrere (key -> value) -> source storage root
 
     /**
     * @dev Several steps happen before a storage update takes place:
     * First verify that the provided proof was obtained for the account on the source chain (account proof)
     * Secondly verify that the current value is part of the current storage root (old contract state proof)
+    * // TODO check if is this necessary? we already check in step 3 that only valid values are inserted?
     * Third step is verifying the provided storage proofs provided in the `proof` (new contract state proof)
     * @param proof The rlp encoded EIP1186 proof
-    * @param the hash of the block that contains the state of source contract we're trying to update to
     */
-    function updateStorage(bytes memory proof, uint256 blockHash) public {
+    function updateStorage(bytes memory proof) public {
         RelayContract relay = getRelay();
-        // get the state root of the at the provided block
-        bytes32 root = relay.getStateRoot(blockHash);
-        // validate that the proof was obtained for the source contract and the account's storage is part of the block with `blockHash`
+        // get the current state root of the source chain as relayed in the relay contract
+        bytes32 root = relay.getStateRoot(SOURCE_ADDRESS);
+        // validate that the proof was obtained for the source contract and the account's storage is part of the current state
         bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
         require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
@@ -59,7 +56,7 @@ contract ProxyContract {
         updateStorageKeys(getProof.storageProofs, account.storageHash);
 
         // update the state in the relay
-        relay.setCurrentStateBlock(blockHash);
+        relay.updateProxyStorage(account.storageHash);
     }
 
 
@@ -71,16 +68,26 @@ contract ProxyContract {
     }
 
     /**
-    * @dev Validate that the key is part of the source contract's storage
+    * @dev Validate that the key and it's value are part of the contract's storage
     */
     function oldContractStateProof(bytes32 key) internal view {
-        // TODO
+        // TODO validating the current value of the key via merkle proof would require its parent nodes in the trie
+        // This would require the key's storageProof (the encoded merkle tree nodes) as input alternatively construct the merkle trie on chain
     }
 
     /**
-    * @dev Update a single storage key
+      * @dev Update a single storage key's value after its proof was successfully validated against the relayed storage root
+      * @param rlpStorageKeyProof contains the rlp encoded proof of the storage to set
+      */
+    function updateStorageKey(bytes memory rlpStorageKeyProof) public {
+        bytes32 currentStorage = getRelay().getStorageRoot(SOURCE_ADDRESS);
+        _updateStorageKey(rlpStorageKeyProof, currentStorage);
+    }
+
+    /**
+    * @dev Update a single storage key after validating against the storage key
     */
-    function updateStorageKey(bytes memory rlpStorageKeyProof, bytes32 storageHash) internal {
+    function _updateStorageKey(bytes memory rlpStorageKeyProof, bytes32 storageHash) internal {
         RLPReader.RLPItem memory it = rlpStorageKeyProof.toRlpItem();
 
         // parse the rlp encoded storage proof
@@ -106,7 +113,7 @@ contract ProxyContract {
 
     /**
     * @dev Sets the contract's storage based on the encoded storage
-    * @param rlpStorage the rlp encoded list of storageproofs
+    * @param rlpStorageKeyProofs the rlp encoded list of storage proofs
     * @param storageHash the hash of the contract's storage
     */
     function updateStorageKeys(bytes memory rlpStorageKeyProofs, bytes32 storageHash) internal {
