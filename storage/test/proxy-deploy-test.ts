@@ -1,10 +1,9 @@
 import {RelayContract__factory, SyncCandidate, SyncCandidate__factory,} from "../src-gen/types";
 import {ethers} from "hardhat";
 import {expect} from "chai";
-import {encodeStorageProof, GetProof} from "../src/verify-proof";
+import {GetProof} from "../src/verify-proof";
 import {getAllKeys} from "../src/utils";
 import {StorageDiffer} from "../src/get-diff";
-import {buildAccountProof} from "../src/build-proof";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 
@@ -27,40 +26,18 @@ describe("Deploy proxy and logic contract", async function () {
     });
 
     it("Should copy the source contract", async function () {
-        const targetContract = await factory.deploy();
-        await targetContract.setValueA(42);
-        expect((await new StorageDiffer(provider).getDiff(srcContract.address, targetContract.address)).isEmpty()).to.be.true;
         const keys = await getAllKeys(srcContract.address, provider);
 
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
+        encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
-        relayContract = await Relayer.deploy(latestBlock.hash, proof.address, latestBlock.stateRoot, proof.storageHash);
+        relayContract = await Relayer.deploy();
 
-        const merkleProof = await buildAccountProof(proof, latestBlock.stateRoot);
-
-        const verified = await relayContract.verify(
-            merkleProof.value,
-            merkleProof.encodedPath,
-            merkleProof.parentNodes,
-            merkleProof.root
-        );
-        expect(verified).to.be.true;
-
-        // rlp encode the `eth_getProof`
-        encodedProof = await proof.encoded(latestBlock.stateRoot);
-        expect(await relayContract.verifyEthGetProof(encodedProof)).to.be.true;
-
-        const storage = proof.storageProof[0];
-
-        const rlpStorage = await encodeStorageProof(storage, proof.storageHash);
-
-        const resp = await relayContract.verifyStorageProof(rlpStorage, proof.storageHash);
-
-        console.log("storage verified: ", resp);
+        await relayContract.relayAccount(srcContract.address, latestBlock.stateRoot, proof.storageHash, latestBlock.number);
     })
 
     it("Should compile the proxy", async function () {
@@ -69,15 +46,14 @@ describe("Deploy proxy and logic contract", async function () {
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
 
-        const proxyContract = await proxyFactory.deploy(encodedProof, latestBlock.hash);
-
-        // TODO vorhalten externen node(addresse)
+        const proxyContract = await proxyFactory.deploy(encodedProof);
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         const differ = new StorageDiffer(provider);
         const diff = await differ.getDiff(srcContract.address, proxyContract.address);
 
         expect(diff.isEmpty()).to.be.true;
+        console.log(diff);
     })
 
 
