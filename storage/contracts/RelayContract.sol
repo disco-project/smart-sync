@@ -76,10 +76,10 @@ contract RelayContract {
     // TODO this simply replaces the currently stored block info for this contract, if the block number is higher than the currently stored one
     // should this store by the block's hash instead?
     function relayAccount(address _contract, bytes32 _stateRoot, bytes32 _storageRoot, uint256 _blockNumber) public {
-        BlockInfo memory info = sourceStates[_contract];
+        BlockInfo storage info = sourceStates[_contract];
         if (_blockNumber > info.blockNumber) {
-            info.storageRoot = _storageRoot;
             info.stateRoot = _stateRoot;
+            info.storageRoot = _storageRoot;
             info.blockNumber = _blockNumber;
         }
     }
