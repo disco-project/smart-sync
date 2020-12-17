@@ -81,17 +81,15 @@ contract ProxyContract {
       */
     function updateStorageKey(bytes memory rlpStorageKeyProof) public {
         bytes32 currentStorage = getRelay().getStorageRoot(SOURCE_ADDRESS);
-        _updateStorageKey(rlpStorageKeyProof, currentStorage);
+        _updateStorageKey(rlpStorageKeyProof.toRlpItem(), currentStorage);
     }
 
     /**
     * @dev Update a single storage key after validating against the storage key
     */
-    function _updateStorageKey(bytes memory rlpStorageKeyProof, bytes32 storageHash) internal {
-        RLPReader.RLPItem memory it = rlpStorageKeyProof.toRlpItem();
-
+    function _updateStorageKey(RLPReader.RLPItem memory rlpStorageKeyProof, bytes32 storageHash) internal {
         // parse the rlp encoded storage proof
-        GetProofLib.StorageProof memory proof = GetProofLib.parseStorageProof(it.toBytes());
+        GetProofLib.StorageProof memory proof = GetProofLib.parseStorageProof(rlpStorageKeyProof.toBytes());
 
         // get the path in the trie leading to the value
         bytes memory path = GetProofLib.triePath(abi.encodePacked(proof.key));
@@ -121,25 +119,7 @@ contract ProxyContract {
         rlpStorageKeyProofs.toRlpItem().iterator();
 
         while (it.hasNext()) {
-            // parse the rlp encoded storage proof
-            GetProofLib.StorageProof memory proof = GetProofLib.parseStorageProof(it.next().toBytes());
-
-            // get the path in the trie leading to the value
-            bytes memory path = GetProofLib.triePath(abi.encodePacked(proof.key));
-
-            // verify the storage proof
-            require(MerklePatriciaProof.verify(
-                    proof.value, path, proof.proof, storageHash
-                ), "Failed to verify the storage proof");
-
-            // decode the rlp encoded value
-            bytes32 value = bytes32(proof.value.toRlpItem().toUint());
-
-            // store the value in the right slot
-            bytes32 slot = proof.key;
-            assembly {
-                sstore(slot, value)
-            }
+            _updateStorageKey(it.next(), storageHash);
         }
     }
 }
