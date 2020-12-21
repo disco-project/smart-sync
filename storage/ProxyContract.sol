@@ -131,8 +131,23 @@ contract ProxyContract {
         }
         if (val == 0)
             revert();
+        // delegate the call
+        bool success = _implementation().delegatecall(msg.data);
+        assembly {
+            let mempointer := mload(0x40)
+            returndatacopy(mempointer, 0, returndatasize())
+            switch success
+            case 0 { revert(mempointer, returndatasize()) }
+            default { return(mempointer, returndatasize()) }
+        }
     }
 
+    /*
+     * The address of the implementation contract
+     */
+    function _implementation() internal returns (address) {
+        return SOURCE_ADDRESS;
+    }
 
     /**
      * @dev Delegates the current call to the address returned by `_implementation()`.
