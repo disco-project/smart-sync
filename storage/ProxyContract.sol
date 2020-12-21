@@ -15,6 +15,7 @@ contract ProxyContract {
     * The address in the file is a placeholder
     */
     address internal constant RELAY_ADDRESS = 0xeBf794b5Cf0217CB806f48d2217D3ceE1e25A7C3;
+
     /**
     * @dev address of the contract that is being mirrored.
     * The address in the file is a placeholder
@@ -37,10 +38,6 @@ contract ProxyContract {
     * Third step is verifying the provided storage proofs provided in the `proof` (new contract state proof)
     * @param proof The rlp encoded EIP1186 proof
     */
-    // NOTE 1: check if this second step (old contract state proof) is even necessary?
-    // if I understood correctly we need to validate that the value stored at the key's location in this proxy contract is also part of the storage root currently tracked for this proxy in the relay?
-    // But we already check in step 3 that only valid values are inserted
-    // NOTE 2: order of second and third step could be changed
     function updateStorage(bytes memory proof) public {
         RelayContract relay = getRelay();
         // get the current state root of the source chain as relayed in the relay contract
@@ -51,9 +48,6 @@ contract ProxyContract {
         require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
 
         GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
-
-        //        bytes32 storageRoot = relay.getStorageRoot(blockHash);
-        //        require(account.storageHash == storageRoot, "Storage root mismatch");
 
         // update the storage or revert on error
         updateStorageKeys(getProof.storageProofs, account.storageHash);
@@ -74,16 +68,7 @@ contract ProxyContract {
     * @dev Validate that the key and it's value are part of the contract's storage
     */
     function oldContractStateProof(bytes32 key) internal view {
-        // TODO validating the current value of the key via merkle proof would require its parent nodes in the trie
-        // This would require the key's storageProof (the encoded merkle tree nodes) as input, meaning an additional proof as input.
 
-        // alternatively we construct the merkle trie on chain and then derive the storage proof:
-        // 1. validate every provided storageProof ([key, value (new value), nodes]) against the storage root of the source contract retrieved from the relay
-        // 2. construct a merkle trie from all those storageProofs, similar to `Trie.fromProof` in the nodejs rlp library
-        // 3. update each key's value in the trie with the storage of this proxy (sload(key) == oldValue)
-        // 4. construct a new proof for each key: get the path via `Trie.path(key)` and validate this proof.
-        //    comparing the root of this new trie against the storage root stored in the relay might not succeed,
-        //    since it's not guaranteed the provided `rlpStorageProof` contains every key currently stored in the account's storage trie, but merely a subset,
     }
 
     /**
@@ -93,6 +78,21 @@ contract ProxyContract {
     function updateStorageKey(bytes memory rlpStorageKeyProof) public {
         bytes32 currentStorage = getRelay().getStorageRoot(SOURCE_ADDRESS);
         _updateStorageKey(rlpStorageKeyProof.toRlpItem(), currentStorage);
+    }
+
+
+    /**
+  * @dev Sets the contract's storage based on the encoded storage
+  * @param rlpStorageKeyProofs the rlp encoded list of storage proofs
+  * @param storageHash the hash of the contract's storage
+  */
+    function updateStorageKeys(bytes memory rlpStorageKeyProofs, bytes32 storageHash) internal {
+        RLPReader.Iterator memory it =
+        rlpStorageKeyProofs.toRlpItem().iterator();
+
+        while (it.hasNext()) {
+            _updateStorageKey(it.next(), storageHash);
+        }
     }
 
     /**
@@ -129,14 +129,17 @@ contract ProxyContract {
             log0(p, 0x20)
             val := mload(msize())
         }
-        if (val == 0)
+        if (val == 0) {
             revert();
+        }
+
         // delegate the call
-        bool success = _implementation().delegatecall(msg.data);
+        (bool _retVal, bytes memory data) = _implementation().delegatecall(msg.data);
+
         assembly {
             let mempointer := mload(0x40)
             returndatacopy(mempointer, 0, returndatasize())
-            switch success
+            switch _retVal
             case 0 { revert(mempointer, returndatasize()) }
             default { return(mempointer, returndatasize()) }
         }
@@ -174,6 +177,7 @@ contract ProxyContract {
     */
     function _delegateLogic() internal {
         // solhint-disable-next-line no-inline-assembly
+        address logic = _implementation();
         assembly {
             // Copy msg.data. We take full control of memory in this inline assembly
             // block because it will not return to Solidity code. We overwrite the
@@ -182,7 +186,7 @@ contract ProxyContract {
 
             // Call the implementation.
             // out and outsize are 0 because we don't know the size yet.
-            let result := delegatecall(gas(), LOGIC_ADDRESS, 0, calldatasize(), 0, 0)
+            let result := delegatecall(gas(), logic, 0, calldatasize(), 0, 0)
 
             // Copy the returned data.
             returndatacopy(0, 0, returndatasize())
