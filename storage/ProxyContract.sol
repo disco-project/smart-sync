@@ -67,8 +67,25 @@ contract ProxyContract {
     /**
     * @dev Validate that the key and it's value are part of the contract's storage
     */
-    function oldContractStateProof(bytes32 key) internal view {
+    function oldContractStateProof(bytes memory rlpStorageKeyProofs, bytes32 storageHash) internal view {
+        RLPReader.Iterator memory it =
+        rlpStorageKeyProofs.toRlpItem().iterator();
 
+        GetProofLib.StorageProof[] memory oldProofs;
+
+        while (it.hasNext()) {
+            // parse the proof
+            GetProofLib.StorageProof memory newProof = GetProofLib.parseStorageProof(it.next().toBytes());
+            bytes32 key = newProof.key;
+            // load the current value
+            bytes32 value;
+            assembly {
+                value := sload(key)
+            }
+
+            // TODO adjust the `newProof.proof`
+
+        }
     }
 
     /**
