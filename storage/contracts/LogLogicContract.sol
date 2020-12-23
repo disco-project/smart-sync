@@ -8,10 +8,6 @@ contract LogLogicContract {
 
     uint256 value;
 
-    constructor() public{
-
-    }
-
     function getValue() public view returns (uint256) {
         return value;
     }
