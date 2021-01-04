@@ -11,6 +11,11 @@ describe("Test log events on fallback", function () {
     let deployer;
     let logic: LogLogicContract;
     let proxy: LogProxyContract;
+    const abi = [
+        "function getValue() view returns (uint256)",
+        "function setValue(uint256 value)",
+        "function valuePure() public pure returns (uint256)"
+    ];
 
     it("Should deploy the contracts", async function () {
         [deployer] = await ethers.getSigners();
@@ -19,6 +24,12 @@ describe("Test log events on fallback", function () {
         const Proxy = new LogProxyContract__factory(deployer);
         proxy = await Proxy.deploy(logic.address);
     });
+
+    it("Should delegate view call", async function () {
+        let contract = new ethers.Contract(proxy.address, abi, deployer);
+        console.log(await contract.valuePure());
+
+    })
 
 
 });

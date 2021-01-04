@@ -83,7 +83,6 @@ contract ProxyContract {
                 value := sload(key)
             }
 
-            // TODO adjust the `newProof.proof`
 
         }
     }
