@@ -16,7 +16,16 @@ contract LogProxyContract {
         return logic;
     }
 
-    function _beforeFallback() internal {
+
+    fallback() external {
+        _fallback();
+    }
+
+    function _fallback() internal {
+        _delegateLogic();
+    }
+
+    function _delegateLogic() internal {
         bytes32 t1 = bytes32(uint256(123));
         int32 val = - 1;
         assembly {
@@ -26,31 +35,10 @@ contract LogProxyContract {
             val := mload(msize())
         }
         if (val == 0) {
+            // TODO always ends up here
             revert();
         }
 
-        // delegate the call
-        (bool _retVal, bytes memory data) = _implementation().delegatecall(msg.data);
-
-        assembly {
-            let mempointer := mload(0x40)
-            returndatacopy(mempointer, 0, returndatasize())
-            switch _retVal
-            case 0 { revert(mempointer, returndatasize()) }
-            default { return(mempointer, returndatasize()) }
-        }
-    }
-
-    function _fallback() internal {
-        _beforeFallback();
-        _delegateLogic();
-    }
-
-    fallback() external payable {
-        _fallback();
-    }
-
-    function _delegateLogic() internal {
         // solhint-disable-next-line no-inline-assembly
         address logic = _implementation();
         assembly {

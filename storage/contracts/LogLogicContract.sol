@@ -6,6 +6,8 @@ pragma solidity >=0.5.0 <0.8.0;
 */
 contract LogLogicContract {
 
+    address _offset;
+
     uint256 value;
 
     function getValue() public view returns (uint256) {
