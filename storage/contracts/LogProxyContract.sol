@@ -8,8 +8,11 @@ contract LogProxyContract {
 
     address logic;
 
+    uint256 value;
+
     constructor(address _logic) public {
         logic = _logic;
+        value = 37;
     }
 
     function _implementation() internal returns (address) {
@@ -25,20 +28,24 @@ contract LogProxyContract {
         _delegateLogic();
     }
 
-    function _delegateLogic() internal {
-        bytes32 t1 = bytes32(uint256(123));
-        int32 val = - 1;
-        assembly {
-            let p := add(msize(), 0x20)
-            mstore(p, t1)
-            log0(p, 0x20)
-            val := mload(msize())
-        }
-        if (val == 0) {
-            // TODO always ends up here
-            revert();
-        }
+    function emitEvent() public {
+        emit Illegal();
+    }
 
+    function _delegateLogic() internal {
+        address addr = address(this);
+        bytes4 sig = bytes4(keccak256("emitEvent()"));
+        
+        bool success; 
+        assembly {
+            let p := mload(0x40)
+            mstore(p,sig)
+            success := call(900, addr, 0, p, 0x04, p, 0x00)
+            mstore(0x20,add(p,0x04))
+            //if eq(success, 1) { revert(0,0) }
+        }
+        require(!success, "only static calls are permitted");
+        
         // solhint-disable-next-line no-inline-assembly
         address logic = _implementation();
         assembly {
@@ -60,4 +67,6 @@ contract LogProxyContract {
             default {return (0, returndatasize())}
         }
     }
+
+    event Illegal();
 }
