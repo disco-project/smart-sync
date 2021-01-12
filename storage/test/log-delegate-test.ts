@@ -2,6 +2,8 @@ import {
     LogLogicContract__factory,
     LogLogicContract,
     LogProxyContract__factory,
+    LogProxyContract2__factory,
+    StaticCallContract__factory,
     LogProxyContract,
     CallingContract__factory,
     CallingContract
@@ -16,6 +18,8 @@ describe("Test log events on fallback", function () {
     let caller: CallingContract;
     const abi = [
         "function getValue() view returns (uint256)",
+        "function f() view returns(uint256)",
+        "function x() view returns (uint256)",
         "function setValue(uint256 value)",
         "function valuePure() public pure returns (uint256)"
     ];
@@ -36,24 +40,13 @@ describe("Test log events on fallback", function () {
  
     });
 
-    it("Should not delegate set call through contract", async function () {
-        let contract = new ethers.Contract(caller.address, abi, deployer);
-        //await expect(await contract.setValue(2)).to.be.reverted;
-        return contract.setValue(2, {gasLimit: 200000})
-            .then(async () => {
-                expect(await contract.getValue()).to.equal("37");
-            });
-    });
-
-    it("Should not delegate set call", async function () {
+    it("Should not delegate set call through proxy contract", async function () {
         let contract = new ethers.Contract(proxy.address, abi, deployer);
-        await contract.setValue(2, {gasLimit: 200000});
         try {
-            const value = await contract.getValue();
-            expect(value.to.equal("37"));
+            await contract.setValue(2);
         } catch (error) {
-            console.log(error);
+            // ignore exception
         }
+        expect(await contract.getValue()).to.equal("37")
     });
-
 });

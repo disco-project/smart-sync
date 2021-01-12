@@ -1,17 +1,21 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity >=0.5.0 <0.8.0;
 
+import './StaticCallContract.sol';
 /**
 * @dev A contract to test log events
 */
-contract LogProxyContract {
+contract LogProxyContract2 {
 
     address logic;
 
     uint256 value;
 
-    constructor(address _logic) public {
+    StaticContext helper;
+
+    constructor(address _logic, address _helper) public {
         logic = _logic;
+        helper = StaticContext(_helper);
         value = 37;
     }
 
@@ -19,20 +23,7 @@ contract LogProxyContract {
         return logic;
     }
 
-
     fallback() external {
-        _fallback();
-    }
-
-    function _fallback() internal {
-//        _delegateLogic();
-        _delegateLogic2();
-    }
-
-    function emitEvent() public {
-        emit Illegal();
-    }
-    function _delegateLogic2() internal {
         address addr = address(this);
         if (msg.sender == addr) {
             // solhint-disable-next-line no-inline-assembly
@@ -57,20 +48,28 @@ contract LogProxyContract {
         }
     }
 
+    function _fallback() internal {
+        _delegateLogic();
+    }
+
+    function emitEvent() public {
+        emit Illegal();
+    }
+
     function _delegateLogic() internal {
         address addr = address(this);
         bytes4 sig = bytes4(keccak256("emitEvent()"));
-        
-        bool success; 
+
+        bool success;
         assembly {
             let p := mload(0x40)
-            mstore(p,sig)
+            mstore(p, sig)
             success := call(900, addr, 0, p, 0x04, p, 0x00)
-            mstore(0x20,add(p,0x04))
-            //if eq(success, 1) { revert(0,0) }
+            mstore(0x20, add(p, 0x04))
+        //if eq(success, 1) { revert(0,0) }
         }
         require(!success, "only static calls are permitted");
-        
+
         // solhint-disable-next-line no-inline-assembly
         address logic = _implementation();
         assembly {
