@@ -47,11 +47,13 @@ describe("Test log events on fallback", function () {
 
     it("Should not delegate set call", async function () {
         let contract = new ethers.Contract(proxy.address, abi, deployer);
-        return contract.setValue(2, {gasLimit: 200000})
-            .then(async (receipt, error) => {
-                console.log(error);
-                expect(await contract.getValue()).to.equal("37");
-            });
+        await contract.setValue(2, {gasLimit: 200000});
+        try {
+            const value = await contract.getValue();
+            expect(value.to.equal("37"));
+        } catch (error) {
+            console.log(error);
+        }
     });
 
 });
