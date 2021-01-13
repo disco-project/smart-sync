@@ -4,6 +4,7 @@ pragma solidity >=0.5.0 <0.8.0;
 import "./contracts/RelayContract.sol";
 import "./contracts/GetProofLib.sol";
 import "./contracts/RLPWriter.sol";
+import "./contracts/MerkleStorage.sol";
 import "solidity-rlp/contracts/RLPReader.sol";
 
 contract ProxyContract {
@@ -65,22 +66,29 @@ contract ProxyContract {
         return RelayContract(RELAY_ADDRESS);
     }
 
-    function rlpEncodeLeaf(bytes memory key, bytes memory value) {
-        //  concat(encodedLen + rlp(key) + rlp(value))
-        bytes[] memory raw = [RLPWriter.encodeBytes()]
+
+    function testOldContractStateProofSingle(bytes memory rlpStorageKeyProofs) public view {
+        bytes32 currentStorage = getRelay().getStorageRoot(SOURCE_ADDRESS);
+        oldContractStateProofSingle(rlpStorageKeyProofs, currentStorage);
     }
 
+
+    function leafEncodedKey(bytes memory _key) internal pure returns (bytes memory path) {
+        bytes memory hp = hex"20";
+        bytes memory key = abi.encodePacked(keccak256(_key));
+        path = abi.encodePacked(hp, key);
+    }
 
     /**
     * @dev Validate that the key and it's value are part of the contract's storage
     */
     // TODO assumes that the proof consists of a single node
-    function oldContractStateProofSingle(bytes memory rlpStorageKeyProofs, bytes32 storageHash) internal view {
+    function oldContractStateProofSingle(bytes memory rlpStorageKeyProofs, bytes32 storageHash) public view returns (bytes32){
         RLPReader.Iterator memory it =
         rlpStorageKeyProofs.toRlpItem().iterator();
 
         while (it.hasNext()) {
-            // parse the proof
+            // parse the proof for the current value
             GetProofLib.StorageProof memory newProof = GetProofLib.parseStorageProof(it.next().toBytes());
 
             bytes32 key = newProof.key;
@@ -90,12 +98,38 @@ contract ProxyContract {
                 value := sload(key)
             }
 
-            // adjust the storage proof array which is rlp([encodedKey, value])
-            RLPReader.RLPItem memory proof;
-            proof.len = 2;
+            // adjust the storage proof array which is an array of rlp([rlpKey, rlpValue])
+            bytes[] memory _list = new bytes[](2);
+            _list[0] = RLPWriter.encodeBytes(leafEncodedKey(abi.encodePacked(newProof.key)));
+            bytes memory rlpValue = RLPWriter.encodeUint(uint256(value));
+
+            _list[1] = rlpValue;
+
+            bytes[] memory nodes = new bytes[](1);
+
+            nodes[0] = RLPWriter.encodeList(_list);
+            bytes memory rlpNodes = RLPWriter.encodeList(nodes);
+
+            GetProofLib.StorageProof memory oldProof;
+
+            oldProof.key = key;
+            // the value in the proof is rlp encoded
+            oldProof.value = rlpValue;
+            oldProof.proof = rlpNodes;
+
+            // get the path in the trie leading to the value
+            bytes memory path = GetProofLib.triePath(abi.encodePacked(oldProof.key));
+
+            // verify the storage proof
+            require(MerklePatriciaProof.verify(
+                    oldProof.value, path, oldProof.proof, storageHash
+                ), "Failed to verify the storage proof");
+
+
+       return MerkleStorage.validateUpdatedStorageProof(newProof.proof, value, storageHash);
 
         }
-
+        return 0;
     }
 
     /**
@@ -129,7 +163,7 @@ contract ProxyContract {
       */
     function updateStorageKey(bytes memory rlpStorageKeyProof) public {
         bytes32 currentStorage = getRelay().getStorageRoot(SOURCE_ADDRESS);
-        _updateStorageKey(rlpStorageKeyProof.toRlpItem(), currentStorage);
+        setStorageKey(rlpStorageKeyProof.toRlpItem(), currentStorage);
     }
 
 
@@ -143,14 +177,15 @@ contract ProxyContract {
         rlpStorageKeyProofs.toRlpItem().iterator();
 
         while (it.hasNext()) {
-            _updateStorageKey(it.next(), storageHash);
+            setStorageKey(it.next(), storageHash);
         }
     }
+
 
     /**
     * @dev Update a single storage key after validating against the storage key
     */
-    function _updateStorageKey(RLPReader.RLPItem memory rlpStorageKeyProof, bytes32 storageHash) internal {
+    function setStorageKey(RLPReader.RLPItem memory rlpStorageKeyProof, bytes32 storageHash) internal {
         // parse the rlp encoded storage proof
         GetProofLib.StorageProof memory proof = GetProofLib.parseStorageProof(rlpStorageKeyProof.toBytes());
 
