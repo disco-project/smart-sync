@@ -1,18 +1,18 @@
 import {
     CallingContract,
     CallingContract__factory,
-    LogLogicContract,
-    LogLogicContract__factory,
-    LogProxyContract,
-    LogProxyContract__factory
+    TestLogicContract,
+    TestLogicContract__factory,
+    TestProxyContract,
+    TestProxyContract__factory
 } from "../src-gen/types";
 import {ethers} from "hardhat";
 import {expect} from "chai";
 
-describe("Test log events on fallback", function () {
+describe("Test static proxy calls", function () {
     let deployer;
-    let logic: LogLogicContract;
-    let proxy: LogProxyContract;
+    let logic: TestLogicContract;
+    let proxy: TestProxyContract;
     let caller: CallingContract;
     const abi = [
         "function getValue() view returns (uint256)",
@@ -22,9 +22,9 @@ describe("Test log events on fallback", function () {
 
     it("Should deploy the contracts", async function () {
         [deployer] = await ethers.getSigners();
-        const Logic = new LogLogicContract__factory(deployer);
+        const Logic = new TestLogicContract__factory(deployer);
         logic = await Logic.deploy();
-        const Proxy = new LogProxyContract__factory(deployer);
+        const Proxy = new TestProxyContract__factory(deployer);
         proxy = await Proxy.deploy(logic.address);
         const Caller = new CallingContract__factory(deployer);
         caller = await Caller.deploy(proxy.address);

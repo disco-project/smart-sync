@@ -4,7 +4,7 @@ pragma solidity >=0.5.0 <0.8.0;
 /**
 * @dev A contract to test delegating static calls
 */
-contract LogProxyContract {
+contract TestProxyContract {
 
     address logic;
 
