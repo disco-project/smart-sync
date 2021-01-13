@@ -2,7 +2,7 @@
 pragma solidity >=0.5.0 <0.8.0;
 
 /**
-* @dev A contract to test log events
+* @dev A contract to test delegating static calls
 */
 contract LogProxyContract {
 
@@ -10,12 +10,12 @@ contract LogProxyContract {
 
     uint256 value;
 
-    constructor(address _logic) public {
+    constructor(address _logic) {
         logic = _logic;
         value = 37;
     }
 
-    function _implementation() internal returns (address) {
+    function _implementation() internal view returns (address) {
         return logic;
     }
 
@@ -25,73 +25,35 @@ contract LogProxyContract {
     }
 
     function _fallback() internal {
-//        _delegateLogic();
-        _delegateLogic2();
+        _delegateLogic();
     }
 
-    function emitEvent() public {
-        emit Illegal();
-    }
-    function _delegateLogic2() internal {
+    /**
+    * @dev Delegates the call to the logic contract after putting the proxy in a static context,
+    * preventing any state modifications that might occur in the logic's function
+    */
+    function _delegateLogic() internal {
         address addr = address(this);
         if (msg.sender == addr) {
             // solhint-disable-next-line no-inline-assembly
-            address logic = _implementation();
+            address logicAddr = _implementation();
             assembly {
                 calldatacopy(0, 0, calldatasize())
-                let result := delegatecall(gas(), logic, 0, calldatasize(), 0, 0)
+                let result := delegatecall(gas(), logicAddr, 0, calldatasize(), 0, 0)
                 returndatacopy(0, 0, returndatasize())
                 switch result
                 case 0 {revert(0, returndatasize())}
                 default {return (0, returndatasize())}
             }
         } else {
-            (bool _retVal, bytes memory data) = addr.staticcall(msg.data);
+            (bool result,) = addr.staticcall(msg.data);
             assembly {
-                let mempointer := mload(0x40)
-                returndatacopy(mempointer, 0, returndatasize())
-                switch _retVal
-                case 0 { revert(mempointer, returndatasize()) }
-                default { return(mempointer, returndatasize()) }
+                let ptr := mload(0x40)
+                returndatacopy(ptr, 0, returndatasize())
+                switch result
+                case 0 { revert(ptr, returndatasize()) }
+                default { return(ptr, returndatasize()) }
             }
         }
     }
-
-    function _delegateLogic() internal {
-        address addr = address(this);
-        bytes4 sig = bytes4(keccak256("emitEvent()"));
-        
-        bool success; 
-        assembly {
-            let p := mload(0x40)
-            mstore(p,sig)
-            success := call(900, addr, 0, p, 0x04, p, 0x00)
-            mstore(0x20,add(p,0x04))
-            //if eq(success, 1) { revert(0,0) }
-        }
-        require(!success, "only static calls are permitted");
-        
-        // solhint-disable-next-line no-inline-assembly
-        address logic = _implementation();
-        assembly {
-        // Copy msg.data. We take full control of memory in this inline assembly
-        // block because it will not return to Solidity code. We overwrite the
-        // Solidity scratch pad at memory position 0.
-            calldatacopy(0, 0, calldatasize())
-
-        // Call the implementation.
-        // out and outsize are 0 because we don't know the size yet.
-            let result := delegatecall(gas(), logic, 0, calldatasize(), 0, 0)
-
-        // Copy the returned data.
-            returndatacopy(0, 0, returndatasize())
-
-            switch result
-            // delegatecall returns 0 on error.
-            case 0 {revert(0, returndatasize())}
-            default {return (0, returndatasize())}
-        }
-    }
-
-    event Illegal();
 }
