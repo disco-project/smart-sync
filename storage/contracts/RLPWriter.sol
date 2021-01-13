@@ -7,6 +7,22 @@ pragma solidity >=0.5.0 <0.8.0;
  */
 library RLPWriter {
 
+
+    /**
+    * @dev RLP encodes a byte string.
+    * @param self The byte string to encode.
+    * @return The RLP encoded string in bytes.
+    */
+    function encodeBytes(bytes memory self) internal pure returns (bytes memory) {
+        bytes memory encoded;
+        if (self.length == 1 && uint8(self[0]) <= 128) {
+            encoded = self;
+        } else {
+            encoded = concat(encodeLength(self.length, 128), self);
+        }
+        return encoded;
+    }
+
     /**
      * @dev RLP encodes a list of RLP encoded byte byte strings.
      * @param _list The list of RLP encoded byte strings.
