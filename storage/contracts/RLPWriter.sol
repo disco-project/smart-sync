@@ -9,16 +9,16 @@ library RLPWriter {
 
 
     /**
-    * @dev RLP encodes a byte string.
-    * @param self The byte string to encode.
-    * @return The RLP encoded string in bytes.
+    * @dev RLP encodes a series of bytes.
+    * @param _item The bytes to encode.
+    * @return The RLP encoded bytes.
     */
-    function encodeBytes(bytes memory self) internal pure returns (bytes memory) {
+    function encodeBytes(bytes memory _item) internal pure returns (bytes memory) {
         bytes memory encoded;
-        if (self.length == 1 && uint8(self[0]) <= 128) {
-            encoded = self;
+        if (_item.length == 1 && uint8(_item[0]) <= 128) {
+            encoded = _item;
         } else {
-            encoded = concat(encodeLength(self.length, 128), self);
+            encoded = concat(encodeLength(_item.length, 128), _item);
         }
         return encoded;
     }
@@ -59,6 +59,39 @@ library RLPWriter {
             }
         }
         return encoded;
+    }
+
+    /**
+    * @dev RLP encodes a uint.
+    * @param self The uint to encode.
+    * @return The RLP encoded uint in bytes.
+    */
+    function encodeUint(uint self) internal pure returns (bytes memory) {
+        return encodeBytes(toBinary(self));
+    }
+
+    /**
+ * @dev Encode integer in big endian binary form with no leading zeroes.
+ * @notice TODO: This should be optimized with assembly to save gas costs.
+ * @param _x The integer to encode.
+ * @return RLP encoded bytes.
+ */
+    function toBinary(uint _x) private pure returns (bytes memory) {
+        bytes memory b = new bytes(32);
+        assembly {
+            mstore(add(b, 32), _x)
+        }
+        uint i;
+        for (i = 0; i < 32; i++) {
+            if (b[i] != 0) {
+                break;
+            }
+        }
+        bytes memory res = new bytes(32 - i);
+        for (uint j = 0; j < res.length; j++) {
+            res[j] = b[i++];
+        }
+        return res;
     }
 
     /**
