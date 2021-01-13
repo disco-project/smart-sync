@@ -22,8 +22,11 @@ library GetProofLib {
     }
 
     struct StorageProof {
+        // key of the storage
         bytes32 key;
+        // value of the storage at `key`
         bytes value;
+        // rlp-serialized array of rlp-serialized MerkleTree-Nodes, starting with the storageHash-Node
         bytes proof;
     }
 

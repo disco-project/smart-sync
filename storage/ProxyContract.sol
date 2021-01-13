@@ -3,6 +3,7 @@ pragma solidity >=0.5.0 <0.8.0;
 
 import "./contracts/RelayContract.sol";
 import "./contracts/GetProofLib.sol";
+import "./contracts/RLPWriter.sol";
 import "solidity-rlp/contracts/RLPReader.sol";
 
 contract ProxyContract {
@@ -64,6 +65,39 @@ contract ProxyContract {
         return RelayContract(RELAY_ADDRESS);
     }
 
+    function rlpEncodeLeaf(bytes memory key, bytes memory value) {
+        //  concat(encodedLen + rlp(key) + rlp(value))
+        bytes[] memory raw = [RLPWriter.encodeBytes()]
+    }
+
+
+    /**
+    * @dev Validate that the key and it's value are part of the contract's storage
+    */
+    // TODO assumes that the proof consists of a single node
+    function oldContractStateProofSingle(bytes memory rlpStorageKeyProofs, bytes32 storageHash) internal view {
+        RLPReader.Iterator memory it =
+        rlpStorageKeyProofs.toRlpItem().iterator();
+
+        while (it.hasNext()) {
+            // parse the proof
+            GetProofLib.StorageProof memory newProof = GetProofLib.parseStorageProof(it.next().toBytes());
+
+            bytes32 key = newProof.key;
+            // load the current value of the key
+            bytes32 value;
+            assembly {
+                value := sload(key)
+            }
+
+            // adjust the storage proof array which is rlp([encodedKey, value])
+            RLPReader.RLPItem memory proof;
+            proof.len = 2;
+
+        }
+
+    }
+
     /**
     * @dev Validate that the key and it's value are part of the contract's storage
     */
@@ -72,6 +106,8 @@ contract ProxyContract {
         rlpStorageKeyProofs.toRlpItem().iterator();
 
         GetProofLib.StorageProof[] memory oldProofs;
+
+        // loop over all keys
 
         while (it.hasNext()) {
             // parse the proof

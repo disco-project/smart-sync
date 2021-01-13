@@ -8,7 +8,7 @@ contract SimpleStorage {
     mapping(address => uint) values;
 
     constructor() {
-        owner = msg.sender;
+//        owner = msg.sender;
     }
 
     function setA(uint _a) public {

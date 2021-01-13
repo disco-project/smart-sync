@@ -42,5 +42,5 @@ interface MerkleProof {
 }
 
 export function formatPathStack(path) {
-    return path.stack.map(node => node.raw())
+    return path.stack.map(node => node.serialize())
 }
