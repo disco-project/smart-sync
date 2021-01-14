@@ -66,26 +66,13 @@ contract ProxyContract {
         return RelayContract(RELAY_ADDRESS);
     }
 
-
-    function testOldContractStateProofSingle(bytes memory rlpStorageKeyProofs) public view {
-        bytes32 currentStorage = getRelay().getStorageRoot(SOURCE_ADDRESS);
-        oldContractStateProofSingle(rlpStorageKeyProofs, currentStorage);
-    }
-
-
-    function leafEncodedKey(bytes memory _key) internal pure returns (bytes memory path) {
-        bytes memory hp = hex"20";
-        bytes memory key = abi.encodePacked(keccak256(_key));
-        path = abi.encodePacked(hp, key);
-    }
-
     /**
-    * @dev Validate that the key and it's value are part of the contract's storage
+    * @dev Validate that the storage proofs with a value different from the current value stored in this contract are part of the storage identified by the storageHash
     */
-    // TODO assumes that the proof consists of a single node
-    function oldContractStateProofSingle(bytes memory rlpStorageKeyProofs, bytes32 storageHash) public view returns (bytes32){
+    function verifyOldContractStateProofs(bytes memory rlpStorageKeyProofs) public view returns (bool){
         RLPReader.Iterator memory it =
         rlpStorageKeyProofs.toRlpItem().iterator();
+        bytes32 currentStorageRoot = getRelay().getStorageRoot(SOURCE_ADDRESS);
 
         while (it.hasNext()) {
             // parse the proof for the current value
@@ -97,74 +84,25 @@ contract ProxyContract {
             assembly {
                 value := sload(key)
             }
-
-            // adjust the storage proof array which is an array of rlp([rlpKey, rlpValue])
-            bytes[] memory _list = new bytes[](2);
-            _list[0] = RLPWriter.encodeBytes(leafEncodedKey(abi.encodePacked(newProof.key)));
-            bytes memory rlpValue = RLPWriter.encodeUint(uint256(value));
-
-            _list[1] = rlpValue;
-
-            bytes[] memory nodes = new bytes[](1);
-
-            nodes[0] = RLPWriter.encodeList(_list);
-            bytes memory rlpNodes = RLPWriter.encodeList(nodes);
-
-            GetProofLib.StorageProof memory oldProof;
-
-            oldProof.key = key;
-            // the value in the proof is rlp encoded
-            oldProof.value = rlpValue;
-            oldProof.proof = rlpNodes;
-
-            // get the path in the trie leading to the value
-            bytes memory path = GetProofLib.triePath(abi.encodePacked(oldProof.key));
-
-            // verify the storage proof
-            require(MerklePatriciaProof.verify(
-                    oldProof.value, path, oldProof.proof, storageHash
-                ), "Failed to verify the storage proof");
-
-
-       return MerkleStorage.validateUpdatedStorageProof(newProof.proof, value, storageHash);
-
-        }
-        return 0;
-    }
-
-    /**
-    * @dev Validate that the key and it's value are part of the contract's storage
-    */
-    function oldContractStateProof(bytes memory rlpStorageKeyProofs, bytes32 storageHash) internal view {
-        RLPReader.Iterator memory it =
-        rlpStorageKeyProofs.toRlpItem().iterator();
-
-        GetProofLib.StorageProof[] memory oldProofs;
-
-        // loop over all keys
-
-        while (it.hasNext()) {
-            // parse the proof
-            GetProofLib.StorageProof memory newProof = GetProofLib.parseStorageProof(it.next().toBytes());
-            bytes32 key = newProof.key;
-            // load the current value
-            bytes32 value;
-            assembly {
-                value := sload(key)
+            // check if the current value differs from value encoded in the proof
+            if (value != bytes32(newProof.value.toRlpItem().toUint())) {
+                bytes32 oldRoot = MerkleStorage.updatedRootHash(newProof.proof, value);
+                if (oldRoot != currentStorageRoot) {
+                    return false;
+                }
             }
-
-
         }
+        return true;
     }
 
-    /**
-      * @dev Update a single storage key's value after its proof was successfully validated against the relayed storage root
-      * @param rlpStorageKeyProof contains the rlp encoded proof of the storage to set
-      */
-    function updateStorageKey(bytes memory rlpStorageKeyProof) public {
-        bytes32 currentStorage = getRelay().getStorageRoot(SOURCE_ADDRESS);
-        setStorageKey(rlpStorageKeyProof.toRlpItem(), currentStorage);
-    }
+//    /**
+//      * @dev Update a single storage key's value after its proof was successfully validated against the relayed storage root
+//      * @param rlpStorageKeyProof contains the rlp encoded proof of the storage to set
+//      */
+//    function updateStorageKey(bytes memory rlpStorageKeyProof) public {
+//        bytes32 currentStorage = getRelay().getStorageRoot(SOURCE_ADDRESS);
+//        setStorageKey(rlpStorageKeyProof.toRlpItem(), currentStorage);
+//    }
 
 
     /**
@@ -227,8 +165,8 @@ contract ProxyContract {
             let mempointer := mload(0x40)
             returndatacopy(mempointer, 0, returndatasize())
             switch _retVal
-            case 0 { revert(mempointer, returndatasize()) }
-            default { return(mempointer, returndatasize()) }
+            case 0 {revert(mempointer, returndatasize())}
+            default {return (mempointer, returndatasize())}
         }
     }
 
@@ -266,16 +204,16 @@ contract ProxyContract {
         // solhint-disable-next-line no-inline-assembly
         address logic = _implementation();
         assembly {
-            // Copy msg.data. We take full control of memory in this inline assembly
-            // block because it will not return to Solidity code. We overwrite the
-            // Solidity scratch pad at memory position 0.
+        // Copy msg.data. We take full control of memory in this inline assembly
+        // block because it will not return to Solidity code. We overwrite the
+        // Solidity scratch pad at memory position 0.
             calldatacopy(0, 0, calldatasize())
 
-            // Call the implementation.
-            // out and outsize are 0 because we don't know the size yet.
+        // Call the implementation.
+        // out and outsize are 0 because we don't know the size yet.
             let result := delegatecall(gas(), logic, 0, calldatasize(), 0, 0)
 
-            // Copy the returned data.
+        // Copy the returned data.
             returndatacopy(0, 0, returndatasize())
 
             switch result
