@@ -4,6 +4,7 @@ pragma solidity >=0.5.0 <0.8.0;
 /**
  * @title RLPWriter
  * @dev helper functions to rlp-encode items
+ * @notice adapted from https://github.com/bakaoh/solidity-rlp-encode/blob/master/contracts/RLPEncode.sol
  */
 library RLPWriter {
 
