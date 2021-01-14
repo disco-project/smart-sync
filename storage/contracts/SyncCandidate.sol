@@ -4,6 +4,7 @@ pragma solidity >=0.6.0 <0.8.0;
 contract SyncCandidate {
 
     uint256 valueA;
+    uint256 valueB;
 
     constructor() {
     }
@@ -19,5 +20,14 @@ contract SyncCandidate {
 
     function getValueA() public view returns (uint256) {
         return valueA;
+    }
+
+    function setValueB(uint256 _valueB) public returns (uint256) {
+        (_valueB, valueB) = (valueB, _valueB);
+        return _valueB;
+    }
+
+    function getValueB() public view returns (uint256) {
+        return valueB;
     }
 }

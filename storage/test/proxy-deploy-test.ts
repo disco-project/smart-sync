@@ -31,10 +31,8 @@ describe("Deploy proxy and logic contract", async function () {
         relayContract = await Relayer.deploy();
         provider = new ethers.providers.JsonRpcProvider();
         await srcContract.setValueA(42);
+        await srcContract.setValueB(100);
         expect(await srcContract.getValueA()).to.be.equal(ethers.BigNumber.from(42));
-        // TODO make initialization from within proxy
-        logicContract = await factory.deploy();
-        await logicContract.setValueA(42);
     });
 
     it("Should copy the source contract", async function () {
@@ -70,11 +68,10 @@ describe("Deploy proxy and logic contract", async function () {
     // TODO remove later
     it("It should validate old contract state", async function () {
         const abi = [
-            "function testOldContractStateProofSingle(bytes memory rlpStorageKeyProofs) public view",
-            "function oldContractStateProofSingle(bytes memory rlpStorageKeyProofs, bytes32 storageHash) public view returns (bytes32)"
+            "function verifyOldContractStateProofs(bytes memory rlpStorageKeyProofs) public view returns (bool)"
         ];
         // update a value
-        await srcContract.setValueA(100);
+        await srcContract.setValueA(200);
 
         const keys = await getAllKeys(srcContract.address, provider);
 
@@ -93,12 +90,8 @@ describe("Deploy proxy and logic contract", async function () {
 
         let contract = new ethers.Contract(proxyContract.address, abi, deployer);
 
-        console.log(await provider.getStorageAt(contract.address, 0));
-
-        const resp = await contract.oldContractStateProofSingle(rlpStorageProofs, storageRoot);
-        console.log(resp);
-        console.log(storageRoot);
-
+        const result = await contract.verifyOldContractStateProofs(rlpStorageProofs);
+        expect(result).to.be.true;
     })
 
 })
