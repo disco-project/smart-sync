@@ -36,7 +36,11 @@ library MerkleStorage {
         if (terminating.length == 17) {
             // terminating branch node
             terminating[16] = RLPWriter.encodeUint(uint256(newValue)).toRlpItem();
-            // TODO update value -> hash node -> compare against storageRoot
+            bytes[] memory _list = new bytes[](17);
+            for (uint j = 0; j < 16; j++) {
+                _list[j] = terminating[j].toRlpBytes();
+            }
+            return keccak256(RLPWriter.encodeList(_list));
         } else if (terminating.length == 2) {
             // terminating leaf
             // determine the reference hash: keccak(rlp(node))
