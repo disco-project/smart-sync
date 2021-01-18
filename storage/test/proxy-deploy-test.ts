@@ -1,14 +1,13 @@
 import {RelayContract__factory, SyncCandidate, SyncCandidate__factory,} from "../src-gen/types";
 import {ethers} from "hardhat";
 import {expect} from "chai";
-import * as rlp from "rlp";
-import {encodeStorageProof, format_proof_nodes, GetProof} from "../src/verify-proof";
+import {encodeStorageProof, GetProof} from "../src/verify-proof";
+import * as utils from "../src/utils";
 import {getAllKeys} from "../src/utils";
 import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
-import * as utils from "../src/utils";
 
 describe("Deploy proxy and logic contract", async function () {
     let deployer;
@@ -62,10 +61,8 @@ describe("Deploy proxy and logic contract", async function () {
         const diff = await differ.getDiff(srcContract.address, proxyContract.address);
 
         expect(diff.isEmpty()).to.be.true;
-        console.log(diff);
     })
 
-    // TODO remove later
     it("It should validate old contract state", async function () {
         const abi = [
             "function verifyOldContractStateProofs(bytes memory rlpStorageKeyProofs) public view returns (bool)"
@@ -73,14 +70,16 @@ describe("Deploy proxy and logic contract", async function () {
         // update a value
         await srcContract.setValueA(200);
 
-        const keys = await getAllKeys(srcContract.address, provider);
+        // get the changed keys
+        const differ = new StorageDiffer(provider);
+        const diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        const keys = diff.changes().map(c => c.key);
 
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage
         const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 
-        console.log(proof.storageProof);
         const storageProofs = await Promise.all(proof.storageProof.map(
             (p) => {
                 return encodeStorageProof(p, proof.storageHash);
