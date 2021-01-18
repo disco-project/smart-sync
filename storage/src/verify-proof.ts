@@ -191,15 +191,23 @@ export class GetProof implements IGetProof {
     async encoded(stateRoot): Promise<Buffer> {
         const account = encodeAccount(this.account());
         const accountNodes = await this.encodeParentNodes(stateRoot);
+        const storage = await this.encodedStorageProofs();
+        return utils.encode(
+            [
+                account, accountNodes, storage
+            ]
+        );
+    }
+
+    /**
+     * @return rlp encoded list of rlp encoded storage proofs
+     */
+    async encodedStorageProofs(): Promise<Buffer> {
         const storage = await Promise.all(this.storageProof.map(
             (p) => {
                 return encodeStorageProof(p, this.storageHash);
             }));
-        return utils.encode(
-            [
-                account, accountNodes, utils.encode(storage)
-            ]
-        );
+        return utils.encode(storage)
     }
 
     private async encodeParentNodes(stateRoot): Promise<Buffer> {
