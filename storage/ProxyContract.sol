@@ -30,7 +30,27 @@ contract ProxyContract {
     */
     constructor(bytes memory proof) public {
         // initialize the contract's storage
-        updateStorage(proof);
+        initialize(proof);
+    }
+
+    /**
+    * @dev initialize the storage of this contract based on the provided proof.
+    * @param proof rlp encoded EIP1186 proof
+    */
+    function initialize(bytes memory proof) internal {
+        RelayContract relay = getRelay();
+        bytes32 root = relay.getStateRoot(SOURCE_ADDRESS);
+        bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
+        GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
+        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
+
+        GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
+
+        // update the storage or revert on error
+        updateStorageKeys(getProof.storageProofs, account.storageHash);
+
+        // update the state in the relay
+        relay.updateProxyStorage(account.storageHash);
     }
 
     /**
@@ -50,6 +70,9 @@ contract ProxyContract {
         require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
 
         GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
+
+        // verify storage keys against values currently stored
+        require(verifyOldContractStateProofs(getProof.storageProofs), "Failed to verify old contract state proof");
 
         // update the storage or revert on error
         updateStorageKeys(getProof.storageProofs, account.storageHash);
@@ -94,16 +117,6 @@ contract ProxyContract {
         }
         return true;
     }
-
-//    /**
-//      * @dev Update a single storage key's value after its proof was successfully validated against the relayed storage root
-//      * @param rlpStorageKeyProof contains the rlp encoded proof of the storage to set
-//      */
-//    function updateStorageKey(bytes memory rlpStorageKeyProof) public {
-//        bytes32 currentStorage = getRelay().getStorageRoot(SOURCE_ADDRESS);
-//        setStorageKey(rlpStorageKeyProof.toRlpItem(), currentStorage);
-//    }
-
 
     /**
   * @dev Sets the contract's storage based on the encoded storage
