@@ -15,4 +15,5 @@ export const LOGIC_CONTRACT_PLACEHOLDER_ADDRESS = "0x0a911618A3dD806a5D14bf856cf
 
 export const PROXY_INTERFACE = [
     "constructor(bytes memory proof)",
+    "function updateStorage(bytes memory proof) public"
 ];
