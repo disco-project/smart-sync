@@ -1,8 +1,7 @@
-import {RelayContract__factory, SyncCandidate, SyncCandidate__factory,} from "../src-gen/types";
+import {RelayContract__factory, SimpleStorage__factory, SyncCandidate, SyncCandidate__factory,} from "../src-gen/types";
 import {ethers} from "hardhat";
 import {expect} from "chai";
-import {encodeStorageProof, GetProof} from "../src/verify-proof";
-import * as utils from "../src/utils";
+import {GetProof} from "../src/verify-proof";
 import {getAllKeys} from "../src/utils";
 import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
@@ -106,6 +105,30 @@ describe("Deploy proxy and logic contract", async function () {
         // after update storage layouts are equal, no diffs
         diff = await differ.getDiff(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
+    })
+
+    it("It should not update wrong values", async function () {
+        const Storage = new SimpleStorage__factory(deployer);
+        const storage = await Storage.deploy();
+        await storage.setB(100);
+        const differ = new StorageDiffer(provider);
+        let diff = await differ.getDiff(storage.address, proxyContract.address);
+        const keys = diff.diffs.map(c => c.key);
+
+        latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
+
+        // create a proof of the source contract's storage
+        const proof = new GetProof(await provider.send("eth_getProof", [storage.address, keys]));
+        const rlpProof = await proof.encoded(latestBlock.stateRoot);
+        // update the proxy storage
+        let error = null
+        try {
+            await proxyContract.updateStorage(rlpProof);
+        }
+        catch (err) {
+            error = err
+        }
+        expect(error).to.be.an('Error')
     })
 
 })
