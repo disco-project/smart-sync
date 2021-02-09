@@ -3,10 +3,6 @@ import {BaseTrie as Trie} from "merkle-patricia-tree";
 import {ethers} from "hardhat";
 import * as rlp from "rlp";
 
-export async function verify() {
-
-}
-
 /**
  * Prepares the Merkle proof payload for on chain verification
  * @param proof [`eth_getProof`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1186.md)
@@ -43,4 +39,17 @@ interface MerkleProof {
 
 export function formatPathStack(path) {
     return path.stack.map(node => node.raw())
+}
+
+export class ProofMerger {
+    private provider;
+
+    constructor(provider) {
+        this.provider = provider;
+    }
+
+    async mergeProof(proof: GetProof) {
+
+    }
+
 }

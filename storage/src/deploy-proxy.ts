@@ -86,8 +86,9 @@ export class DeployProxy {
                 file += "node_modules/" + path;
             }
             return {
-                // bump the compiler for RLPReader
+                // FIXME: bump the compiler for RLPReader
                 contents: readFileSync(file, "utf8").replace("solidity ^0.5.0", "solidity >=0.5.0 <0.8.0")
+                .replace("solidity >=0.5.0 <0.6.0", "solidity >=0.5.0 <0.8.0")
             }
         }
 

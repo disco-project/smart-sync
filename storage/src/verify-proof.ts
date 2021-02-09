@@ -188,6 +188,48 @@ export class GetProof implements IGetProof {
         this.storageProof = proof.storageProof;
     }
 
+    /**
+     * optimize the storage proof paths
+     */
+    optimizedStorageProof() {
+        const pathNodes: Map<string, ProofPathBuilder> = new Map<string, ProofPathBuilder>();
+        let rootNode;
+        for (let storageProof of this.storageProof) {
+            let parentNode;
+            for (let i = 0; i < storageProof.proof.length; i++) {
+                let proofNode = storageProof.proof[i];
+                if(!rootNode) {
+                    rootNode = proofNode;
+                }
+                const node = rlp.decode(hexStringToBuffer(proofNode));
+                if (node.length === 17) {
+                    // branch node
+                    if (parentNode) {
+                        // add to parent
+                        pathNodes[proofNode].addBranch(node, proofNode);
+                    } else {
+                        // first node
+                        pathNodes[proofNode] = new ProofPathBuilder(node);
+                    }
+                    parentNode = proofNode;
+
+                    if (i === storageProof.proof.length - 1) {
+                        // terminating
+                        pathNodes[proofNode].addValue(node[0], node[1]);
+                    }
+                } else if (node.length === 2) {
+                    if (i === storageProof.proof.length - 1) {
+                        pathNodes[parentNode].addValue(node[0], node[1]);
+                    } else {
+                        // extension
+                    }
+                }
+            }
+        }
+        // return the encoded proof
+        return pathNodes[rootNode].encode();
+    }
+
     async encoded(stateRoot): Promise<Buffer> {
         const account = encodeAccount(this.account());
         const accountNodes = await this.encodeParentNodes(stateRoot);
@@ -227,6 +269,76 @@ export class GetProof implements IGetProof {
             storageHash: this.storageHash,
             codeHash: this.codeHash,
         };
+    }
+}
+
+
+class ProofPathBuilder {
+    branchNode: Buffer[][];
+    values: ValueNode[];
+
+    constructor(branchNode) {
+        this.branchNode = branchNode;
+        this.values = Array(17).fill(ValueNode.empty());
+    }
+
+    addValue(key, value) {
+        for (let i = 0; i < this.branchNode.length; i++) {
+            if (this.branchNode[i][1] == key) {
+                this.values[i] = new ValueNode(value);
+            }
+        }
+    }
+
+    addBranch(branchNode, hash) {
+
+    }
+
+    encode() {
+        const value = rlp.encode(this.values.map(n => n.value));
+        const nodes = rlp.encode(this.branchNode);
+        return rlp.encode([nodes, value]);
+    }
+}
+
+/**
+ * A value node is either a leaf that holds the final value of the storage key or another divergent path
+ */
+export class ValueNode {
+    /**
+     * The final value
+     */
+    value: Buffer;
+    /**
+     * Another divergent path
+     */
+    path?: ProofPath;
+
+    constructor(value: Buffer, path?: ProofPath) {
+
+    }
+
+
+    static empty() {
+        return new ValueNode(Buffer.from([]), null)
+    }
+}
+
+/**
+ * Represents a path of merkle trie nodes that all underlying leaf nodes share
+ */
+export class ProofPath {
+    /**
+     * The path of merkle nodes to the last common branch all nodes share, which is a branch node
+     */
+    commonPath: Buffer[];
+    /**
+     * The values of the nodes grouped by index of the
+     */
+    values: ValueNode[];
+
+    constructor() {
+
     }
 }
 
