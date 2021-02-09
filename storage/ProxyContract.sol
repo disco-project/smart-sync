@@ -6,11 +6,13 @@ import "./contracts/GetProofLib.sol";
 import "./contracts/RLPWriter.sol";
 import "./contracts/MerkleStorage.sol";
 import "solidity-rlp/contracts/RLPReader.sol";
+import {PatriciaTree} from "solidity-patricia-tree/contracts/tree.sol";
 
 contract ProxyContract {
     using RLPReader for RLPReader.RLPItem;
     using RLPReader for RLPReader.Iterator;
     using RLPReader for bytes;
+    using PatriciaTree for PatriciaTree.Tree;
 
     /**
     * @dev address of the deployed relay contract.
@@ -66,9 +68,10 @@ contract ProxyContract {
         bytes32 root = relay.getStateRoot(SOURCE_ADDRESS);
         // validate that the proof was obtained for the source contract and the account's storage is part of the current state
         bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
+
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
 
-        // FIXME check why account proof fails
+        // FIXME this currently fails because the state roots differ, root in the relay is still the old state root
 //        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
 
         GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
@@ -89,6 +92,30 @@ contract ProxyContract {
     */
     function getRelay() internal view returns (RelayContract) {
         return RelayContract(RELAY_ADDRESS);
+    }
+
+
+    // TODO
+    function verifyOldContractStateProofs2(bytes memory rlpStorageKeyProofs) public view returns (bool){
+        RLPReader.Iterator memory it =
+        rlpStorageKeyProofs.toRlpItem().iterator();
+        bytes32 currentStorageRoot = getRelay().getStorageRoot(SOURCE_ADDRESS);
+
+        while (it.hasNext()) {
+            // parse the proof for the current value
+            GetProofLib.StorageProof memory newProof = GetProofLib.parseStorageProof(it.next().toBytes());
+
+            bytes32 key = newProof.key;
+            // load the current value of the key
+            bytes32 value;
+            assembly {
+                value := sload(key)
+            }
+
+        }
+
+
+        return false;
     }
 
     /**
