@@ -72,7 +72,7 @@ contract ProxyContract {
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
 
         // FIXME this currently fails because the state roots differ, root in the relay is still the old state root
-//        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
+        //        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
 
         GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
 
@@ -263,5 +263,105 @@ contract ProxyContract {
             case 0 {revert(0, returndatasize())}
             default {return (0, returndatasize())}
         }
+    }
+
+
+
+    /**
+    * @dev Validates a single proof node and returns the the adjusted hash
+    * @param proofNode proof of form of:
+    *        [list of common branches..last common branch,], values[0..16] || proofNode
+    */
+    function updateProofNode(bytes memory rlpProofNode) internal returns (bytes32) {
+        // the hash that references the next node
+        bytes32 parentHash;
+        // the updated reference hash
+        bytes32 newParentHash;
+
+        RLPReader.RLPItem[] memory proofNode = RLPReader.toList(rlpProofNode);
+        // the last proof node consists of a list of common branch nodes
+        RLPReader.RLPItem[] memory commonBranches = RLPReader.toList(proofNode[0]);
+        // the last common branch for all underlying values
+        RLPReader.RLPItem[] memory lastBranch = RLPReader.toList(commonBranches[commonBranches.length - 1]);
+        // and a list of values [0..16] for the last branch node
+        RLPReader.RLPItem[] memory latestCommonBranchValues = RLPReader.toList(proofNode[1]);
+
+        // store the old reference hash
+        parentHash = keccak256(lastBranch.toRlpBytes());
+
+        // loop through every value
+        for (uint i = 0; i < 16; i--) {
+            // the value node either holds the [key, value]directly or another proofnode
+            RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
+            if (valueNode.length == 2) {
+                // leaf value, where the is the value of the latest branch node at index i
+                uint key = valueNode[0].toUint();
+                bytes32 newValue;
+                assembly {
+                    newValue := sload(key)
+                }
+                // update the value and compute the new hash
+                // rlp(node) = rlp[rlp(key), rlp(value)]
+                bytes[] memory _list = new bytes[](2);
+                _list[0] = RLPWriter.encodeUint(uint256(key));
+                _list[1] = RLPWriter.encodeUint(uint256(newValue));
+
+                // insert in the last common branch
+                lastBranch[i] = RLPWriter.encodeList(_list).toRlpItem();
+
+            } else if (valueNode.length == 3) {
+                // another proofNode [branches], values | proofnode, key
+                bytes32 newReferenceHash = updateProofNode(latestCommonBranchValues[i].toRlpBytes());
+                // update in the hash in the last lastBranch
+                RLPReader.RLPItem[] memory ref = lastBranch[i].toRlpItem();
+                bytes[] memory _list = new bytes[](2);
+                _list[0] = RLPWriter.encodeUint(ref[0].toUint());
+                _list[1] = RLPWriter.encodeUint(uint256(newReferenceHash));
+                lastBranch[i] = RLPWriter.encodeList(_list).toRlpItem();
+            }
+        }
+
+        // hash the last branch to get the reference hash
+        bytes[] memory _list = new bytes[](17);
+        for (uint j = 0; j < 16; j++) {
+            _list[j] = lastBranch[j].toRlpBytes();
+        }
+        newParentHash = keccak256(RLPWriter.encodeList(_list));
+
+        // adjust all the common parent branches
+        bytes32 keccakParentHash = keccak256(abi.encodePacked(parentHash));
+        for (uint i = commonBranches.length - 1; i > 0; i--) {
+            bytes[] memory _list = new bytes[](17);
+            for (uint j = 0; j < 17; j++) {
+                // find the reference hash
+                bytes memory val = commonBranches[i].toBytes();
+                if (keccak256(val) == keccakParentHash) {
+                    // found the position that references the next node
+                    // update the index with the adapted hash of the next node
+                    _list[j] = RLPWriter.encodeUint(uint256(newParentHash));
+                } else {
+                    _list[j] = currentNodeList[j].toRlpBytes();
+                }
+            }
+            newParentHash = keccak256(RLPWriter.encodeList(_list));
+        }
+
+        return newParentHash;
+    }
+
+
+
+    /**
+    * @dev Validate the proof.
+    *
+    * @param rlpStorageProof proof of form a of an rlp encoded proof node:
+    *        [list of common branches..last common branch], values[0..16] || proofNode
+    */
+    function validateProof(bytes memory rlpStorageProof) internal returns (bool) {
+        bytes32 oldRoot = updateProofNode(rlpStorageProof);
+
+        bytes32 currentStorageRoot = getRelay().getStorageRoot(SOURCE_ADDRESS);
+
+        return oldRoot == currentStorageRoot;
     }
 }
