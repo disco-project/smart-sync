@@ -206,7 +206,7 @@ export class GetProof implements IGetProof {
                     // branch node
                     if (parentNode) {
                         // add to parent
-                        pathNodes[proofNode].addBranch(node, proofNode);
+                        pathNodes[proofNode].addBranch(node);
                     } else {
                         // first node
                         pathNodes[proofNode] = new ProofPathBuilder(node);
@@ -290,8 +290,8 @@ class ProofPathBuilder {
         }
     }
 
-    addBranch(branchNode, hash) {
-
+    addBranch(branchNode) {
+        this.branchNode.push(branchNode);
     }
 
     encode() {
@@ -315,12 +315,13 @@ export class ValueNode {
     path?: ProofPath;
 
     constructor(value: Buffer, path?: ProofPath) {
-
+        this.value = value;
+        this.path = path;
     }
 
 
     static empty() {
-        return new ValueNode(Buffer.from([]), null)
+        return new ValueNode(Buffer.from([]))
     }
 }
 
