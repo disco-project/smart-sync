@@ -269,7 +269,7 @@ contract ProxyContract {
 
     /**
     * @dev Validates a single proof node and returns the the adjusted hash
-    * @param proofNode proof of form of:
+    * @param rlpProofNode proof of form of:
     *        [list of common branches..last common branch,], values[0..16] || proofNode
     */
     function updateProofNode(bytes memory rlpProofNode) internal returns (bytes32) {
@@ -278,7 +278,7 @@ contract ProxyContract {
         // the updated reference hash
         bytes32 newParentHash;
 
-        RLPReader.RLPItem[] memory proofNode = RLPReader.toList(rlpProofNode);
+        RLPReader.RLPItem[] memory proofNode = rlpProofNode.toRlpItem().toList();
         // the last proof node consists of a list of common branch nodes
         RLPReader.RLPItem[] memory commonBranches = RLPReader.toList(proofNode[0]);
         // the last common branch for all underlying values
@@ -287,7 +287,7 @@ contract ProxyContract {
         RLPReader.RLPItem[] memory latestCommonBranchValues = RLPReader.toList(proofNode[1]);
 
         // store the old reference hash
-        parentHash = keccak256(lastBranch.toRlpBytes());
+        parentHash = keccak256(commonBranches[commonBranches.length - 1].toRlpBytes());
 
         // loop through every value
         for (uint i = 0; i < 16; i--) {
@@ -313,7 +313,7 @@ contract ProxyContract {
                 // another proofNode [branches], values | proofnode, key
                 bytes32 newReferenceHash = updateProofNode(latestCommonBranchValues[i].toRlpBytes());
                 // update in the hash in the last lastBranch
-                RLPReader.RLPItem[] memory ref = lastBranch[i].toRlpItem();
+                RLPReader.RLPItem[] memory ref = lastBranch[i].toList();
                 bytes[] memory _list = new bytes[](2);
                 _list[0] = RLPWriter.encodeUint(ref[0].toUint());
                 _list[1] = RLPWriter.encodeUint(uint256(newReferenceHash));
@@ -331,16 +331,17 @@ contract ProxyContract {
         // adjust all the common parent branches
         bytes32 keccakParentHash = keccak256(abi.encodePacked(parentHash));
         for (uint i = commonBranches.length - 1; i > 0; i--) {
+            RLPReader.RLPItem[] memory branchNode = RLPReader.toList(commonBranches[i]);
             bytes[] memory _list = new bytes[](17);
             for (uint j = 0; j < 17; j++) {
                 // find the reference hash
-                bytes memory val = commonBranches[i].toBytes();
+                bytes memory val = branchNode[i].toBytes();
                 if (keccak256(val) == keccakParentHash) {
                     // found the position that references the next node
                     // update the index with the adapted hash of the next node
                     _list[j] = RLPWriter.encodeUint(uint256(newParentHash));
                 } else {
-                    _list[j] = currentNodeList[j].toRlpBytes();
+                    _list[j] = branchNode[j].toRlpBytes();
                 }
             }
             newParentHash = keccak256(RLPWriter.encodeList(_list));
