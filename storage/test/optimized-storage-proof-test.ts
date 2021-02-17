@@ -15,13 +15,13 @@ describe("Test storage proof optimization", async function () {
         provider = new ethers.providers.JsonRpcProvider();
     });
 
-    it("Should optimize the storage proof", async function () {
-        const tx = await storage.setA(1337);
-        const key = ethers.utils.hexZeroPad("0x0", 32);
-        const proof = new GetProof (await provider.send("eth_getProof", [storage.address, [key]]));
-
-        proof.optimizedStorageProof();
-    })
+    // it("Should optimize the storage proof", async function () {
+    //     const tx = await storage.setA(1337);
+    //     const key = ethers.utils.hexZeroPad("0x0", 32);
+    //     const proof = new GetProof (await provider.send("eth_getProof", [storage.address, [key]]));
+    //
+    //     proof.optimizedStorageProof();
+    // })
 
     it("Should insert some mappings and create a nested optimized proof", async function () {
         const values:any[] = [];
@@ -38,6 +38,7 @@ describe("Test storage proof optimization", async function () {
 
         const proof = new GetProof (await provider.send("eth_getProof", [storage.address, keys]));
         const optimized = proof.optimizedStorageProof();
+
     })
 
 })
