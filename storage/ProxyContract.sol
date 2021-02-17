@@ -239,14 +239,12 @@ contract ProxyContract {
         }
     }
 
-
-
     /**
-    * @dev Validates a single proof node and returns the the adjusted hash
+    * @dev Recursively updates a single proof node and returns the adjusted hash after modifying all the proof node's values
     * @param rlpProofNode proof of form of:
-    *        [list of common branches..last common branch,], values[0..16] || proofNode
+    *        [list of common branches..last common branch,], values[0..16; LeafNode || proof node]
     */
-    function updateProofNode(bytes memory rlpProofNode) public returns (bytes32) {
+    function updateProofNode(bytes memory rlpProofNode) public view returns (bytes32) {
         // the hash that references the next node
         bytes32 parentHash;
         // the updated reference hash
@@ -275,15 +273,13 @@ contract ProxyContract {
                     newValue := sload(key)
                 }
                 // update the value and compute the new hash
-                // rlp(node) = rlp[rlp(key), rlp(value)]
+                // rlp(node) = rlp[rlp(encoded Path), rlp(value)]
                 bytes[] memory _list = new bytes[](2);
                 _list[0] = valueNode[1].toRlpBytes();
                 _list[1] = RLPWriter.encodeUint(uint256(newValue));
-
                 // insert in the last common branch
                 bytes32 hash = keccak256(RLPWriter.encodeList(_list));
                 lastBranch[i] = RLPWriter.encodeUint(uint256(hash)).toRlpItem();
-
             } else if (valueNode.length == 2) {
                 // another proofNode [branches], values | proofnode, key
                 bytes32 newReferenceHash = updateProofNode(latestCommonBranchValues[i].toRlpBytes());
@@ -297,7 +293,7 @@ contract ProxyContract {
             _list[j] = lastBranch[j].toRlpBytes();
         }
         newParentHash = keccak256(RLPWriter.encodeList(_list));
-        return newParentHash;
+
         // adjust all the common parent branches
         bytes32 keccakParentHash = keccak256(abi.encodePacked(parentHash));
         for (uint i = commonBranches.length - 1; i > 0; i--) {
@@ -329,11 +325,69 @@ contract ProxyContract {
     * @param rlpStorageProof proof of form a of an rlp encoded proof node:
     *        [list of common branches..last common branch], values[0..16] || proofNode
     */
-    function validateOldContractStateProof(bytes memory rlpStorageProof) public returns (bool) {
+    function validateOldContractStateProof(bytes memory rlpStorageProof) public view returns (bool) {
         bytes32 oldRoot = updateProofNode(rlpStorageProof);
 
         bytes32 currentStorageRoot = getRelay().getStorageRoot(SOURCE_ADDRESS);
 
         return oldRoot == currentStorageRoot;
+    }
+
+        /**
+    * @dev Several steps happen before a storage update takes place:
+    * First verify that the provided proof was obtained for the account on the source chain (account proof)
+    * Secondly verify that the current value is part of the current storage root (old contract state proof)
+    * Third step is verifying the provided storage proofs provided in the `proof` (new contract state proof)
+    * @param proof The rlp encoded EIP1186 proof
+    */
+    function updateStorage2(bytes memory proof) public {
+        RelayContract relay = getRelay();
+        // get the current state root of the source chain as relayed in the relay contract
+        bytes32 root = relay.getStateRoot(SOURCE_ADDRESS);
+        // validate that the proof was obtained for the source contract and the account's storage is part of the current state
+        bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
+
+        GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
+
+        // verify storage keys against values currently stored
+        require(validateOldContractStateProof(getProof.storageProofs), "Failed to verify old contract state proof");
+
+        // update the storage or revert on error
+        setStorageValues(getProof.storageProofs);
+
+        // update the state in the relay
+        relay.updateProxyStorage(account.storageHash);
+    }
+
+    /**
+    * @dev Recursively set contract's storage based on the provided proof nodes
+    * @param rlpProofNode the rlp encoded storage proof nodes, starting with the root node
+    */
+    function setStorageValues(bytes memory rlpProofNode) internal {
+        RLPReader.RLPItem[] memory proofNode = rlpProofNode.toRlpItem().toList();
+        // the last proof node consists of a list of common branch nodes
+        RLPReader.RLPItem[] memory commonBranches = RLPReader.toList(proofNode[0]);
+        // the last common branch for all underlying values
+        RLPReader.RLPItem[] memory lastBranch = RLPReader.toList(commonBranches[commonBranches.length - 1]);
+        // and a list of values [0..16] for the last branch node
+        RLPReader.RLPItem[] memory latestCommonBranchValues = RLPReader.toList(proofNode[1]);
+
+        // loop through every value
+        for (uint i = 0; i < 17; i++) {
+            // the value node either holds the [key, value]directly or another proofnode
+            RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
+            if (valueNode.length == 3) {
+                // leaf value, where the is the value of the latest branch node at index i
+                bytes32 slot = bytes32(valueNode[0].toUint());
+                bytes32 value = bytes32(valueNode[2].toUint());
+                assembly {
+                    sstore(slot, value)
+                }
+            } else if (valueNode.length == 2) {
+                setStorageValues(latestCommonBranchValues[i].toRlpBytes());
+            }
+        }
+
+
     }
 }
