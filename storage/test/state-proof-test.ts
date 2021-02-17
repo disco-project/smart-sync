@@ -1,60 +1,59 @@
-import * as rlp from "rlp";
+import * as hre from "hardhat";
 import {ethers} from "hardhat";
+import * as rlp from "rlp";
 import {expect} from "chai";
-import {StorageDiffer} from "../src/get-diff";
 import {BaseTrie as Trie} from "merkle-patricia-tree";
 import {SimpleStorage, SimpleStorage__factory} from "../src-gen/types";
-import * as hre from "hardhat";
 import {format_proof_nodes, GetProof, hexStringToBuffer} from "../src/verify-proof";
+import * as utils from "../src/utils";
 
-describe("Get contract storage diff", function () {
+describe("Validate old contract state", function () {
     let deployer;
     let storage: SimpleStorage;
 
-    it("Should create old contract state proof", async function () {
+    it("Should validate contract state proof", async function () {
         [deployer] = await ethers.getSigners();
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
-
         const provider = new hre.ethers.providers.JsonRpcProvider();
 
+        const oldValue = 1;
+
+        await storage.setA(oldValue);
+
         let keys = await provider.send("parity_listStorageKeys", [
-            storage.address, 5, null
+            storage.address, 10, null
         ]);
 
         const oldProof = <GetProof>await provider.send("eth_getProof", [storage.address, keys]);
-        await storage.setB(1337);
 
-        await provider.send("parity_listStorageKeys", [
-            storage.address, 5, null
+        await storage.setA(1337);
+
+        keys = await provider.send("parity_listStorageKeys", [
+            storage.address, 10, null
         ]);
 
         const proof = <GetProof>await provider.send("eth_getProof", [storage.address, keys]);
 
-        const block = await provider.send('eth_getBlockByNumber', ["latest", true]);
-
-        const storageProof = proof.storageProof[0];
-
         const trie = new Trie();
 
-        console.log(storageProof);
+        for (let p of proof.storageProof) {
+            const storageKey = hexStringToBuffer(ethers.utils.keccak256(ethers.utils.hexZeroPad(p.key, 32)));
+            const val = p.value === "0x0" ? Buffer.from([]) : hexStringToBuffer(ethers.BigNumber.from(p.value).toHexString());
+            await trie.put(
+                storageKey,
+                utils.encode(val)
+            );
+        }
 
-        console.log(storageProof.key);
-        const storageKey = hexStringToBuffer(ethers.utils.keccak256(ethers.utils.hexZeroPad(storageProof.key, 32)));
+        expect(proof.storageHash).to.be.equal("0x" + trie.root.toString("hex"))
 
+        // reset to old value
         await trie.put(
-            storageKey,
-            hexStringToBuffer(storageProof.value)
+            hexStringToBuffer(ethers.utils.keccak256(ethers.utils.hexZeroPad("0x0", 32))),
+            utils.encode(hexStringToBuffer(ethers.BigNumber.from(oldValue).toHexString()))
         );
 
-
-        // const trieProof = await Trie.createProof(trie,  hexStringToBuffer(storageProof.key));
-        //
-        // console.log(trieProof);
-        console.log("");
-        console.log(rlp.decode(storageProof.proof[0]));
-        console.log(rlp.decode(storageProof.proof[1]));
-        //console.log(ethers.utils.keccak256(ethers.utils.hexZeroPad(storageProof.key, 32)));
-
+        expect(oldProof.storageHash).to.be.equal("0x" + trie.root.toString("hex"))
     })
 });

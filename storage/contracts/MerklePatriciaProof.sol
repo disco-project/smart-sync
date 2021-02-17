@@ -2,7 +2,6 @@
 pragma solidity >=0.5.0 <0.8.0;
 
 import "solidity-rlp/contracts/RLPReader.sol";
-import "hardhat/console.sol";
 
 library MerklePatriciaProof {
 

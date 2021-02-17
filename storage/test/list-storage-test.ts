@@ -19,36 +19,6 @@ describe("Storage", function () {
         expect(await storage.getValue(deployer.address)).to.equal(0);
     });
 
-    // The constructor sets the `owner` field at slot 2, and `b` is initialized with 42 at slot 1
-    // the order of the keys is determined by https://docs.rs/trie-db/0.22.1/trie_db/struct.FatDBIterator.html (pre-order traversal)
-    // at https://github.com/openethereum/openethereum/blob/main/ethcore/src/client/client.rs#L2144
-    it("Should contain two storage keys after deployment", async function () {
-        const provider = new hre.ethers.providers.JsonRpcProvider();
-
-        // https://openethereum.github.io/JSONRPC-parity-module#parity_liststoragekeys
-        const keys = await provider.send("parity_listStorageKeys", [
-            storage.address, 5, null
-        ]);
-        expect(keys.length).to.equal(2);
-
-        //  value of `address owner;` is inside the slot with index 2 of the contract's storage
-        const ownerSlot = ethers.BigNumber.from(keys[0]);
-        expect(ownerSlot).to.equal(ethers.BigNumber.from(2));
-
-        // value of `uint b` (=42) is inside the slot with index 1 (second slot)
-        const bSlot = ethers.BigNumber.from(keys[1]);
-        expect(bSlot).to.equal(ethers.BigNumber.from(1));
-
-        // get the value of the `owner` field
-        const storageOwner = await provider.getStorageAt(storage.address, ownerSlot);
-        // converted to a 20byte address this equals to the address of the contract's deployer
-        expect(ethers.utils.getAddress(storageOwner.slice(2 + 24))).to.equal(deployer.address)
-
-        // get the value of the `b` field
-        const bValue = await provider.getStorageAt(storage.address, bSlot);
-        expect(bValue).to.equal(ethers.BigNumber.from(42));
-    })
-
     it("Should read correct storage after transactions", async function () {
         const provider = new hre.ethers.providers.JsonRpcProvider();
 
@@ -59,7 +29,7 @@ describe("Storage", function () {
             storage.address, 5, null
         ]);
         // now there should be 3 storage keys
-        expect(keys.length).to.equal(3);
+        expect(keys.length).to.equal(2);
 
         // `a` is the first field of the contract and its value is stored at slot 0
         const aValue = await provider.getStorageAt(storage.address, 0);
@@ -75,7 +45,7 @@ describe("Storage", function () {
             storage.address, 5, null
         ]);
         // after setting `a` and inserting a value in the mapping there should be 4 storage keys
-        expect(keys.length).to.equal(4);
+        expect(keys.length).to.equal(3);
         const storageKey = ethers.BigNumber.from(keys[1]);
 
         // the `storageKey` of the `value` is the hash of the `key` of `value` in the mapping

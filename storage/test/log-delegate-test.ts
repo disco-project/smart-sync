@@ -29,7 +29,7 @@ describe("Test static proxy calls", function () {
         const Caller = new CallingContract__factory(deployer);
         caller = await Caller.deploy(proxy.address);
     });
-
+  
     it("Should not delegate set call through proxy contract", async function () {
         let contract = new ethers.Contract(proxy.address, abi, deployer);
         try {
