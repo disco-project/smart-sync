@@ -1,4 +1,4 @@
-import {RelayContract__factory, SimpleStorage__factory, SyncCandidate, SyncCandidate__factory,} from "../src-gen/types";
+import {RelayContract__factory, SyncCandidate, SyncCandidate__factory,} from "../src-gen/types";
 import {ethers} from "hardhat";
 import {expect} from "chai";
 import {GetProof} from "../src/verify-proof";
@@ -7,7 +7,6 @@ import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
-import * as rlp from "rlp";
 
 describe("Deploy proxy and logic contract", async function () {
     let deployer;
@@ -63,82 +62,19 @@ describe("Deploy proxy and logic contract", async function () {
         expect(diff.isEmpty()).to.be.true;
     })
 
-    it("It should validate old contract state", async function () {
-        const abi = [
-            "function verifyOldContractStateProofs(bytes memory rlpStorageKeyProofs) public view returns (bool)"
-        ];
-        // update a value
-        await srcContract.setValueA(200);
-
-        // get the changed keys
-        const differ = new StorageDiffer(provider);
-        const diff = await differ.getDiff(srcContract.address, proxyContract.address);
-        const keys = diff.changes().map(c => c.key);
-
-        latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
-
-        // create a proof of the source contract's storage
-        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
-
-        const rlpStorageProofs = await proof.encodedStorageProofs();
-
-        let contract = new ethers.Contract(proxyContract.address, abi, deployer);
-
-        const result = await contract.verifyOldContractStateProofs(rlpStorageProofs);
-        expect(result).to.be.true;
-    })
-
-    it("It should update the proxy contract state", async function () {
-        // get the changed keys
-        const differ = new StorageDiffer(provider);
-        let diff = await differ.getDiff(srcContract.address, proxyContract.address);
-        const keys = diff.changes().map(c => c.key);
-
-        latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
-
-        // create a proof of the source contract's storage
-        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
-
-        const rlpProof = await proof.encoded(latestBlock.stateRoot);
-        // update the proxy storage
-        await proxyContract.updateStorage(rlpProof);
-
-        // after update storage layouts are equal, no diffs
-        diff = await differ.getDiff(srcContract.address, proxyContract.address);
-        expect(diff.isEmpty()).to.be.true;
-    })
-
-    it("It should not update wrong values", async function () {
-        const Storage = new SimpleStorage__factory(deployer);
-        const storage = await Storage.deploy();
-        await storage.setB(100);
-        const differ = new StorageDiffer(provider);
-        let diff = await differ.getDiff(storage.address, proxyContract.address);
-        const keys = diff.diffs.map(c => c.key);
-
-        latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
-
-        // create a proof of the source contract's storage
-        const proof = new GetProof(await provider.send("eth_getProof", [storage.address, keys]));
-        const rlpProof = await proof.encoded(latestBlock.stateRoot);
-        // update the proxy storage
-        let error = null
-        try {
-            await proxyContract.updateStorage(rlpProof);
-        }
-        catch (err) {
-            error = err
-        }
-        expect(error).to.be.an('Error')
-    })
-
     it("It should update multiple values", async function () {
         srcContract = await factory.deploy();
-        for (let i = 0; i < 10; i++) {
-            // get some random values
-            const entry = {key: i, value: Math.floor(Math.random() * Math.floor(1000))};
-            await srcContract.insert(entry.key, entry.value);
-        }
+
+        // insert some random values
+        await srcContract.insert(420, 30);
+        await srcContract.insert(470, 1);
+        await srcContract.insert(710, 2);
+        await srcContract.insert(337, 3);
+        await srcContract.insert(331, 4);
+        await srcContract.insert(752, 5);
+        await srcContract.insert(602, 6);
+        await srcContract.insert(691, 8);
+
         let keys = await getAllKeys(srcContract.address, provider);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
@@ -161,33 +97,39 @@ describe("Deploy proxy and logic contract", async function () {
         let diff = await differ.getDiff(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
-        for (let i = 0; i < 10; i++) {
-            // get some random values
-            const entry = {key: i, value: Math.floor(Math.random() * Math.floor(1000))};
-            await srcContract.insert(entry.key, entry.value);
-        }
+        // change all the previous synced values
+        await srcContract.insert(420, 5);
+        await srcContract.insert(470, 9);
+        await srcContract.insert(710, 8);
+        await srcContract.insert(337, 7);
+        await srcContract.insert(331, 5);
+        await srcContract.insert(752, 6);
+        await srcContract.insert(602, 7);
+        await srcContract.insert(691, 9);
 
+        // get the diff set, the storage keys for the changed values
         diff = await differ.getDiff(srcContract.address, proxyContract.address);
         const changedKeys = diff.diffs.map(c => c.key);
 
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
-        // create a proof of the source contract's storage
+        // create a proof of the source contract's storage for all the changed keys
         proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
 
+        // compute the optimized storage proof
         const rlpOptimized = proof.optimizedStorageProof();
 
-        const abi = [
-            "function validateOldContractStateProof(bytes memory rlpStorageProof) public view returns (bool)",
-            "function updateProofNode(bytes memory rlpProofNode) public view returns (bytes32)"
-        ];
+        // ensure that the old contract state equals the last synced storage hash
+        const validated = await proxyContract.verifyOldContractStateProof(rlpOptimized);
+        expect(validated).to.be.true;
 
-        let contract = new ethers.Contract(proxyContract.address, abi, deployer);
-        console.log(rlp.decode(rlpOptimized));
-        const result = await contract.updateProofNode(rlpOptimized);
+        const rlpProof = await proof.optimizedProof(latestBlock.stateRoot);
 
-        console.log("new storage root ", proof.storageHash);
-        console.log("old storage root ", storageRoot);
-        console.log("result ", result);
+        // update the proxy storage
+        await proxyContract.updateStorage(rlpProof);
+
+        // // after update storage layouts are equal, no diffs
+        diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        expect(diff.isEmpty()).to.be.true;
     })
 })

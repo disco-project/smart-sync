@@ -188,6 +188,17 @@ export class GetProof implements IGetProof {
         this.storageProof = proof.storageProof;
     }
 
+    async optimizedProof(stateRoot) {
+        const account = encodeAccount(this.account());
+        const accountNodes = await this.encodeParentNodes(stateRoot);
+        const storage = this.optimizedStorageProof();
+        return utils.encode(
+            [
+                account, accountNodes, storage
+            ]
+        );
+    }
+
     /**
      * optimize the storage proof paths
      */
@@ -399,6 +410,9 @@ class BranchNode {
         return false;
     }
 
+    /**
+     * Encodes the branch node as [[common branches... node], children]
+     */
     encode() {
         const nodes = this.children.map(n => {
             if (n) {
@@ -407,7 +421,7 @@ class BranchNode {
                 return [];
             }
         });
-        return [[this.node], nodes];
+        return [[...this.commonNodes, this.node], nodes];
     }
 }
 

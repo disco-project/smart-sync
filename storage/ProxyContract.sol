@@ -57,68 +57,10 @@ contract ProxyContract {
     }
 
     /**
-    * @dev Several steps happen before a storage update takes place:
-    * First verify that the provided proof was obtained for the account on the source chain (account proof)
-    * Secondly verify that the current value is part of the current storage root (old contract state proof)
-    * Third step is verifying the provided storage proofs provided in the `proof` (new contract state proof)
-    * @param proof The rlp encoded EIP1186 proof
-    */
-    function updateStorage(bytes memory proof) public {
-        RelayContract relay = getRelay();
-        // get the current state root of the source chain as relayed in the relay contract
-        bytes32 root = relay.getStateRoot(SOURCE_ADDRESS);
-        // validate that the proof was obtained for the source contract and the account's storage is part of the current state
-        bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
-
-        GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
-
-        GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
-
-        // verify storage keys against values currently stored
-        require(verifyOldContractStateProofs(getProof.storageProofs), "Failed to verify old contract state proof");
-
-        // update the storage or revert on error
-        updateStorageKeys(getProof.storageProofs, account.storageHash);
-
-        // update the state in the relay
-        relay.updateProxyStorage(account.storageHash);
-    }
-
-
-    /**
     * @dev Used to access the Relay's abi
     */
     function getRelay() internal view returns (RelayContract) {
         return RelayContract(RELAY_ADDRESS);
-    }
-
-    /**
-    * @dev Validate that the storage proofs with a value different from the current value stored in this contract are part of the storage identified by the storageHash
-    */
-    function verifyOldContractStateProofs(bytes memory rlpStorageKeyProofs) public view returns (bool){
-        RLPReader.Iterator memory it =
-        rlpStorageKeyProofs.toRlpItem().iterator();
-        bytes32 currentStorageRoot = getRelay().getStorageRoot(SOURCE_ADDRESS);
-
-        while (it.hasNext()) {
-            // parse the proof for the current value
-            GetProofLib.StorageProof memory newProof = GetProofLib.parseStorageProof(it.next().toBytes());
-
-            bytes32 key = newProof.key;
-            // load the current value of the key
-            bytes32 value;
-            assembly {
-                value := sload(key)
-            }
-            // check if the current value differs from value encoded in the proof
-            if (value != bytes32(newProof.value.toRlpItem().toUint())) {
-                bytes32 oldRoot = MerkleStorage.updatedRootHash(newProof.proof, value);
-                if (oldRoot != currentStorageRoot) {
-                    return false;
-                }
-            }
-        }
-        return true;
     }
 
     /**
@@ -244,7 +186,7 @@ contract ProxyContract {
     * @param rlpProofNode proof of form of:
     *        [list of common branches..last common branch,], values[0..16; LeafNode || proof node]
     */
-    function updateProofNode(bytes memory rlpProofNode) public view returns (bytes32) {
+    function updateProofNode(bytes memory rlpProofNode) internal view returns (bytes32) {
         // the hash that references the next node
         bytes32 parentHash;
         // the updated reference hash
@@ -325,7 +267,7 @@ contract ProxyContract {
     * @param rlpStorageProof proof of form a of an rlp encoded proof node:
     *        [list of common branches..last common branch], values[0..16] || proofNode
     */
-    function validateOldContractStateProof(bytes memory rlpStorageProof) public view returns (bool) {
+    function verifyOldContractStateProof(bytes memory rlpStorageProof) public view returns (bool) {
         bytes32 oldRoot = updateProofNode(rlpStorageProof);
 
         bytes32 currentStorageRoot = getRelay().getStorageRoot(SOURCE_ADDRESS);
@@ -333,14 +275,14 @@ contract ProxyContract {
         return oldRoot == currentStorageRoot;
     }
 
-        /**
+    /**
     * @dev Several steps happen before a storage update takes place:
     * First verify that the provided proof was obtained for the account on the source chain (account proof)
     * Secondly verify that the current value is part of the current storage root (old contract state proof)
     * Third step is verifying the provided storage proofs provided in the `proof` (new contract state proof)
-    * @param proof The rlp encoded EIP1186 proof
+    * @param proof The rlp encoded optimized proof
     */
-    function updateStorage2(bytes memory proof) public {
+    function updateStorage(bytes memory proof) public {
         RelayContract relay = getRelay();
         // get the current state root of the source chain as relayed in the relay contract
         bytes32 root = relay.getStateRoot(SOURCE_ADDRESS);
@@ -350,13 +292,10 @@ contract ProxyContract {
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
 
         // verify storage keys against values currently stored
-        require(validateOldContractStateProof(getProof.storageProofs), "Failed to verify old contract state proof");
+        require(verifyOldContractStateProof(getProof.storageProofs), "Failed to verify old contract state proof");
 
         // update the storage or revert on error
         setStorageValues(getProof.storageProofs);
-
-        // update the state in the relay
-        relay.updateProxyStorage(account.storageHash);
     }
 
     /**
