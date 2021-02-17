@@ -5,6 +5,7 @@ contract SyncCandidate {
 
     uint256 valueA;
     uint256 valueB;
+    mapping(uint => uint) map;
 
     constructor() {
     }
@@ -29,5 +30,9 @@ contract SyncCandidate {
 
     function getValueB() public view returns (uint256) {
         return valueB;
+    }
+
+    function insert(uint _key, uint _value) public {
+        map[_key] = _value;
     }
 }
