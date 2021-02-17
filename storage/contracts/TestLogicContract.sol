@@ -2,9 +2,9 @@
 pragma solidity >=0.5.0 <0.8.0;
 
 /**
-* @dev A contract to test log events
+* @dev A contract to test proxy calls
 */
-contract LogLogicContract {
+contract TestLogicContract {
 
     address _offset;
 
