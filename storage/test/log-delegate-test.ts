@@ -25,11 +25,4 @@ describe("Test log events on fallback", function () {
         proxy = await Proxy.deploy(logic.address);
     });
 
-    it("Should delegate view call", async function () {
-        let contract = new ethers.Contract(proxy.address, abi, deployer);
-        console.log(await contract.valuePure());
-
-    })
-
-
 });
