@@ -132,4 +132,27 @@ describe("Deploy proxy and logic contract", async function () {
         diff = await differ.getDiff(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
     })
+
+    it("It should reject unknown values", async function () {
+        await srcContract.insert(999, 6);
+        await srcContract.insert(1200, 7);
+        await srcContract.insert(1222, 9);
+
+        // get the diff set, the storage keys for the changed values
+        const differ = new StorageDiffer(provider);
+        const diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
+        const keys = diff.diffs.map(c => c.key);
+
+        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
+
+        const rlpProof = await proof.optimizedProof(latestBlock.stateRoot);
+
+        // compute the optimized storage proof
+        const rlpOptimized = proof.optimizedStorageProof();
+        // ensure that the old contract state equals the last synced storage hash
+        const validated = await proxyContract.verifyOldContractStateProof(rlpOptimized);
+        expect(validated).to.be.false;
+
+    })
 })
