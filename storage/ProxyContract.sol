@@ -4,16 +4,12 @@ pragma solidity >=0.5.0 <0.8.0;
 import "./contracts/RelayContract.sol";
 import "./contracts/GetProofLib.sol";
 import "./contracts/RLPWriter.sol";
-import "./contracts/MerkleStorage.sol";
 import "solidity-rlp/contracts/RLPReader.sol";
-import {PatriciaTree} from "solidity-patricia-tree/contracts/tree.sol";
-
 
 contract ProxyContract {
     using RLPReader for RLPReader.RLPItem;
     using RLPReader for RLPReader.Iterator;
     using RLPReader for bytes;
-    using PatriciaTree for PatriciaTree.Tree;
 
     /**
     * @dev address of the deployed relay contract.
