@@ -8,6 +8,7 @@ import "./contracts/MerkleStorage.sol";
 import "solidity-rlp/contracts/RLPReader.sol";
 import {PatriciaTree} from "solidity-patricia-tree/contracts/tree.sol";
 
+
 contract ProxyContract {
     using RLPReader for RLPReader.RLPItem;
     using RLPReader for RLPReader.Iterator;
@@ -71,9 +72,6 @@ contract ProxyContract {
 
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
 
-        // FIXME this currently fails because the state roots differ, root in the relay is still the old state root
-        //        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
-
         GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
 
         // verify storage keys against values currently stored
@@ -92,30 +90,6 @@ contract ProxyContract {
     */
     function getRelay() internal view returns (RelayContract) {
         return RelayContract(RELAY_ADDRESS);
-    }
-
-
-    // TODO
-    function verifyOldContractStateProofs2(bytes memory rlpStorageKeyProofs) public view returns (bool){
-        RLPReader.Iterator memory it =
-        rlpStorageKeyProofs.toRlpItem().iterator();
-        bytes32 currentStorageRoot = getRelay().getStorageRoot(SOURCE_ADDRESS);
-
-        while (it.hasNext()) {
-            // parse the proof for the current value
-            GetProofLib.StorageProof memory newProof = GetProofLib.parseStorageProof(it.next().toBytes());
-
-            bytes32 key = newProof.key;
-            // load the current value of the key
-            bytes32 value;
-            assembly {
-                value := sload(key)
-            }
-
-        }
-
-
-        return false;
     }
 
     /**
@@ -272,28 +246,28 @@ contract ProxyContract {
     * @param rlpProofNode proof of form of:
     *        [list of common branches..last common branch,], values[0..16] || proofNode
     */
-    function updateProofNode(bytes memory rlpProofNode) internal returns (bytes32) {
+    function updateProofNode(bytes memory rlpProofNode) public returns (bytes32) {
         // the hash that references the next node
         bytes32 parentHash;
         // the updated reference hash
         bytes32 newParentHash;
 
         RLPReader.RLPItem[] memory proofNode = rlpProofNode.toRlpItem().toList();
+
         // the last proof node consists of a list of common branch nodes
         RLPReader.RLPItem[] memory commonBranches = RLPReader.toList(proofNode[0]);
         // the last common branch for all underlying values
         RLPReader.RLPItem[] memory lastBranch = RLPReader.toList(commonBranches[commonBranches.length - 1]);
         // and a list of values [0..16] for the last branch node
         RLPReader.RLPItem[] memory latestCommonBranchValues = RLPReader.toList(proofNode[1]);
-
         // store the old reference hash
         parentHash = keccak256(commonBranches[commonBranches.length - 1].toRlpBytes());
 
         // loop through every value
-        for (uint i = 0; i < 16; i--) {
+        for (uint i = 0; i < 17; i++) {
             // the value node either holds the [key, value]directly or another proofnode
             RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
-            if (valueNode.length == 2) {
+            if (valueNode.length == 3) {
                 // leaf value, where the is the value of the latest branch node at index i
                 uint key = valueNode[0].toUint();
                 bytes32 newValue;
@@ -303,35 +277,32 @@ contract ProxyContract {
                 // update the value and compute the new hash
                 // rlp(node) = rlp[rlp(key), rlp(value)]
                 bytes[] memory _list = new bytes[](2);
-                _list[0] = RLPWriter.encodeUint(uint256(key));
+                _list[0] = valueNode[1].toRlpBytes();
                 _list[1] = RLPWriter.encodeUint(uint256(newValue));
 
                 // insert in the last common branch
-                lastBranch[i] = RLPWriter.encodeList(_list).toRlpItem();
+                bytes32 hash = keccak256(RLPWriter.encodeList(_list));
+                lastBranch[i] = RLPWriter.encodeUint(uint256(hash)).toRlpItem();
 
-            } else if (valueNode.length == 3) {
+            } else if (valueNode.length == 2) {
                 // another proofNode [branches], values | proofnode, key
                 bytes32 newReferenceHash = updateProofNode(latestCommonBranchValues[i].toRlpBytes());
-                // update in the hash in the last lastBranch
-                RLPReader.RLPItem[] memory ref = lastBranch[i].toList();
-                bytes[] memory _list = new bytes[](2);
-                _list[0] = RLPWriter.encodeUint(ref[0].toUint());
-                _list[1] = RLPWriter.encodeUint(uint256(newReferenceHash));
-                lastBranch[i] = RLPWriter.encodeList(_list).toRlpItem();
+                lastBranch[i] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
             }
         }
 
         // hash the last branch to get the reference hash
         bytes[] memory _list = new bytes[](17);
-        for (uint j = 0; j < 16; j++) {
+        for (uint j = 0; j < 17; j++) {
             _list[j] = lastBranch[j].toRlpBytes();
         }
         newParentHash = keccak256(RLPWriter.encodeList(_list));
-
+        return newParentHash;
         // adjust all the common parent branches
         bytes32 keccakParentHash = keccak256(abi.encodePacked(parentHash));
         for (uint i = commonBranches.length - 1; i > 0; i--) {
             RLPReader.RLPItem[] memory branchNode = RLPReader.toList(commonBranches[i]);
+
             bytes[] memory _list = new bytes[](17);
             for (uint j = 0; j < 17; j++) {
                 // find the reference hash
@@ -358,7 +329,7 @@ contract ProxyContract {
     * @param rlpStorageProof proof of form a of an rlp encoded proof node:
     *        [list of common branches..last common branch], values[0..16] || proofNode
     */
-    function validateProof(bytes memory rlpStorageProof) internal returns (bool) {
+    function validateOldContractStateProof(bytes memory rlpStorageProof) public returns (bool) {
         bytes32 oldRoot = updateProofNode(rlpStorageProof);
 
         bytes32 currentStorageRoot = getRelay().getStorageRoot(SOURCE_ADDRESS);
