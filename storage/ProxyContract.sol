@@ -206,14 +206,19 @@ contract ProxyContract {
                 assembly {
                     newValue := sload(key)
                 }
-                // update the value and compute the new hash
-                // rlp(node) = rlp[rlp(encoded Path), rlp(value)]
-                bytes[] memory _list = new bytes[](2);
-                _list[0] = valueNode[1].toRlpBytes();
-                _list[1] = RLPWriter.encodeUint(uint256(newValue));
-                // insert in the last common branch
-                bytes32 hash = keccak256(RLPWriter.encodeList(_list));
-                lastBranch[i] = RLPWriter.encodeUint(uint256(hash)).toRlpItem();
+                // If the slot was empty before, remove branch
+                if(newValue != 0x0) {
+                    // update the value and compute the new hash
+                    // rlp(node) = rlp[rlp(encoded Path), rlp(value)]
+                    bytes[] memory _list = new bytes[](2);
+                    _list[0] = valueNode[1].toRlpBytes();
+                    _list[1] = RLPWriter.encodeUint(uint256(newValue));
+                    // insert in the last common branch
+                    bytes32 hash = keccak256(RLPWriter.encodeList(_list));
+                    lastBranch[i] = RLPWriter.encodeUint(uint256(hash)).toRlpItem();
+                } else {
+                    lastBranch[i] = RLPWriter.encodeUint(0).toRlpItem();
+                }
             } else if (valueNode.length == 2) {
                 // another proofNode [branches], values | proofnode, key
                 bytes32 newReferenceHash = updateProofNode(latestCommonBranchValues[i].toRlpBytes());
