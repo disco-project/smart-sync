@@ -100,29 +100,25 @@ contract ProxyContract {
     }
 
     function _beforeFallback() internal {
-        bytes32 t1 = bytes32(uint256(123));
-        int32 val = - 1;
+        address addr = address(this);
+        bytes4 sig = bytes4(keccak256("emitEvent()"));
+        
+        bool success; 
         assembly {
-            let p := add(msize(), 0x20)
-            mstore(p, t1)
-            log0(p, 0x20)
-            val := mload(msize())
+            let p := mload(0x40)
+            mstore(p,sig)
+            success := call(950, addr, 0, p, 0x04, p, 0x00)
+            mstore(0x20,add(p,0x04))
+            //if eq(success, 1) { revert(0,0) }
         }
-        if (val == 0) {
-            revert();
-        }
-
-        // delegate the call
-        (bool _retVal, bytes memory data) = _implementation().delegatecall(msg.data);
-
-        assembly {
-            let mempointer := mload(0x40)
-            returndatacopy(mempointer, 0, returndatasize())
-            switch _retVal
-            case 0 {revert(mempointer, returndatasize())}
-            default {return (mempointer, returndatasize())}
-        }
+        require(!success, "only static calls are permitted");
     }
+
+    function emitEvent() public {
+        emit Illegal();
+    }
+
+    event Illegal();
 
     /*
      * The address of the implementation contract

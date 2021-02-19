@@ -1,4 +1,4 @@
-import {RelayContract__factory, SyncCandidate, SyncCandidate__factory,} from "../src-gen/types";
+import {RelayContract__factory, SyncCandidate, SyncCandidate__factory, CallRelayContract__factory, CallRelayContract} from "../src-gen/types";
 import {ethers} from "hardhat";
 import {expect} from "chai";
 import {GetProof} from "../src/verify-proof";
@@ -7,6 +7,7 @@ import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
+import { isRawNode } from "merkle-patricia-tree/dist/trieNode";
 
 describe("Deploy proxy and logic contract", async function () {
     let deployer;
@@ -18,6 +19,7 @@ describe("Deploy proxy and logic contract", async function () {
     let encodedProof;
     let latestBlock;
     let proxyContract: Contract;
+    let callRelayContract: CallRelayContract;
     let storageRoot;
 
     it("Should deploy initial contract and set an initial value", async function () {
@@ -153,6 +155,33 @@ describe("Deploy proxy and logic contract", async function () {
         // ensure that the old contract state equals the last synced storage hash
         const validated = await proxyContract.verifyOldContractStateProof(rlpOptimized);
         expect(validated).to.be.false;
+    })
 
+    it("should reject state changes via fallback called externally", async function() {
+        // Deploy Calling contract
+        const callRelayFactory = new CallRelayContract__factory(deployer);
+        callRelayContract = await callRelayFactory.deploy(proxyContract.address);
+
+        try {
+            await proxyContract.insert(691,10);
+        } catch (error) {
+            // ignore error
+        }
+        // TODO: Why do external static calls not work?
+        // expect(await proxyContract.callStatic.getValue(691)).to.equal(9);
+        expect(await callRelayContract.callStatic.getValue(691)).to.equal(ethers.BigNumber.from(9));
+    })
+
+    it("should be possible to retreive values via fallback through calling contract", async function() {
+        expect(await callRelayContract.callStatic.getValue(691)).to.equal(ethers.BigNumber.from(9));
+    })
+
+    it("should reject state changes via fallback through calling contract", async function() {
+        try {
+            await callRelayContract.insert(691,10);
+        } catch (error) {
+            // ignore error
+        }
+        expect(await callRelayContract.getValue(691)).to.equal(9);
     })
 })
