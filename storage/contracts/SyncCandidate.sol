@@ -35,4 +35,8 @@ contract SyncCandidate {
     function insert(uint _key, uint _value) public {
         map[_key] = _value;
     }
+
+    function getValue(uint _key) public view returns (uint256) {
+        return map[_key];
+    }
 }
