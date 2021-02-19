@@ -108,6 +108,8 @@ describe("Deploy proxy and logic contract", async function () {
         await srcContract.insert(752, 6);
         await srcContract.insert(602, 7);
         await srcContract.insert(691, 9);
+        // add new value
+        await srcContract.insert(333, 33);
 
         // get the diff set, the storage keys for the changed values
         diff = await differ.getDiff(srcContract.address, proxyContract.address);
@@ -174,6 +176,7 @@ describe("Deploy proxy and logic contract", async function () {
 
     it("should be possible to retreive values via fallback through calling contract", async function() {
         expect(await callRelayContract.callStatic.getValue(691)).to.equal(ethers.BigNumber.from(9));
+        expect(await callRelayContract.callStatic.getValue(333)).to.equal(ethers.BigNumber.from(33));
     })
 
     it("should reject state changes via fallback through calling contract", async function() {
