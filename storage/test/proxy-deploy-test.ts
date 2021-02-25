@@ -46,7 +46,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         storageRoot = proof.storageHash;
 
-        await relayContract.relayAccount(srcContract.address, latestBlock.stateRoot, proof.storageHash, latestBlock.number);
+        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
     })
 
     it("Should compile and deploy the proxy", async function () {
@@ -85,7 +85,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         storageRoot = proof.storageHash;
 
-        await relayContract.relayAccount(srcContract.address, latestBlock.stateRoot, proof.storageHash, latestBlock.number);
+        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 
         const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, srcContract.address);
 
@@ -128,11 +128,40 @@ describe("Deploy proxy and logic contract", async function () {
         expect(validated).to.be.true;
 
         const rlpProof = await proof.optimizedProof(latestBlock.stateRoot);
+        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+
+        // update the proxy storage
+        let txResponse = await proxyContract.updateStorage(rlpProof);
+        let receipt = await txResponse.wait();
+        console.log("Gas used for updating 8 and adding 1 value: ", receipt.gasUsed.toNumber());
+
+        // after update storage layouts are equal, no diffs
+        diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        expect(diff.isEmpty()).to.be.true;
+    })
+
+    it("should perform second iteration", async function() {
+        // change some previously synced values
+        await srcContract.insert(420, 53);
+        await srcContract.insert(470, 93);
+        await srcContract.insert(710, 83);
+
+        // get the diff set, the storage keys for the changed values
+        const differ = new StorageDiffer(provider);
+        let diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        const changedKeys = diff.diffs.map(c => c.key);
+
+        latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
+
+        // create a proof of the source contract's storage for all the changed keys
+        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
+        const rlpProof = await proof.optimizedProof(latestBlock.stateRoot);
+        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
         await proxyContract.updateStorage(rlpProof);
 
-        // // after update storage layouts are equal, no diffs
+        // after update storage layouts are equal, no diffs
         diff = await differ.getDiff(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
     })
