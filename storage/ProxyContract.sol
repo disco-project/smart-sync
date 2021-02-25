@@ -38,7 +38,7 @@ contract ProxyContract {
     */
     function initialize(bytes memory proof) internal {
         RelayContract relay = getRelay();
-        bytes32 root = relay.getStateRoot(SOURCE_ADDRESS);
+        bytes32 root = relay.getStateRoot();
         bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
         require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
@@ -256,8 +256,6 @@ contract ProxyContract {
         return newParentHash;
     }
 
-
-
     /**
     * @dev Validate the proof.
     *
@@ -267,9 +265,9 @@ contract ProxyContract {
     function verifyOldContractStateProof(bytes memory rlpStorageProof) public view returns (bool) {
         bytes32 oldRoot = updateProofNode(rlpStorageProof);
 
-        bytes32 currentStorageRoot = getRelay().getStorageRoot(SOURCE_ADDRESS);
+        bytes32 computedStorageRoot = getRelay().getStorageRoot();
 
-        return oldRoot == currentStorageRoot;
+        return oldRoot == computedStorageRoot;
     }
 
     /**
@@ -280,19 +278,30 @@ contract ProxyContract {
     * @param proof The rlp encoded optimized proof
     */
     function updateStorage(bytes memory proof) public {
+        // First verify stateRoot -> account (account proof)
+
         RelayContract relay = getRelay();
-        // get the current state root of the source chain as relayed in the relay contract
-        bytes32 root = relay.getStateRoot(SOURCE_ADDRESS);
+        // get the current state root of the source chain
+        bytes32 root = relay.getStateRoot();
         // validate that the proof was obtained for the source contract and the account's storage is part of the current state
         bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
 
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
+        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
 
-        // verify storage keys against values currently stored
+        GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
+
+        // Second verify proof would map to current state by replacing values with current values (old contract state proof)
         require(verifyOldContractStateProof(getProof.storageProofs), "Failed to verify old contract state proof");
+
+        // Third verify proof is valid according to current block in relay contract
+        // TODO: verify
 
         // update the storage or revert on error
         setStorageValues(getProof.storageProofs);
+
+        // update the state in the relay
+        relay.updateProxyStorage(account.storageHash);
     }
 
     /**
@@ -301,10 +310,6 @@ contract ProxyContract {
     */
     function setStorageValues(bytes memory rlpProofNode) internal {
         RLPReader.RLPItem[] memory proofNode = rlpProofNode.toRlpItem().toList();
-        // the last proof node consists of a list of common branch nodes
-        RLPReader.RLPItem[] memory commonBranches = RLPReader.toList(proofNode[0]);
-        // the last common branch for all underlying values
-        RLPReader.RLPItem[] memory lastBranch = RLPReader.toList(commonBranches[commonBranches.length - 1]);
         // and a list of values [0..16] for the last branch node
         RLPReader.RLPItem[] memory latestCommonBranchValues = RLPReader.toList(proofNode[1]);
 
@@ -314,10 +319,12 @@ contract ProxyContract {
             RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
             if (valueNode.length == 3) {
                 // leaf value, where the is the value of the latest branch node at index i
-                bytes32 slot = bytes32(valueNode[0].toUint());
                 bytes32 value = bytes32(valueNode[2].toUint());
-                assembly {
-                    sstore(slot, value)
+                if (value != 0x0) {
+                    bytes32 slot = bytes32(valueNode[0].toUint());
+                    assembly {
+                        sstore(slot, value)
+                    }
                 }
             } else if (valueNode.length == 2) {
                 setStorageValues(latestCommonBranchValues[i].toRlpBytes());
