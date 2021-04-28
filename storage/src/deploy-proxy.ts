@@ -2,6 +2,7 @@ import {getAllKeys} from "./utils";
 import {promises as fs, readFileSync} from 'fs';
 import {
     LOGIC_CONTRACT_PLACEHOLDER_ADDRESS,
+    SOURCE_CONTRACT_PLACEHOLDER_ADDRESS,
     PROXY_CONTRACT_FILE_NAME,
     PROXY_CONTRACT_NAME,
     RELAY_CONTRACT_PLACEHOLDER_ADDRESS
@@ -18,9 +19,11 @@ export class DeployProxy {
      * @param logicAddress the address of the relay contract that the proxy should use as constant
      * @return the proxy contract source code
      */
-    static async readProxyContract(relayAddress, logicAddress): Promise<string> {
+    static async readProxyContract(relayAddress, logicAddress, sourceAddress): Promise<string> {
         const source = await fs.readFile(__dirname + "/../" + PROXY_CONTRACT_FILE_NAME, "utf8");
-        return source.replace(RELAY_CONTRACT_PLACEHOLDER_ADDRESS, ethers.utils.getAddress(relayAddress)).replace(LOGIC_CONTRACT_PLACEHOLDER_ADDRESS, ethers.utils.getAddress(logicAddress));
+        return source.replace(RELAY_CONTRACT_PLACEHOLDER_ADDRESS, ethers.utils.getAddress(relayAddress))
+                        .replace(LOGIC_CONTRACT_PLACEHOLDER_ADDRESS, ethers.utils.getAddress(logicAddress))
+                        .replace(SOURCE_CONTRACT_PLACEHOLDER_ADDRESS, ethers.utils.getAddress(sourceAddress));
     }
 
     /**
@@ -29,8 +32,8 @@ export class DeployProxy {
      * @param logicAddress
      * @return The abi and bytecode of the proxy
      */
-    static async compiledAbiAndBytecode(relayAddress, logicAddress) {
-        const compiled = JSON.parse(await this.compileProxy(relayAddress, logicAddress));
+    static async compiledAbiAndBytecode(relayAddress, logicAddress, sourceAddress) {
+        const compiled = JSON.parse(await this.compileProxy(relayAddress, logicAddress, sourceAddress));
         const contract = compiled.contracts[PROXY_CONTRACT_FILE_NAME][PROXY_CONTRACT_NAME]
         return {
             "abi": contract.abi,
@@ -45,8 +48,8 @@ export class DeployProxy {
      * @param logicAddress
      * @return the solidity compiler output
      */
-    static async writeArtifacts(path, relayAddress, logicAddress) {
-        const artifacts = await DeployProxy.compileProxy(relayAddress, logicAddress);
+    static async writeArtifacts(path, relayAddress, logicAddress, sourceAddress) {
+        const artifacts = await DeployProxy.compileProxy(relayAddress, logicAddress, sourceAddress);
         await fs.writeFile(path, artifacts, "utf8");
         return artifacts;
     }
@@ -57,8 +60,8 @@ export class DeployProxy {
      * @param logicAddress the address of the relay contract that the proxy should use as constant
      * @return the solidity compiler output
      */
-    static async compileProxy(relayAddress, logicAddress) {
-        const source = await DeployProxy.readProxyContract(relayAddress, logicAddress);
+    static async compileProxy(relayAddress, logicAddress, sourceAddress) {
+        const source = await DeployProxy.readProxyContract(relayAddress, logicAddress, sourceAddress);
         // https://docs.soliditylang.org/en/v0.5.0/using-the-compiler.html#compiler-input-and-output-json-description
         const input = {
             language: 'Solidity',

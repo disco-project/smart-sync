@@ -24,6 +24,12 @@ contract ProxyContract {
     address internal constant SOURCE_ADDRESS = 0x0a911618A3dD806a5D14bf856cf355C4b9C84526;
 
     /**
+    * @dev address of the contract that is being mirrored.
+    * The address in the file is a placeholder
+    */
+    address internal constant LOGIC_ADDRESS = 0x55f2155f2fEdbf701262573Be477A6562E09AeE0;
+
+    /**
     * @dev initialize the storage of this contract based on the provided proof.
     * @param proof rlp encoded EIP1186 proof
     */
@@ -124,7 +130,7 @@ contract ProxyContract {
      * The address of the implementation contract
      */
     function _implementation() internal returns (address) {
-        return SOURCE_ADDRESS;
+        return LOGIC_ADDRESS;
     }
 
     /**
@@ -196,12 +202,13 @@ contract ProxyContract {
         // store the old reference hash
         parentHash = keccak256(commonBranches[commonBranches.length - 1].toRlpBytes());
 
-        if(isOldContractStateProof) {
-            // loop through every value
-            for (uint i = 0; i < 17; i++) {
-                // the value node either holds the [key, value]directly or another proofnode
-                RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
-                if (valueNode.length == 3) {
+        
+        // loop through every value
+        for (uint i = 0; i < 17; i++) {
+            // the value node either holds the [key, value]directly or another proofnode
+            RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
+            if (valueNode.length == 3) {
+                if(isOldContractStateProof) {
                     // leaf value, where the is the value of the latest branch node at index i
                     uint key = valueNode[0].toUint();
                     bytes32 newValue;
@@ -221,11 +228,11 @@ contract ProxyContract {
                     } else {
                         lastBranch[i] = RLPWriter.encodeUint(0).toRlpItem();
                     }
-                } else if (valueNode.length == 2) {
-                    // another proofNode [branches], values | proofnode, key
-                    bytes32 newReferenceHash = computeRoot(latestCommonBranchValues[i].toRlpBytes(), isOldContractStateProof);
-                    lastBranch[i] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
                 }
+            } else if (valueNode.length == 2) {
+                // another proofNode [branches], values | proofnode, key
+                bytes32 newReferenceHash = computeRoot(latestCommonBranchValues[i].toRlpBytes(), isOldContractStateProof);
+                lastBranch[i] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
             }
         }
 
@@ -298,7 +305,7 @@ contract ProxyContract {
         require(verifyOldContractStateProof(getProof.storageProofs), "Failed to verify old contract state proof");
 
         // Third verify proof is valid according to current block in relay contract
-        require(computeRoot(getProof.storageProofs, false) == account.storageHash);
+        require(computeRoot(getProof.storageProofs, false) == account.storageHash, "Failed to verify new contract state proof");
 
 
         // update the storage or revert on error
