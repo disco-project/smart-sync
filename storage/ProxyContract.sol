@@ -187,6 +187,42 @@ contract ProxyContract {
 
         RLPReader.RLPItem[] memory proofNode = rlpProofNode.toRlpItem().toList();
 
+        if (!RLPReader.isList(proofNode[1])) {
+            // its only one leaf node
+            if (isOldContractStateProof) {
+                // tree consists of only one entry
+                uint key = proofNode[0].toUint();
+                bytes32 currValue;
+                assembly {
+                    currValue := sload(key)
+                }
+
+                // If the slot was empty before, remove branch to get the old contract state
+                if(currValue != 0x0) {
+                    // update the value and compute the new hash
+                    // rlp(node) = rlp[rlp(encoded Path), rlp(value)]
+                    bytes[] memory _list = new bytes[](2);
+                    _list[0] = proofNode[1].toRlpBytes();
+                    if (uint256(currValue) > 127) {
+                        _list[1] = RLPWriter.encodeBytes(RLPWriter.encodeUint(uint256(currValue)));
+                    } else {
+                        _list[1] = RLPWriter.encodeUint(uint256(currValue));
+                    }
+                    
+                    return keccak256(RLPWriter.encodeList(_list));
+                } else {
+                    return keccak256(RLPWriter.encodeUint(0));
+                }
+            } else {
+                // just return hashed value if its the only one
+                bytes[] memory _list = new bytes[](2);
+                _list[0] = proofNode[1].toRlpBytes();
+                _list[1] = proofNode[2].toRlpBytes();
+                
+                return keccak256(RLPWriter.encodeList(_list));
+            }
+        }
+
         // the last proof node consists of a list of common branch nodes
         RLPReader.RLPItem[] memory commonBranches = RLPReader.toList(proofNode[0]);
         // the last common branch for all underlying values
@@ -204,21 +240,32 @@ contract ProxyContract {
                 if (valueNode.length == 3) {
                     // leaf value, where the is the value of the latest branch node at index i
                     uint key = valueNode[0].toUint();
-                    bytes32 newValue;
+                    bytes32 currValue;
                     assembly {
-                        newValue := sload(key)
+                        currValue := sload(key)
                     }
-                    // If the slot was empty before, remove branch
-                    if(newValue != 0x0) {
-                        // update the value and compute the new hash
+
+                    // if value changed, get the old value and insert into last branch
+                    if(currValue != 0x0) {
                         // rlp(node) = rlp[rlp(encoded Path), rlp(value)]
                         bytes[] memory _list = new bytes[](2);
                         _list[0] = valueNode[1].toRlpBytes();
-                        _list[1] = RLPWriter.encodeUint(uint256(newValue));
+                        // value needs double encoding if too long for some reason
+                        // TODO only encode double if more than one byte is needed
+                        if (uint256(currValue) > 127) {
+                            _list[1] = RLPWriter.encodeBytes(RLPWriter.encodeUint(uint256(currValue)));
+                        } else {
+                            _list[1] = RLPWriter.encodeUint(uint256(currValue));
+                        }
                         // insert in the last common branch
-                        bytes32 hash = keccak256(RLPWriter.encodeList(_list));
-                        lastBranch[i] = RLPWriter.encodeUint(uint256(hash)).toRlpItem();
+                        bytes memory encodedList = RLPWriter.encodeList(_list);
+                        if (encodedList.length > 32) {
+                            lastBranch[i] = RLPReader.toRlpItem(RLPWriter.encodeUint(uint256(keccak256(encodedList))));
+                        } else {
+                            lastBranch[i] = encodedList.toRlpItem();
+                        }
                     } else {
+                        // If the slot was empty before, remove branch to get the old contract state
                         lastBranch[i] = RLPWriter.encodeUint(0).toRlpItem();
                     }
                 } else if (valueNode.length == 2) {
@@ -235,9 +282,9 @@ contract ProxyContract {
             _list[j] = lastBranch[j].toRlpBytes();
         }
         newParentHash = keccak256(RLPWriter.encodeList(_list));
-
         // adjust all the common parent branches
         bytes32 keccakParentHash = keccak256(abi.encodePacked(parentHash));
+        // todo why is it i > 0 and not i>=0 and i = commonBranches.length -2? commonBranches.length-1 is not a common branch, but the rootNode...
         for (uint i = commonBranches.length - 1; i > 0; i--) {
             RLPReader.RLPItem[] memory branchNode = RLPReader.toList(commonBranches[i]);
 
@@ -290,7 +337,8 @@ contract ProxyContract {
         bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
 
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
-        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
+        bool verified = GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root);
+        require(verified, "Failed to verify the account proof");
 
         GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
 
@@ -298,8 +346,7 @@ contract ProxyContract {
         require(verifyOldContractStateProof(getProof.storageProofs), "Failed to verify old contract state proof");
 
         // Third verify proof is valid according to current block in relay contract
-        require(computeRoot(getProof.storageProofs, false) == account.storageHash);
-
+        require(computeRoot(getProof.storageProofs, false) == account.storageHash, 'Current contract state proof does not match');
 
         // update the storage or revert on error
         setStorageValues(getProof.storageProofs);
@@ -314,24 +361,65 @@ contract ProxyContract {
     */
     function setStorageValues(bytes memory rlpProofNode) internal {
         RLPReader.RLPItem[] memory proofNode = rlpProofNode.toRlpItem().toList();
-        // and a list of values [0..16] for the last branch node
-        RLPReader.RLPItem[] memory latestCommonBranchValues = RLPReader.toList(proofNode[1]);
 
-        // loop through every value
-        for (uint i = 0; i < 17; i++) {
-            // the value node either holds the [key, value]directly or another proofnode
-            RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
-            if (valueNode.length == 3) {
-                // leaf value, where the is the value of the latest branch node at index i
-                bytes32 value = bytes32(valueNode[2].toUint());
-                if (value != 0x0) {
-                    bytes32 slot = bytes32(valueNode[0].toUint());
+        if (RLPReader.isList(proofNode[1])) {
+            // its a branch
+            // and a list of values [0..16] for the last branch node
+            RLPReader.RLPItem[] memory latestCommonBranchValues = RLPReader.toList(proofNode[1]);
+            // loop through every value
+            for (uint i = 0; i < 17; i++) {
+                // the value node either holds the [key, value]directly or another proofnode
+                RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
+                if (valueNode.length == 3) {
+                    // leaf value, where the is the value of the latest branch node at index i
+                    uint byte0;
+                    bytes32 value;
+                    uint memPtr = valueNode[2].memPtr;
                     assembly {
-                        sstore(slot, value)
+                        byte0 := byte(0, mload(memPtr))
                     }
+
+                    if (byte0 > 127) {
+                        // leaf is double encoded when greater than 127
+                        valueNode[2].memPtr += 1;
+                        valueNode[2].len -= 1;
+                        value = bytes32(valueNode[2].toUint());
+                    } else {
+                        value = bytes32(byte0);
+                    }
+                    if (value != 0x0) {
+                        bytes32 slot = bytes32(valueNode[0].toUint());
+                        assembly {
+                            sstore(slot, value)
+                        }
+                    }
+                } else if (valueNode.length == 2) {
+                    setStorageValues(latestCommonBranchValues[i].toRlpBytes());
                 }
-            } else if (valueNode.length == 2) {
-                setStorageValues(latestCommonBranchValues[i].toRlpBytes());
+            }
+        } else {
+            // its only one value
+            // leaf value, where the is the value of the latest branch node at index i
+            uint byte0;
+            bytes32 value;
+            uint memPtr = proofNode[2].memPtr;
+            assembly {
+                byte0 := byte(0, mload(memPtr))
+            }
+
+            if (byte0 > 127) {
+                // leaf is double encoded when greater than 127
+                proofNode[2].memPtr += 1;
+                proofNode[2].len -= 1;
+                value = bytes32(proofNode[2].toUint());
+            } else {
+                value = bytes32(byte0);
+            }
+            if (value != 0x0) {
+                bytes32 slot = bytes32(proofNode[0].toUint());
+                assembly {
+                    sstore(slot, value)
+                }
             }
         }
     }
