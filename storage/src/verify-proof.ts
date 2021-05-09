@@ -207,19 +207,20 @@ export class GetProof implements IGetProof {
         let pathNodes: ProofPathBuilder | undefined = undefined;
         let rootNode;
         for (let storageProof of this.storageProof) {
-            let parentNode: BranchNode | ProofPathBuilder | undefined = undefined;
+            let parentNode: ParentNode | undefined = undefined;
             // loop over all proof nodes
             for (let i = 0; i < storageProof.proof.length; i++) {
                 let proofNode = storageProof.proof[i];
                 const node = rlp.decode(hexStringToBuffer(proofNode));
                 
                 if (!pathNodes) {
-                    if (node.length === 17) {
-                        // first node in proof array is the root node
-                        pathNodes = new ProofPathBuilder(node);
-                    } else if (i === storageProof.proof.length - 1) { // node.length === 2
+                    if (i === storageProof.proof.length - 1) { // node.length === 2
                         // only one node in the tree
+                        console.log('Leaf as root');
                         pathNodes = new ProofPathBuilder(node, storageProof.key);
+                    } else {
+                        // its an extension or branch
+                        pathNodes = new ProofPathBuilder(node);
                     }
                     rootNode = proofNode;
                 }
@@ -228,7 +229,10 @@ export class GetProof implements IGetProof {
                     parentNode = pathNodes;
                     continue;
                 }
-                if (!pathNodes) process.exit(-1);
+                if (!pathNodes || !parentNode) {
+                    console.log('not possible.');
+                    process.exit(-1);
+                }
                 if (node.length === 17) {
                     // branch node
                     if (i === storageProof.proof.length - 1) {
@@ -247,7 +251,7 @@ export class GetProof implements IGetProof {
                     } else {
                         // extension
                         console.log('extension');
-                        // todo extension kann auch root sein
+                        pathNodes.addExtension(node, parentNode);
                     }
                 }
             }
@@ -260,9 +264,10 @@ export class GetProof implements IGetProof {
         const account = encodeAccount(this.account());
         const accountNodes = await this.encodeParentNodes(stateRoot);
         const storage = await this.encodedStorageProofs();
-        return utils.encode(
-            [
-                account, accountNodes, storage
+        return utils.encode([
+                account, 
+                accountNodes, 
+                storage
             ]
         );
     }
@@ -271,8 +276,7 @@ export class GetProof implements IGetProof {
      * @return rlp encoded list of rlp encoded storage proofs
      */
     async encodedStorageProofs(): Promise<Buffer> {
-        const storage = await Promise.all(this.storageProof.map(
-            (p) => {
+        const storage = await Promise.all(this.storageProof.map((p) => {
                 return encodeStorageProof(p, this.storageHash);
             }));
         return utils.encode(storage)
@@ -301,7 +305,7 @@ export class GetProof implements IGetProof {
 
 class ProofPathBuilder {
     root: LeafNode | any;
-    children: EmbeddedNode[] | undefined;
+    children: EmbeddedNode | EmbeddedNode[] | undefined;
 
     constructor(root, storageKey?) {
         if (root.length === 2 && storageKey) {
@@ -309,30 +313,51 @@ class ProofPathBuilder {
             this.root = new LeafNode(root, storageKey);
         } else if (root.length === 2) {
             // root is extension
+            console.log('extension as root');
+            this.root = root;
         } else {
             // root is branch
+            console.log('branch as root');
             this.root = root;
             this.children = Array(17).fill(null);
         }
     }
 
-    addValue(storageKey, leafNode, parentNode): LeafNode | undefined {
+    addValue(storageKey, leafNode, parentNode: ParentNode): LeafNode | undefined {
         return this.insert(leafNode, parentNode, storageKey, true) as LeafNode;
     }
 
-    addBranch(branchNode, parentNode, storageKey): BranchNode | undefined {
+    addBranch(branchNode, parentNode: ParentNode, storageKey): BranchNode | undefined {
         return this.insert(branchNode, parentNode, storageKey, false) as BranchNode;
     }
 
-    insertChild(childBranch: BranchNode, node, parentNode: BranchNode, storageKey, isLeaf): EmbeddedNode | undefined | null {
+    addExtension(extensionNode, parentNode: ParentNode): ExtensionNode | undefined {
+        return this.insert(extensionNode, parentNode, undefined, false) as ExtensionNode;
+    }
+
+    insertChild(childBranch: ParentNode, node, parentNode: ParentNode, storageKey, isLeaf): EmbeddedNode | undefined | null {
         const nodeRef = hexStringToBuffer(ethers.utils.keccak256(rlp.encode(node)));
-        if (!this.children) return undefined;
+        if (childBranch instanceof ProofPathBuilder) {
+            console.log('not possible to be proofpathbuilder in insertChild');
+            process.exit(-1);
+        } else if (childBranch instanceof ExtensionNode) {
+            // todo extension root and first child.
+            if (!childBranch.child) {
+                childBranch.child = new BranchNode(node, storageKey);
+                return childBranch.child;
+            }
+            return this.insertChild(childBranch.child as BranchNode, node, parentNode, storageKey, isLeaf);
+        }
 
         for (let i = 0; i < childBranch.children.length; i++) {
             if (childBranch.node[i].equals(nodeRef)) {
                 if (isLeaf) {
                     // insert leaf
                     childBranch.children[i] = new LeafNode(node, storageKey);
+                } else if (node.length === 2 && !childBranch.children[i]) {
+                    // insert extension
+                    childBranch.children[i] = new ExtensionNode(node, undefined);
+                    return childBranch.children[i];
                 } else {
                     if (!childBranch.children[i]) {
                         // insert branch
@@ -346,8 +371,8 @@ class ProofPathBuilder {
             }
             // check nested
             if (childBranch.children[i]) {
-                if (childBranch.children[i] instanceof BranchNode) {
-                    let newNode = this.insertChild(childBranch.children[i] as BranchNode, node, parentNode, storageKey, isLeaf);
+                if (childBranch.children[i] instanceof BranchNode || childBranch.children[i] instanceof ExtensionNode) {
+                    let newNode = this.insertChild(childBranch.children[i] as ParentNode, node, parentNode, storageKey, isLeaf);
                     if (newNode !== undefined) {
                         console.log('new subnode');
                         return newNode;
@@ -358,17 +383,31 @@ class ProofPathBuilder {
         return undefined;
     }
 
-    insert(node, parentNode, storageKey, isLeaf): EmbeddedNode | undefined | null {
+    insert(node, parentNode: ParentNode, storageKey, isLeaf): EmbeddedNode | undefined | null {
         const nodeRef = hexStringToBuffer(ethers.utils.keccak256(rlp.encode(node)));
-        const parentRef = ethers.utils.keccak256(rlp.encode(parentNode));
-        if (!this.children) return undefined;
+        // const parentRef = ethers.utils.keccak256(rlp.encode(parentNode));
 
         // find the parent node
+        if (!(this.children instanceof Array)) {
+            // root is extension node
+            if (!this.children) {
+                this.children = new BranchNode(node, storageKey);
+                return this.children;
+            }
+            // -> check nested
+            return this.insertChild(this.children as BranchNode, node, parentNode, storageKey, isLeaf);
+        }
+
+        // root is branch node
         for (let i = 0; i < this.children.length; i++) {
             if (this.root[i].equals(nodeRef)) {
                 if (isLeaf) {
                     // insert leaf
                     this.children[i] = new LeafNode(node, storageKey);
+                    return this.children[i];
+                } else if (node.length === 2 && !this.children[i]) {
+                    // insert extension
+                    this.children[i] = new ExtensionNode(node, undefined);
                     return this.children[i];
                 } else {
                     if (!this.children[i]) {
@@ -382,8 +421,8 @@ class ProofPathBuilder {
             }
             // check nested
             if (this.children[i]) {
-                if (this.children[i] instanceof BranchNode) {
-                    let newNode = this.insertChild(this.children[i] as BranchNode, node, parentNode, storageKey, isLeaf);
+                if (this.children[i] instanceof BranchNode || this.children[i] instanceof ExtensionNode) {
+                    let newNode = this.insertChild(this.children[i] as ParentNode, node, parentNode, storageKey, isLeaf);
                     if (newNode !== undefined) {
                         console.log('new subnode');
                         
@@ -392,25 +431,34 @@ class ProofPathBuilder {
                 }
             }
         }
+
+        return undefined;
     }
 
     encode() {
         if (this.root instanceof LeafNode) return rlp.encode(this.root.encode());
         else if (!this.children) return null;
         
-        const nodes = this.children.map(n => {
-            if (n) {
-                return n.encode();
-            } else {
-                return [];
-            }
-        });
+        if (this.children instanceof Array) {
+            // its a branch as a root
+            const nodes = this.children.map(n => {
+                if (n) {
+                    return n.encode();
+                } else {
+                    return [];
+                }
+            });
 
-        return rlp.encode([[this.root], nodes]);
+            return rlp.encode([[this.root], nodes]);
+        }
+
+        // its an extension
+        return rlp.encode([[this.root], [this.children]]);
     }
 }
 
-type EmbeddedNode = LeafNode | BranchNode;
+type EmbeddedNode = LeafNode | BranchNode | ExtensionNode;
+type ParentNode = BranchNode | ExtensionNode | ProofPathBuilder;
 
 class LeafNode {
     storageKey: Buffer;
@@ -423,6 +471,21 @@ class LeafNode {
 
     encode() {
         return [ethers.utils.hexZeroPad(this.storageKey, 32), this.node[0], this.node[1]];
+    }
+}
+
+class ExtensionNode {
+    node: Buffer[];
+    child: EmbeddedNode | undefined;
+
+    constructor(node: Buffer[], child: EmbeddedNode | undefined) {
+        this.node = node;
+        this.child = child;
+    }
+
+    encode() {
+        if (!this.child) return undefined
+        return [ [this.node], [this.child.encode()] ];
     }
 }
 

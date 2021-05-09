@@ -65,8 +65,7 @@ contract ProxyContract {
   * @param storageHash the hash of the contract's storage
   */
     function updateStorageKeys(bytes memory rlpStorageKeyProofs, bytes32 storageHash) internal {
-        RLPReader.Iterator memory it =
-        rlpStorageKeyProofs.toRlpItem().iterator();
+        RLPReader.Iterator memory it = rlpStorageKeyProofs.toRlpItem().iterator();
 
         while (it.hasNext()) {
             setStorageKey(it.next(), storageHash);
@@ -85,6 +84,7 @@ contract ProxyContract {
         bytes memory path = GetProofLib.triePath(abi.encodePacked(proof.key));
 
         // verify the storage proof
+        // todo hier gibts probleme
         require(MerklePatriciaProof.verify(
                 proof.value, path, proof.proof, storageHash
             ), "Failed to verify the storage proof");
@@ -188,6 +188,8 @@ contract ProxyContract {
         RLPReader.RLPItem[] memory proofNode = rlpProofNode.toRlpItem().toList();
 
         if (!RLPReader.isList(proofNode[1])) {
+            // todo could be an extension
+        
             // its only one leaf node
             if (isOldContractStateProof) {
                 // tree consists of only one entry
@@ -233,55 +235,72 @@ contract ProxyContract {
         parentHash = keccak256(commonBranches[commonBranches.length - 1].toRlpBytes());
 
         if(isOldContractStateProof) {
-            // loop through every value
-            for (uint i = 0; i < 17; i++) {
-                // the value node either holds the [key, value]directly or another proofnode
-                RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
-                if (valueNode.length == 3) {
-                    // leaf value, where the is the value of the latest branch node at index i
-                    uint key = valueNode[0].toUint();
-                    bytes32 currValue;
-                    assembly {
-                        currValue := sload(key)
-                    }
+            if (latestCommonBranchValues.length == 1) {
+                // its an extension
+                bytes32 newReferenceHash = computeRoot(latestCommonBranchValues[0].toRlpBytes(), isOldContractStateProof);
+                lastBranch[1] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
+            } else {
+                // its a branch
+                // loop through every value
+                for (uint i = 0; i < 17; i++) {
+                    // the value node either holds the [key, value]directly or another proofnode
+                    RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
+                    if (valueNode.length == 3) {
+                        // leaf value, where the is the value of the latest branch node at index i
+                        uint key = valueNode[0].toUint();
+                        bytes32 currValue;
+                        assembly {
+                            currValue := sload(key)
+                        }
 
-                    // if value changed, get the old value and insert into last branch
-                    if(currValue != 0x0) {
-                        // rlp(node) = rlp[rlp(encoded Path), rlp(value)]
-                        bytes[] memory _list = new bytes[](2);
-                        _list[0] = valueNode[1].toRlpBytes();
-                        // value needs double encoding if too long for some reason
-                        // TODO only encode double if more than one byte is needed
-                        if (uint256(currValue) > 127) {
-                            _list[1] = RLPWriter.encodeBytes(RLPWriter.encodeUint(uint256(currValue)));
+                        // if value changed, get the old value and insert into last branch
+                        if(currValue != 0x0) {
+                            // rlp(node) = rlp[rlp(encoded Path), rlp(value)]
+                            bytes[] memory _list = new bytes[](2);
+                            _list[0] = valueNode[1].toRlpBytes();
+                            // value needs double encoding if too long for some reason
+                            if (uint256(currValue) > 127) {
+                                _list[1] = RLPWriter.encodeBytes(RLPWriter.encodeUint(uint256(currValue)));
+                            } else {
+                                _list[1] = RLPWriter.encodeUint(uint256(currValue));
+                            }
+                            // insert in the last common branch
+                            bytes memory encodedList = RLPWriter.encodeList(_list);
+                            if (encodedList.length > 32) {
+                                lastBranch[i] = RLPReader.toRlpItem(RLPWriter.encodeUint(uint256(keccak256(encodedList))));
+                            } else {
+                                lastBranch[i] = encodedList.toRlpItem();
+                            }
                         } else {
-                            _list[1] = RLPWriter.encodeUint(uint256(currValue));
+                            // If the slot was empty before, remove branch to get the old contract state
+                            lastBranch[i] = RLPWriter.encodeUint(0).toRlpItem();
                         }
-                        // insert in the last common branch
-                        bytes memory encodedList = RLPWriter.encodeList(_list);
-                        if (encodedList.length > 32) {
-                            lastBranch[i] = RLPReader.toRlpItem(RLPWriter.encodeUint(uint256(keccak256(encodedList))));
-                        } else {
-                            lastBranch[i] = encodedList.toRlpItem();
-                        }
-                    } else {
-                        // If the slot was empty before, remove branch to get the old contract state
-                        lastBranch[i] = RLPWriter.encodeUint(0).toRlpItem();
+                    } else if (valueNode.length == 2) {
+                        // branch or extension
+                        // another proofNode [branches], values | proofnode, key
+                        bytes32 newReferenceHash = computeRoot(latestCommonBranchValues[i].toRlpBytes(), isOldContractStateProof);
+                        lastBranch[i] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
                     }
-                } else if (valueNode.length == 2) {
-                    // another proofNode [branches], values | proofnode, key
-                    bytes32 newReferenceHash = computeRoot(latestCommonBranchValues[i].toRlpBytes(), isOldContractStateProof);
-                    lastBranch[i] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
                 }
             }
+            
         }
 
         // hash the last branch to get the reference hash
-        bytes[] memory _list = new bytes[](17);
-        for (uint j = 0; j < 17; j++) {
-            _list[j] = lastBranch[j].toRlpBytes();
+        if (lastBranch.length == 2) {
+            bytes[] memory _list = new bytes[](2);
+            for (uint j = 0; j < 2; j++) {
+                _list[j] = lastBranch[j].toRlpBytes();
+            }
+            newParentHash = keccak256(RLPWriter.encodeList(_list));
+        } else {
+            bytes[] memory _list = new bytes[](17);
+            for (uint j = 0; j < 17; j++) {
+                _list[j] = lastBranch[j].toRlpBytes();
+            }
+            newParentHash = keccak256(RLPWriter.encodeList(_list));
         }
-        newParentHash = keccak256(RLPWriter.encodeList(_list));
+        
         // adjust all the common parent branches
         bytes32 keccakParentHash = keccak256(abi.encodePacked(parentHash));
         // todo why is it i > 0 and not i>=0 and i = commonBranches.length -2? commonBranches.length-1 is not a common branch, but the rootNode...

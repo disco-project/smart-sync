@@ -47,7 +47,7 @@ library MerklePatriciaProof {
                 }
 
                 uint8 nextPathNibble = uint8(path[pathPtr]);
-                if (nextPathNibble > 16) {return false;}
+                if (nextPathNibble > 16) { return false; }
                 nodeKey = bytes32(RLPReader.toUint(currentNodeList[nextPathNibble]));
                 pathPtr += 1;
             } else if (currentNodeList.length == 2) {
