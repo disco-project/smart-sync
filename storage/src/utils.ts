@@ -28,7 +28,7 @@ export function hexlify(input) {
  * @param batchSize how many keys to retrieve per request [parity_liststoragekeys](https://openethereum.github.io/JSONRPC-parity-module#parity_liststoragekeys)
  * @returns all the storage keys of the contract with `address` at block `blockNum`
  */
-export async function getAllKeys(address, provider = new ethers.providers.JsonRpcProvider(), blockNum = "latest", batchSize = 50) {
+export async function getAllKeys(address, provider = new ethers.providers.JsonRpcProvider(), blockNum = "latest", batchSize = 50): Promise<String[]> {
     let keys = [];
     let batch = [];
     let batchCounter = 1;
