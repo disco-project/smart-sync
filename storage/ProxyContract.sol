@@ -29,33 +29,22 @@ contract ProxyContract {
     */
     address internal constant LOGIC_ADDRESS = 0x55f2155f2fEdbf701262573Be477A6562E09AeE0;
 
-    /**
-    * @dev initialize the storage of this contract based on the provided proof.
-    * @param proof rlp encoded EIP1186 proof
-    */
-    constructor(bytes memory proof) public {
-        // initialize the contract's storage
-        initialize(proof);
+    constructor() public {
     }
 
     /**
-    * @dev initialize the storage of this contract based on the provided proof.
-    * @param proof rlp encoded EIP1186 proof
+    * @dev Adds values to the storage. Used for initialization.
+    * @param keys -> Array of keys for storage
+    * @param values -> Array of values corresponding to the array keys.
     */
-    function initialize(bytes memory proof) internal {
-        RelayContract relay = getRelay();
-        bytes32 root = relay.getStateRoot();
-        bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
-        GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
-        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
-
-        GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
-
-        // update the storage or revert on error
-        updateStorageKeys(getProof.storageProofs, account.storageHash);
-
-        // update the state in the relay
-        relay.updateProxyStorage(account.storageHash);
+    function addStorage(bytes32[] memory keys, bytes32[] memory values) public {
+        require(keys.length == values.length, 'arrays keys and values do not have the same length');
+        
+        for (uint i = 0; i < keys.length; i++) {
+            assembly {
+                store(keys[i], values[i])
+            }
+        }
     }
 
     /**
@@ -63,45 +52,6 @@ contract ProxyContract {
     */
     function getRelay() internal view returns (RelayContract) {
         return RelayContract(RELAY_ADDRESS);
-    }
-
-    /**
-  * @dev Sets the contract's storage based on the encoded storage
-  * @param rlpStorageKeyProofs the rlp encoded list of storage proofs
-  * @param storageHash the hash of the contract's storage
-  */
-    function updateStorageKeys(bytes memory rlpStorageKeyProofs, bytes32 storageHash) internal {
-        RLPReader.Iterator memory it = rlpStorageKeyProofs.toRlpItem().iterator();
-
-        while (it.hasNext()) {
-            setStorageKey(it.next(), storageHash);
-        }
-    }
-
-
-    /**
-    * @dev Update a single storage key after validating against the storage key
-    */
-    function setStorageKey(RLPReader.RLPItem memory rlpStorageKeyProof, bytes32 storageHash) internal {
-        // parse the rlp encoded storage proof
-        GetProofLib.StorageProof memory proof = GetProofLib.parseStorageProof(rlpStorageKeyProof.toBytes());
-
-        // get the path in the trie leading to the value
-        bytes memory path = GetProofLib.triePath(abi.encodePacked(proof.key));
-
-        // verify the storage proof
-        require(MerklePatriciaProof.verify(
-                proof.value, path, proof.proof, storageHash
-            ), "Failed to verify the storage proof");
-
-        // decode the rlp encoded value
-        bytes32 value = bytes32(proof.value.toRlpItem().toUint());
-
-        // store the value in the right slot
-        bytes32 slot = proof.key;
-        assembly {
-            sstore(slot, value)
-        }
     }
 
     function _beforeFallback() internal {
