@@ -285,12 +285,7 @@ contract ProxyContract {
                         lastBranch[i] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
                     }
                 }
-            } else if (valueNode.length == 2) {
-                // another proofNode [branches], values | proofnode, key
-                bytes32 newReferenceHash = computeRoot(latestCommonBranchValues[i].toRlpBytes(), isOldContractStateProof);
-                lastBranch[i] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
-            }
-            
+            }            
         }
 
         // hash the last branch to get the reference hash
