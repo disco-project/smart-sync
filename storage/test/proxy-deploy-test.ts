@@ -26,6 +26,7 @@ describe("Deploy proxy and logic contract", async function () {
         [deployer] = await ethers.getSigners();
         factory = new SyncCandidate__factory(deployer);
         srcContract = await factory.deploy();
+        logicContract = await factory.deploy();
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
@@ -50,7 +51,7 @@ describe("Deploy proxy and logic contract", async function () {
     })
 
     it("Should compile and deploy the proxy", async function () {
-        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, srcContract.address);
+        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
 
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
@@ -87,7 +88,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 
-        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, srcContract.address);
+        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
 
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
@@ -180,6 +181,8 @@ describe("Deploy proxy and logic contract", async function () {
         const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 
         const rlpProof = await proof.optimizedProof(latestBlock.stateRoot);
+
+        // Note that the respective block is not added to the realy contract here
 
         // compute the optimized storage proof
         const rlpOptimized = proof.optimizedStorageProof();

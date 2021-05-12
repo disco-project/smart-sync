@@ -24,6 +24,12 @@ contract ProxyContract {
     address internal constant SOURCE_ADDRESS = 0x0a911618A3dD806a5D14bf856cf355C4b9C84526;
 
     /**
+    * @dev address of the contract that is being mirrored.
+    * The address in the file is a placeholder
+    */
+    address internal constant LOGIC_ADDRESS = 0x55f2155f2fEdbf701262573Be477A6562E09AeE0;
+
+    /**
     * @dev initialize the storage of this contract based on the provided proof.
     * @param proof rlp encoded EIP1186 proof
     */
@@ -123,7 +129,7 @@ contract ProxyContract {
      * The address of the implementation contract
      */
     function _implementation() internal returns (address) {
-        return SOURCE_ADDRESS;
+        return LOGIC_ADDRESS;
     }
 
     /**
@@ -281,6 +287,10 @@ contract ProxyContract {
                         lastBranch[i] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
                     }
                 }
+            } else if (valueNode.length == 2) {
+                // another proofNode [branches], values | proofnode, key
+                bytes32 newReferenceHash = computeRoot(latestCommonBranchValues[i].toRlpBytes(), isOldContractStateProof);
+                lastBranch[i] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
             }
             
         }
@@ -364,7 +374,8 @@ contract ProxyContract {
         require(verifyOldContractStateProof(getProof.storageProofs), "Failed to verify old contract state proof");
 
         // Third verify proof is valid according to current block in relay contract
-        require(computeRoot(getProof.storageProofs, false) == account.storageHash, 'Current contract state proof does not match');
+        require(computeRoot(getProof.storageProofs, false) == account.storageHash, "Failed to verify new contract state proof");
+
 
         // update the storage or revert on error
         setStorageValues(getProof.storageProofs);
