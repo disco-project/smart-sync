@@ -193,8 +193,6 @@ contract ProxyContract {
         RLPReader.RLPItem[] memory proofNode = rlpProofNode.toRlpItem().toList();
 
         if (!RLPReader.isList(proofNode[1])) {
-            // todo could be an extension
-        
             // its only one leaf node
             if (isOldContractStateProof) {
                 // tree consists of only one entry
