@@ -84,7 +84,6 @@ contract ProxyContract {
         bytes memory path = GetProofLib.triePath(abi.encodePacked(proof.key));
 
         // verify the storage proof
-        // todo hier gibts probleme
         require(MerklePatriciaProof.verify(
                 proof.value, path, proof.proof, storageHash
             ), "Failed to verify the storage proof");
