@@ -6,6 +6,7 @@ import assert from "assert";
 import * as utils from "./utils";
 import {formatPathStack} from "./build-proof";
 import { exit } from "process";
+import { Logger } from "tslog";
 
 export async function testStorageProof(storageProof: StorageProof, storageRoot) {
     const trie = new Trie(null, hexStringToBuffer(storageRoot));
@@ -154,13 +155,14 @@ export class GetProof implements IGetProof {
     nonce: string;
     storageHash: string;
     storageProof: StorageProof[];
+    logger: Logger;
 
     /**
      *
      * @param buf
      * @param address
      */
-    static decode(buf: Buffer, address) {
+    static decode(buf: Buffer, address, logger: Logger) {
         const it = rlp.decode(buf);
         assert(it.length === 3, "Rlp encoded Proof requires exactly 3 entries");
         const account = decodeAccount(it[0] as any);
@@ -175,10 +177,10 @@ export class GetProof implements IGetProof {
             nonce: account.nonce,
             storageHash: account.storageHash,
             storageProof
-        });
+        }, logger);
     }
 
-    constructor(proof) {
+    constructor(proof, logger: Logger) {
         this.accountProof = proof.accountProof;
         this.address = proof.address;
         this.balance = proof.balance;
@@ -187,6 +189,7 @@ export class GetProof implements IGetProof {
         this.codeHash = proof.codeHash;
         this.storageHash = proof.storageHash;
         this.storageProof = proof.storageProof;
+        this.logger = logger.getChildLogger({ name: 'GetProof' });
     }
 
     async optimizedProof(stateRoot) {
@@ -216,11 +219,11 @@ export class GetProof implements IGetProof {
                 if (!pathNodes) {
                     if (i === storageProof.proof.length - 1) { // node.length === 2
                         // only one node in the tree
-                        console.log('Leaf as root');
-                        pathNodes = new ProofPathBuilder(node, storageProof.key);
+                        this.logger.debug('Leaf as root');
+                        pathNodes = new ProofPathBuilder(node, this.logger, storageProof.key);
                     } else {
                         // its an extension or branch
-                        pathNodes = new ProofPathBuilder(node);
+                        pathNodes = new ProofPathBuilder(node, this.logger);
                     }
                     rootNode = proofNode;
                 }
@@ -230,28 +233,28 @@ export class GetProof implements IGetProof {
                     continue;
                 }
                 if (!pathNodes || !parentNode) {
-                    console.log('not possible.');
+                    this.logger.debug('not possible.');
                     process.exit(-1);
                 }
                 if (node.length === 17) {
                     // branch node
                     if (i === storageProof.proof.length - 1) {
                         // terminating
-                        console.log('terminating branch');
+                        this.logger.debug('terminating branch');
                         parentNode = pathNodes.addBranch(node, parentNode, storageProof.key);
                     } else {
-                        console.log('branch');
+                        this.logger.debug('branch');
                         parentNode = pathNodes.addBranch(node, parentNode, null);
                     }
                 } else if (node.length === 2) {
                     if (i === storageProof.proof.length - 1) {
-                        console.log('leaf');
+                        this.logger.debug('leaf');
                         // leaf
                         pathNodes.addValue(storageProof.key, node, parentNode);
                     } else {
                         // extension
-                        console.log('extension');
-                        pathNodes.addExtension(node, parentNode);
+                        this.logger.debug('extension');
+                        parentNode = pathNodes.addExtension(node, parentNode);
                     }
                 }
             }
@@ -277,7 +280,7 @@ export class GetProof implements IGetProof {
      */
     async encodedStorageProofs(): Promise<Buffer> {
         const storage = await Promise.all(this.storageProof.map((p) => {
-                return encodeStorageProof(p, this.storageHash);
+                return encodeStorageProof(p, this.storageHash, this.logger);
             }));
         return utils.encode(storage)
     }
@@ -306,18 +309,20 @@ export class GetProof implements IGetProof {
 class ProofPathBuilder {
     root: LeafNode | any;
     children: EmbeddedNode | EmbeddedNode[] | undefined;
+    logger: Logger;
 
-    constructor(root, storageKey?) {
+    constructor(root, logger: Logger, storageKey?) {
+        this.logger = logger.getChildLogger({ name: 'ProofPathBuilder' });
         if (root.length === 2 && storageKey) {
             // root is leaf
             this.root = new LeafNode(root, storageKey);
         } else if (root.length === 2) {
             // root is extension
-            console.log('extension as root');
+            this.logger.debug('extension as root');
             this.root = root;
         } else {
             // root is branch
-            console.log('branch as root');
+            this.logger.debug('branch as root');
             this.root = root;
             this.children = Array(17).fill(null);
         }
@@ -338,12 +343,15 @@ class ProofPathBuilder {
     insertChild(childBranch: ParentNode, node, parentNode: ParentNode, storageKey, isLeaf): EmbeddedNode | undefined | null {
         const nodeRef = hexStringToBuffer(ethers.utils.keccak256(rlp.encode(node)));
         if (childBranch instanceof ProofPathBuilder) {
-            console.log('not possible to be proofpathbuilder in insertChild');
+            this.logger.debug('not possible to be proofpathbuilder in insertChild');
             process.exit(-1);
         } else if (childBranch instanceof ExtensionNode) {
             // todo extension root and first child.
             if (!childBranch.child) {
                 childBranch.child = new BranchNode(node, storageKey);
+                return childBranch.child;
+            } else if (childBranch.node[1].equals(nodeRef)) {
+                // child already exists
                 return childBranch.child;
             }
             return this.insertChild(childBranch.child as BranchNode, node, parentNode, storageKey, isLeaf);
@@ -357,7 +365,6 @@ class ProofPathBuilder {
                 } else if (node.length === 2 && !childBranch.children[i]) {
                     // insert extension
                     childBranch.children[i] = new ExtensionNode(node, undefined);
-                    return childBranch.children[i];
                 } else {
                     if (!childBranch.children[i]) {
                         // insert branch
@@ -365,7 +372,6 @@ class ProofPathBuilder {
                     } else if (storageKey && !((childBranch.children[i] as BranchNode).children[16])) {
                         (childBranch.children[i] as BranchNode).children[16] = new LeafNode(rlp.decode(node[16]) as any, storageKey);
                     }
-                    return childBranch.children[i];
                 }
                 return childBranch.children[i];
             }
@@ -374,7 +380,7 @@ class ProofPathBuilder {
                 if (childBranch.children[i] instanceof BranchNode || childBranch.children[i] instanceof ExtensionNode) {
                     let newNode = this.insertChild(childBranch.children[i] as ParentNode, node, parentNode, storageKey, isLeaf);
                     if (newNode !== undefined) {
-                        console.log('new subnode');
+                        this.logger.debug('new subnode');
                         return newNode;
                     }
                 }
@@ -404,11 +410,9 @@ class ProofPathBuilder {
                 if (isLeaf) {
                     // insert leaf
                     this.children[i] = new LeafNode(node, storageKey);
-                    return this.children[i];
                 } else if (node.length === 2 && !this.children[i]) {
                     // insert extension
                     this.children[i] = new ExtensionNode(node, undefined);
-                    return this.children[i];
                 } else {
                     if (!this.children[i]) {
                         // insert branch
@@ -416,15 +420,15 @@ class ProofPathBuilder {
                     } else if (storageKey && !((this.children[i] as BranchNode).children[16])) {
                         (this.children[i] as BranchNode).children[16] = new LeafNode(rlp.decode(node[16]) as any, storageKey);
                     }
-                    return this.children[i];
                 }
+                return this.children[i];
             }
             // check nested
             if (this.children[i]) {
                 if (this.children[i] instanceof BranchNode || this.children[i] instanceof ExtensionNode) {
                     let newNode = this.insertChild(this.children[i] as ParentNode, node, parentNode, storageKey, isLeaf);
                     if (newNode !== undefined) {
-                        console.log('new subnode');
+                        this.logger.debug('new subnode');
                         
                         return newNode;
                     }
@@ -580,7 +584,8 @@ export interface StorageProof {
     proof: string[];
 }
 
-export async function encodeStorageProof(storageProof: StorageProof, storageRoot): Promise<Buffer> {
+export async function encodeStorageProof(storageProof: StorageProof, storageRoot, logger: Logger): Promise<Buffer> {
+    const log = logger.getChildLogger({ name: 'encodeStorageProof' });
     const trie = new Trie(null, hexStringToBuffer(storageRoot));
     const storageNodes = format_proof_nodes(storageProof.proof);
     const storageTrie = await Trie.fromProof(storageNodes, trie);
@@ -588,6 +593,9 @@ export async function encodeStorageProof(storageProof: StorageProof, storageRoot
     const path = await storageTrie.findPath(storageKey) as any;
     let parentNodes = formatPathStack(path);
     // const key = Buffer.from("00" + storageKey.toString("hex"), "hex");
+    log.trace(`key: ${storageProof.key}, value: ${storageProof.value}`);
+    log.trace(parentNodes);
+    log.trace(ethers.utils.keccak256(rlp.encode(parentNodes[parentNodes.length - 1])));
     const entries = [
         hexStringToBuffer(ethers.utils.hexZeroPad(storageProof.key, 32)),
         utils.encode(storageProof.value),

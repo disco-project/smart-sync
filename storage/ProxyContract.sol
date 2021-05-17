@@ -178,6 +178,31 @@ contract ProxyContract {
         }
     }
 
+    function restoreOldValueState(RLPReader.RLPItem[] memory leaf) internal view returns (bytes memory) {
+        uint key = leaf[0].toUint();
+        bytes32 currValue;
+        assembly {
+            currValue := sload(key)
+        }
+
+        // If the slot was empty before, remove branch to get the old contract state
+        if(currValue != 0x0) {
+            // update the value and compute the new hash
+            // rlp(node) = rlp[rlp(encoded Path), rlp(value)]
+            bytes[] memory _list = new bytes[](2);
+            _list[0] = leaf[1].toRlpBytes();
+            if (uint256(currValue) > 127) {
+                _list[1] = RLPWriter.encodeBytes(RLPWriter.encodeUint(uint256(currValue)));
+            } else {
+                _list[1] = RLPWriter.encodeUint(uint256(currValue));
+            }
+            
+            return RLPWriter.encodeList(_list);
+        } else {
+            return RLPWriter.encodeUint(0);
+        }
+    }
+
     /**
     * @dev If is old contract state proof: Recursively updates a single proof node and returns the adjusted hash after modifying all the proof node's values
     * @dev Else: Computes state root from adjusted Merkle Tree
@@ -196,28 +221,7 @@ contract ProxyContract {
             // its only one leaf node
             if (isOldContractStateProof) {
                 // tree consists of only one entry
-                uint key = proofNode[0].toUint();
-                bytes32 currValue;
-                assembly {
-                    currValue := sload(key)
-                }
-
-                // If the slot was empty before, remove branch to get the old contract state
-                if(currValue != 0x0) {
-                    // update the value and compute the new hash
-                    // rlp(node) = rlp[rlp(encoded Path), rlp(value)]
-                    bytes[] memory _list = new bytes[](2);
-                    _list[0] = proofNode[1].toRlpBytes();
-                    if (uint256(currValue) > 127) {
-                        _list[1] = RLPWriter.encodeBytes(RLPWriter.encodeUint(uint256(currValue)));
-                    } else {
-                        _list[1] = RLPWriter.encodeUint(uint256(currValue));
-                    }
-                    
-                    return keccak256(RLPWriter.encodeList(_list));
-                } else {
-                    return keccak256(RLPWriter.encodeUint(0));
-                }
+                return keccak256(restoreOldValueState(proofNode));
             } else {
                 // just return hashed value if its the only one
                 bytes[] memory _list = new bytes[](2);
@@ -250,33 +254,12 @@ contract ProxyContract {
                     RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
                     if (valueNode.length == 3) {
                         // leaf value, where the is the value of the latest branch node at index i
-                        uint key = valueNode[0].toUint();
-                        bytes32 currValue;
-                        assembly {
-                            currValue := sload(key)
-                        }
-
-                        // if value changed, get the old value and insert into last branch
-                        if(currValue != 0x0) {
-                            // rlp(node) = rlp[rlp(encoded Path), rlp(value)]
-                            bytes[] memory _list = new bytes[](2);
-                            _list[0] = valueNode[1].toRlpBytes();
-                            // value needs double encoding if too long for some reason
-                            if (uint256(currValue) > 127) {
-                                _list[1] = RLPWriter.encodeBytes(RLPWriter.encodeUint(uint256(currValue)));
-                            } else {
-                                _list[1] = RLPWriter.encodeUint(uint256(currValue));
-                            }
-                            // insert in the last common branch
-                            bytes memory encodedList = RLPWriter.encodeList(_list);
-                            if (encodedList.length > 32) {
-                                lastBranch[i] = RLPReader.toRlpItem(RLPWriter.encodeUint(uint256(keccak256(encodedList))));
-                            } else {
-                                lastBranch[i] = encodedList.toRlpItem();
-                            }
+                        bytes memory encodedList = restoreOldValueState(valueNode);
+                        
+                        if (encodedList.length > 32) {
+                            lastBranch[i] = RLPReader.toRlpItem(RLPWriter.encodeUint(uint256(keccak256(encodedList))));
                         } else {
-                            // If the slot was empty before, remove branch to get the old contract state
-                            lastBranch[i] = RLPWriter.encodeUint(0).toRlpItem();
+                            lastBranch[i] = encodedList.toRlpItem();
                         }
                     } else if (valueNode.length == 2) {
                         // branch or extension
@@ -358,8 +341,7 @@ contract ProxyContract {
         bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
 
         GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
-        bool verified = GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root);
-        require(verified, "Failed to verify the account proof");
+        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
 
         GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
 
