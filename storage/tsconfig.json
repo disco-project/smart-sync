@@ -6,7 +6,8 @@
     "esModuleInterop": true,
     "noImplicitAny": false,
     "strictPropertyInitialization": false,
-    "outDir": "dist"
+    "outDir": "dist",
+    "sourceMap": true
   },
   "include": ["./scripts", "./test", "./src"],
   "files": ["./hardhat.config.ts"]
