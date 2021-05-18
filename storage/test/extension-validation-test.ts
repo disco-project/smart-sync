@@ -7,7 +7,7 @@ import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
-import { Logger } from "tslog";
+import { logger } from "../src/logger";
 const rlp = require('rlp');
 
 describe("Test scaling of contract", async function () {
@@ -22,7 +22,6 @@ describe("Test scaling of contract", async function () {
     let proxyContract: Contract;
     let callRelayContract: CallRelayContract;
     let storageRoot;
-    let logger: Logger;
 
     beforeEach(async () => {
         [deployer] = await ethers.getSigners();
@@ -35,8 +34,7 @@ describe("Test scaling of contract", async function () {
         provider = new ethers.providers.JsonRpcProvider();
         await srcContract.setValueA(42);
         await srcContract.setValueB(100);
-
-        logger = new Logger({ name: 'extension-validation-test.ts', minLevel: 'info' });
+        logger.setSettings({minLevel: 'info', name: 'scale_test.ts'});
     });
 
     it("It should create an optimized proof with extension nodes in it", async function () {
@@ -59,8 +57,9 @@ describe("Test scaling of contract", async function () {
         let keys = await getAllKeys(srcContract.address, provider);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
-        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
 
+        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
+      
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         const rlpOptimized = proof.optimizedStorageProof();
@@ -80,7 +79,7 @@ describe("Test scaling of contract", async function () {
         let keys = await getAllKeys(srcContract.address, provider);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
-        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 

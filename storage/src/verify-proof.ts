@@ -5,8 +5,8 @@ import {BaseTrie as Trie} from "merkle-patricia-tree";
 import assert from "assert";
 import * as utils from "./utils";
 import {formatPathStack} from "./build-proof";
-import { exit } from "process";
 import { Logger } from "tslog";
+import { logger } from "./logger"
 
 export async function testStorageProof(storageProof: StorageProof, storageRoot) {
     const trie = new Trie(null, hexStringToBuffer(storageRoot));
@@ -162,7 +162,7 @@ export class GetProof implements IGetProof {
      * @param buf
      * @param address
      */
-    static decode(buf: Buffer, address, logger: Logger) {
+    static decode(buf: Buffer, address) {
         const it = rlp.decode(buf);
         assert(it.length === 3, "Rlp encoded Proof requires exactly 3 entries");
         const account = decodeAccount(it[0] as any);
@@ -177,10 +177,10 @@ export class GetProof implements IGetProof {
             nonce: account.nonce,
             storageHash: account.storageHash,
             storageProof
-        }, logger);
+        });
     }
 
-    constructor(proof, logger: Logger) {
+    constructor(proof) {
         this.accountProof = proof.accountProof;
         this.address = proof.address;
         this.balance = proof.balance;
@@ -220,10 +220,10 @@ export class GetProof implements IGetProof {
                     if (i === storageProof.proof.length - 1) { // node.length === 2
                         // only one node in the tree
                         this.logger.debug('Leaf as root');
-                        pathNodes = new ProofPathBuilder(node, this.logger, storageProof.key);
+                        pathNodes = new ProofPathBuilder(node, storageProof.key);
                     } else {
                         // its an extension or branch
-                        pathNodes = new ProofPathBuilder(node, this.logger);
+                        pathNodes = new ProofPathBuilder(node,);
                     }
                     rootNode = proofNode;
                 }
@@ -280,7 +280,7 @@ export class GetProof implements IGetProof {
      */
     async encodedStorageProofs(): Promise<Buffer> {
         const storage = await Promise.all(this.storageProof.map((p) => {
-                return encodeStorageProof(p, this.storageHash, this.logger);
+                return encodeStorageProof(p, this.storageHash);
             }));
         return utils.encode(storage)
     }
@@ -311,7 +311,7 @@ class ProofPathBuilder {
     children: EmbeddedNode | EmbeddedNode[] | undefined;
     logger: Logger;
 
-    constructor(root, logger: Logger, storageKey?) {
+    constructor(root, storageKey?) {
         this.logger = logger.getChildLogger({ name: 'ProofPathBuilder' });
         if (root.length === 2 && storageKey) {
             // root is leaf
@@ -586,7 +586,7 @@ export interface StorageProof {
     proof: string[];
 }
 
-export async function encodeStorageProof(storageProof: StorageProof, storageRoot, logger: Logger): Promise<Buffer> {
+export async function encodeStorageProof(storageProof: StorageProof, storageRoot): Promise<Buffer> {
     const log = logger.getChildLogger({ name: 'encodeStorageProof' });
     const trie = new Trie(null, hexStringToBuffer(storageRoot));
     const storageNodes = format_proof_nodes(storageProof.proof);
