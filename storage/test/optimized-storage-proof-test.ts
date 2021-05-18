@@ -14,7 +14,8 @@ describe("Test storage proof optimization", async function () {
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
         provider = new ethers.providers.JsonRpcProvider();
-        logger = new Logger({ name: 'optimized-storage-proof.ts', minLevel: 'info' });
+        process.env.CROSS_CHAIN_LOG_LEVEL = 'info';
+        process.env.CROSS_CHAIN_LOGGER_NAME = 'optimized-storage-proof.ts';
     });
 
     it("Should insert some mappings and create a nested optimized proof", async function () {
@@ -28,7 +29,7 @@ describe("Test storage proof optimization", async function () {
             storage.address, 100, null
         ]);
 
-        const proof = new GetProof (await provider.send("eth_getProof", [storage.address, keys]), logger);
+        const proof = new GetProof (await provider.send("eth_getProof", [storage.address, keys]));
         const optimized = proof.optimizedStorageProof();
     })
 
