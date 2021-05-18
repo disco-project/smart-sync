@@ -60,6 +60,7 @@ describe("Test scaling of contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
         let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         const rlpOptimized = proof.optimizedStorageProof();
@@ -67,5 +68,42 @@ describe("Test scaling of contract", async function () {
         expect(rlpOptimized).to.not.be.null;
         if (!rlpOptimized) process.exit(-1);
         expect(ethers.utils.keccak256(rlpOptimized)).to.equal('0x56058e12a3cd40a2bb799c6f297535d7da47185263d82d5d1e760df9eb65b8cd');
+    });
+
+    it("proxyContract should accept proof with extensions in it and create an optimized proof with an extension node as root", async function () {
+        srcContract = await factory.deploy();
+
+        // insert some random values
+        await srcContract.insert(20, 5);
+        await srcContract.insert(333, 33);
+
+        let keys = await getAllKeys(srcContract.address, provider);
+        latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
+        // create a proof of the source contract's storage
+        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+
+        encodedProof = await proof.encoded(latestBlock.stateRoot);
+
+        storageRoot = proof.storageHash;
+
+        let response = await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+
+        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
+
+        // deploy the proxy with the state of the `srcContract`
+        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
+
+        proxyContract = await proxyFactory.deploy(encodedProof);
+
+        // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
+        let differ = new StorageDiffer(provider);
+        let diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        expect(diff.isEmpty()).to.be.true;
+
+        const rlpOptimized = proof.optimizedStorageProof();
+        expect(rlpOptimized).to.not.be.undefined;
+        expect(rlpOptimized).to.not.be.null;
+        if (!rlpOptimized) process.exit(-1);
+        expect(ethers.utils.keccak256(rlpOptimized)).to.equal('0x1af21a373943b987bcbf3fdcbbb249ec3c6ec3f4074bc554b0a766deeb1bf677');
     });
 });

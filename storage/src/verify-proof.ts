@@ -399,6 +399,8 @@ class ProofPathBuilder {
             if (!this.children) {
                 this.children = new BranchNode(node, storageKey);
                 return this.children;
+            } else if (this.root[1].equals(nodeRef)) {
+                return this.children;
             }
             // -> check nested
             return this.insertChild(this.children as BranchNode, node, parentNode, storageKey, isLeaf);
@@ -457,7 +459,7 @@ class ProofPathBuilder {
         }
 
         // its an extension
-        return rlp.encode([[this.root], [this.children]]);
+        return rlp.encode([[this.root], [this.children.encode()]]);
     }
 }
 
