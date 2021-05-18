@@ -7,6 +7,7 @@ import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
+import { logger } from "../src/logger";
 const rlp = require('rlp');
 
 describe("Test scaling of contract", async function () {
@@ -33,9 +34,7 @@ describe("Test scaling of contract", async function () {
         provider = new ethers.providers.JsonRpcProvider();
         await srcContract.setValueA(42);
         await srcContract.setValueB(100);
-
-        process.env.CROSS_CHAIN_LOG_LEVEL = 'info';
-        process.env.CROSS_CHAIN_LOGGER_NAME = 'extension-validation-test.ts';
+        logger.setSettings({minLevel: 'info', name: 'scale_test.ts'});
     });
 
     it("It should create an optimized proof with extension nodes in it", async function () {

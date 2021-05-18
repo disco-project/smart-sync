@@ -42,8 +42,7 @@ describe("Test scaling of contract", async function () {
         relayContract = await Relayer.deploy();
         provider = new ethers.providers.JsonRpcProvider();
 
-        process.env.CROSS_CHAIN_LOG_LEVEL = 'info';
-        process.env.CROSS_CHAIN_LOGGER_NAME = 'scale_test.ts';
+        logger.setSettings({minLevel: 'info', name: 'scale_test.ts'});
     });
 
     it("Contract with map containing 1 value, update 1 value", async function () {

@@ -7,8 +7,8 @@ import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
+import { logger } from "../src/logger"
 import { isRawNode } from "merkle-patricia-tree/dist/trieNode";
-import { Logger } from "tslog";
 
 describe("Deploy proxy and logic contract", async function () {
     let deployer;
@@ -24,8 +24,7 @@ describe("Deploy proxy and logic contract", async function () {
     let storageRoot;
 
     before(async () => {
-        process.env.CROSS_CHAIN_LOG_LEVEL = 'info';
-        process.env.CROSS_CHAIN_LOGGER_NAME = 'proxy-deploy-test.ts';
+        logger.setSettings({minLevel: 'info', name: 'proxy-deploy-test.ts'});
     });
 
     it("Should deploy initial contract and set an initial value", async function () {

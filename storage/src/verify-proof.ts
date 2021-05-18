@@ -5,7 +5,6 @@ import {BaseTrie as Trie} from "merkle-patricia-tree";
 import assert from "assert";
 import * as utils from "./utils";
 import {formatPathStack} from "./build-proof";
-import { exit } from "process";
 import { Logger } from "tslog";
 import { logger } from "./logger"
 

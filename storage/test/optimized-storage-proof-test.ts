@@ -1,21 +1,19 @@
 import {SimpleStorage, SimpleStorage__factory,} from "../src-gen/types";
 import {ethers} from "hardhat";
 import {GetProof} from "../src/verify-proof";
-import { Logger } from "tslog";
+import { logger } from "../src/logger";
 
 describe("Test storage proof optimization", async function () {
     let deployer;
     let storage: SimpleStorage;
     let provider;
-    let logger: Logger;
 
     before(async function () {
         [deployer] = await ethers.getSigners();
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
         provider = new ethers.providers.JsonRpcProvider();
-        process.env.CROSS_CHAIN_LOG_LEVEL = 'info';
-        process.env.CROSS_CHAIN_LOGGER_NAME = 'optimized-storage-proof.ts';
+        logger.setSettings({minLevel: 'info', name: 'scale_test.ts'});
     });
 
     it("Should insert some mappings and create a nested optimized proof", async function () {
