@@ -60,10 +60,6 @@ library MerklePatriciaProof {
                         return false;
                     }
                 }
-                //extension node
-                if (_nibblesToTraverse(RLPReader.toBytes(currentNodeList[0]), path, pathPtr) == 0) {
-                    return false;
-                }
 
                 nodeKey = bytes32(RLPReader.toUint(currentNodeList[1]));
             } else {
