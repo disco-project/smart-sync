@@ -59,7 +59,6 @@ describe("Test scaling of contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
         let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
-
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         const rlpOptimized = proof.optimizedStorageProof();
