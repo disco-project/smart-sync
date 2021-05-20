@@ -5,7 +5,6 @@ import {BaseTrie as Trie} from "merkle-patricia-tree";
 import assert from "assert";
 import * as utils from "./utils";
 import {formatPathStack} from "./build-proof";
-import { exit } from "process";
 import { Logger } from "tslog";
 
 export async function testStorageProof(storageProof: StorageProof, storageRoot) {
@@ -107,6 +106,32 @@ export function decodeAccount(buf: Buffer): Account {
     };
 }
 
+export function encodeBlockHeader(blockHeader: BlockHeader): Buffer {
+    // needed parameters for block header hash
+    // https://ethereum.stackexchange.com/questions/67055/block-header-hash-verification
+    let cleanBlockHeader = [
+        blockHeader.parentHash,
+        blockHeader.sha3Uncles,
+        blockHeader.miner,
+        blockHeader.stateRoot,
+        blockHeader.transactionsRoot,
+        blockHeader.receiptsRoot,
+        blockHeader.logsBloom,
+        ethers.BigNumber.from(blockHeader.difficulty).toHexString(),
+        ethers.BigNumber.from(blockHeader.number).toHexString(),
+        ethers.BigNumber.from(blockHeader.gasLimit).toHexString(),
+        ethers.BigNumber.from(blockHeader.gasUsed).toHexString(),
+        ethers.BigNumber.from(blockHeader.timestamp).toHexString(),
+        blockHeader.extraData,
+    ];
+    if (blockHeader.mixHash && blockHeader.nonce) {
+        // if chain is PoW
+        cleanBlockHeader.push(blockHeader.mixHash);
+        cleanBlockHeader.push(blockHeader.nonce);
+    } // else chain is PoA
+    return Buffer.from(rlp.encode(cleanBlockHeader));
+}
+
 function encodeStringObject(element): Buffer {
     const keys = Object.values(element).map(val => hexStringToBuffer(<string>val));
     return utils.encode(keys);
@@ -132,6 +157,24 @@ export interface Account {
     balance: string;
     storageHash: string;
     codeHash: string;
+}
+
+export interface BlockHeader {
+    difficulty: string;
+    extraData: string;
+    miner: string;
+    gasLimit: number;
+    gasUsed: number;
+    mixHash?: string;
+    transactionsRoot: string;
+    receiptsRoot: string;
+    logsBloom: string;
+    number: string;
+    nonce?: string;
+    parentHash: string;
+    sha3Uncles: string;
+    stateRoot: string;
+    timestamp: number;
 }
 
 /**
@@ -192,10 +235,10 @@ export class GetProof implements IGetProof {
         this.logger = logger.getChildLogger({ name: 'GetProof' });
     }
 
-    async optimizedProof(stateRoot) {
+    async optimizedProof(stateRoot, includeStorage: Boolean = true) {
         const account = encodeAccount(this.account());
         const accountNodes = await this.encodeParentNodes(stateRoot);
-        const storage = this.optimizedStorageProof();
+        const storage = includeStorage ? this.optimizedStorageProof() : [];
         return utils.encode(
             [
                 account, accountNodes, storage

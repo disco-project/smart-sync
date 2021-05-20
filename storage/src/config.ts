@@ -23,5 +23,7 @@ export const PROXY_INTERFACE = [
     "function updateStorage(bytes memory proof) public",
     "function verifyOldContractStateProof(bytes memory rlpStorageProof) public view returns (bool)",
     "function insert(uint _key, uint _value) public",
-    "function getValue(uint _key) public view returns (uint256)"
+    "function getValue(uint _key) public view returns (uint256)",
+    "function addStorage(bytes32[] memory keys, bytes32[] memory values) public",
+    "function verifyMigrateContract(bytes memory sourceAccountProof, bytes memory proxyAccountProof, bytes memory proxyChainBlockHeader) public"
 ];
