@@ -7,10 +7,11 @@ import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
-import { assert } from "console";
-import { Logger } from "tslog";
 import Web3 from 'web3';
+import { logger } from '../src/logger';
 const rlp = require('rlp');
+
+const KEY_VALUE_PAIR_PER_BATCH = 100;
 
 function hex_to_ascii(str1) {
     var hex  = str1.toString();
@@ -33,7 +34,6 @@ describe("Test scaling of contract", async function () {
     let proxyContract: Contract;
     let callRelayContract: CallRelayContract;
     let storageRoot;
-    let logger: Logger;
 
     beforeEach(async () => {
         [deployer] = await ethers.getSigners();
@@ -44,34 +44,31 @@ describe("Test scaling of contract", async function () {
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
         provider = new ethers.providers.JsonRpcProvider();
-        logger = new Logger({ name: 'new-initialization.ts', minLevel: 'debug' });
+        logger.setSettings({ minLevel: 'info' });
     });
 
-    it("Contract with map containing 50 values, update 1 value", async function() {
+    it("Contract with map containing 1000 values, update 20 values", async function() {
         // insert some random values
-        // for (let i = 0; i < 10; i++) {
-        //     const value = Math.floor(Math.random() * 10000000);
-        //     await srcContract.insert(i, value);
-        // }
-        await srcContract.insert(0, 345436);
-        await srcContract.insert(1, 2000360);
-        await srcContract.insert(2, 200030);
-        await srcContract.insert(3, 200600);
-        await srcContract.insert(4, 200500);
-        await srcContract.insert(5, 200400);
-        await srcContract.insert(6, 200300);
-        await srcContract.insert(7, 200400);
-        await srcContract.insert(8, 20000);
-        await srcContract.insert(9, 200700);
-        await srcContract.insert(10, 200400);
-        await srcContract.insert(11, 200080);
-
-        // ethers.utils.RLP.
+        let srcKeys: Array<number> = [];
+        let srcValues: Array<number> = [];
+        let srcCounter: number = 0;
+        for (let i = 0; i < 1000; i++) {
+            const value = Math.floor(Math.random() * 10000000);
+            srcKeys.push(i);
+            srcValues.push(value);
+            srcCounter++;
+            if (srcCounter >= KEY_VALUE_PAIR_PER_BATCH) {
+                await srcContract.insertMultiple(srcKeys, srcValues);
+                srcValues = [];
+                srcKeys = [];
+                srcCounter = 0;
+            } 
+        }
 
         let keys = await getAllKeys(srcContract.address, provider);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
-        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         storageRoot = proof.storageHash;
@@ -84,20 +81,28 @@ describe("Test scaling of contract", async function () {
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
         // process.exit(-1);
         try {
-            proxyContract = await proxyFactory.deploy(encodedProof, { gasLimit: 4700000 });
+            proxyContract = await proxyFactory.deploy({ gasLimit: 4700000 });
             // wait for the transaction to be mined
             logger.debug('Deploying proxyContract...(Waiting for the tx to be mined)')
             await proxyContract.deployTransaction.wait();
             logger.debug('Done.');
 
             // migrate storage
-            const keys: Array<String> = [];
-            const values: Array<String> = [];
-            proof.storageProof.forEach((proof) => {
-                keys.push(ethers.utils.hexZeroPad(proof.key, 32));
-                values.push(ethers.utils.hexZeroPad(proof.value, 32));
-            });
-            await proxyContract.addStorage(keys, values);
+            let keys: Array<String> = [];
+            let values: Array<String> = [];
+            let counter = 0;
+            for (const storageProof of proof.storageProof) {
+                keys.push(ethers.utils.hexZeroPad(storageProof.key, 32));
+                values.push(ethers.utils.hexZeroPad(storageProof.value, 32));
+                counter++;
+                if (counter >= KEY_VALUE_PAIR_PER_BATCH) {
+                    await proxyContract.addStorage(keys, values, { gasLimit: 8000000 });
+                    counter = 0;
+                    keys = [];
+                    values = [];
+                }
+            }
+            if (counter != 0) await proxyContract.addStorage(keys, values, { gasLimit: 8000000 });
 
             // validate migration
             //  getting account proof from source contract
@@ -106,7 +111,7 @@ describe("Test scaling of contract", async function () {
             //  getting account proof from proxy contract
             const proxyProvider = new ethers.providers.JsonRpcProvider('http://localhost:8545');
             const latestProxyChainBlock = await proxyProvider.send('eth_getBlockByNumber', ["latest", false]);
-            const proxyChainProof = new GetProof(await proxyProvider.send("eth_getProof", [proxyContract.address, []]), logger);
+            const proxyChainProof = new GetProof(await proxyProvider.send("eth_getProof", [proxyContract.address, []]));
             const proxyAccountProof = await proxyChainProof.optimizedProof(latestProxyChainBlock.stateRoot, false);
 
             //  getting encoded block header
@@ -142,7 +147,7 @@ describe("Test scaling of contract", async function () {
         expect(diff.isEmpty()).to.be.true;
 
         // change all the previous synced values
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 20; i++) {
             const value = Math.floor(Math.random() * 10000000);
             await srcContract.insert(i, value);
         }
@@ -154,7 +159,7 @@ describe("Test scaling of contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]), logger);
+        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
 
         // compute the optimized storage proof
         const rlpOptimized = proof.optimizedStorageProof();

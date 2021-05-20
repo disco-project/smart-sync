@@ -359,38 +359,43 @@ contract ProxyContract {
         RLPReader.RLPItem[] memory proofNode = rlpProofNode.toRlpItem().toList();
 
         if (RLPReader.isList(proofNode[1])) {
-            // its a branch
-            // and a list of values [0..16] for the last branch node
             RLPReader.RLPItem[] memory latestCommonBranchValues = RLPReader.toList(proofNode[1]);
-            // loop through every value
-            for (uint i = 0; i < 17; i++) {
-                // the value node either holds the [key, value]directly or another proofnode
-                RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
-                if (valueNode.length == 3) {
-                    // leaf value, where the is the value of the latest branch node at index i
-                    uint byte0;
-                    bytes32 value;
-                    uint memPtr = valueNode[2].memPtr;
-                    assembly {
-                        byte0 := byte(0, mload(memPtr))
-                    }
-
-                    if (byte0 > 127) {
-                        // leaf is double encoded when greater than 127
-                        valueNode[2].memPtr += 1;
-                        valueNode[2].len -= 1;
-                        value = bytes32(valueNode[2].toUint());
-                    } else {
-                        value = bytes32(byte0);
-                    }
-                    if (value != 0x0) {
-                        bytes32 slot = bytes32(valueNode[0].toUint());
+            if (latestCommonBranchValues.length == 1) {
+                // its an extension
+                setStorageValues(latestCommonBranchValues[0].toRlpBytes());
+            } else {
+                // its a branch
+                // and a list of values [0..16] for the last branch node
+                // loop through every value
+                for (uint i = 0; i < 17; i++) {
+                    // the value node either holds the [key, value]directly or another proofnode
+                    RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
+                    if (valueNode.length == 3) {
+                        // leaf value, where the is the value of the latest branch node at index i
+                        uint byte0;
+                        bytes32 value;
+                        uint memPtr = valueNode[2].memPtr;
                         assembly {
-                            sstore(slot, value)
+                            byte0 := byte(0, mload(memPtr))
                         }
+
+                        if (byte0 > 127) {
+                            // leaf is double encoded when greater than 127
+                            valueNode[2].memPtr += 1;
+                            valueNode[2].len -= 1;
+                            value = bytes32(valueNode[2].toUint());
+                        } else {
+                            value = bytes32(byte0);
+                        }
+                        if (value != 0x0) {
+                            bytes32 slot = bytes32(valueNode[0].toUint());
+                            assembly {
+                                sstore(slot, value)
+                            }
+                        }
+                    } else if (valueNode.length == 2) {
+                        setStorageValues(latestCommonBranchValues[i].toRlpBytes());
                     }
-                } else if (valueNode.length == 2) {
-                    setStorageValues(latestCommonBranchValues[i].toRlpBytes());
                 }
             }
         } else {
