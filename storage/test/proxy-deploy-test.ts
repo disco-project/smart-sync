@@ -7,8 +7,8 @@ import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
+import { logger } from "../src/logger"
 import { isRawNode } from "merkle-patricia-tree/dist/trieNode";
-import { Logger } from "tslog";
 
 describe("Deploy proxy and logic contract", async function () {
     let deployer;
@@ -22,10 +22,9 @@ describe("Deploy proxy and logic contract", async function () {
     let proxyContract: Contract;
     let callRelayContract: CallRelayContract;
     let storageRoot;
-    let logger: Logger;
 
     before(async () => {
-        logger = new Logger({ name: 'proxy-deploy-test.ts', minLevel: 'info' });
+        logger.setSettings({minLevel: 'info', name: 'proxy-deploy-test.ts'});
     });
 
     it("Should deploy initial contract and set an initial value", async function () {
@@ -48,7 +47,7 @@ describe("Deploy proxy and logic contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage
-        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         storageRoot = proof.storageHash;
@@ -87,7 +86,7 @@ describe("Deploy proxy and logic contract", async function () {
         let keys = await getAllKeys(srcContract.address, provider);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
-        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         storageRoot = proof.storageHash;
@@ -125,7 +124,7 @@ describe("Deploy proxy and logic contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]), logger);
+        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
 
         // compute the optimized storage proof
         const rlpOptimized = proof.optimizedStorageProof();
@@ -161,7 +160,7 @@ describe("Deploy proxy and logic contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]), logger);
+        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
         const rlpProof = await proof.optimizedProof(latestBlock.stateRoot);
         await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 
@@ -184,7 +183,7 @@ describe("Deploy proxy and logic contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         const keys = diff.diffs.map(c => c.key);
 
-        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 
         const rlpProof = await proof.optimizedProof(latestBlock.stateRoot);
 

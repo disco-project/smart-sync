@@ -7,7 +7,7 @@ import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
-import { Logger } from "tslog";
+import { logger } from "../src/logger"
 const rlp = require('rlp');
 
 function hex_to_ascii(str1) {
@@ -31,7 +31,6 @@ describe("Test scaling of contract", async function () {
     let proxyContract: Contract;
     let callRelayContract: CallRelayContract;
     let storageRoot;
-    let logger: Logger;
 
     beforeEach(async () => {
         [deployer] = await ethers.getSigners();
@@ -43,7 +42,7 @@ describe("Test scaling of contract", async function () {
         relayContract = await Relayer.deploy();
         provider = new ethers.providers.JsonRpcProvider();
 
-        logger = new Logger({ name: 'scale_test.ts', minLevel: 'info' });
+        logger.setSettings({minLevel: 'info', name: 'scale_test.ts'});
     });
 
     it("Contract with map containing 1 value, update 1 value", async function () {
@@ -55,7 +54,7 @@ describe("Test scaling of contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage
-        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         storageRoot = proof.storageHash;
@@ -84,7 +83,7 @@ describe("Test scaling of contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]), logger);
+        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
 
         // compute the optimized storage proof
         const rlpOptimized = proof.optimizedStorageProof();
@@ -139,7 +138,7 @@ describe("Test scaling of contract", async function () {
         let keys = await getAllKeys(srcContract.address, provider);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
-        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         storageRoot = proof.storageHash;
@@ -169,7 +168,7 @@ describe("Test scaling of contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]), logger);
+        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
 
         // compute the optimized storage proof
         const rlpOptimized = proof.optimizedStorageProof();
@@ -225,7 +224,7 @@ describe("Test scaling of contract", async function () {
         let keys = await getAllKeys(srcContract.address, provider);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
-        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         storageRoot = proof.storageHash;
@@ -257,7 +256,7 @@ describe("Test scaling of contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]), logger);
+        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
 
         // compute the optimized storage proof
         const rlpOptimized = proof.optimizedStorageProof();
@@ -289,7 +288,7 @@ describe("Test scaling of contract", async function () {
         let keys = await getAllKeys(srcContract.address, provider);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
-        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         storageRoot = proof.storageHash;
@@ -321,7 +320,7 @@ describe("Test scaling of contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]), logger);
+        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
 
         // compute the optimized storage proof
         const rlpOptimized = proof.optimizedStorageProof();
@@ -353,7 +352,7 @@ describe("Test scaling of contract", async function () {
         let keys = await getAllKeys(srcContract.address, provider);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
-        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]), logger);
+        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         storageRoot = proof.storageHash;
@@ -385,7 +384,7 @@ describe("Test scaling of contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]), logger);
+        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
 
         // compute the optimized storage proof
         const rlpOptimized = proof.optimizedStorageProof();
