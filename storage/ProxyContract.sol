@@ -52,9 +52,12 @@ contract ProxyContract {
         }
     }
 
-    // falls addressen nicht im proof enthalten, dann auch uebergeben
-    // @dev 
-    // function verifyMigrateContract(bytes memory sourceAccountProof, bytes memory proxyAccountProof, bytes memory proxyChainBlockHeader) public returns (bool) {
+    /**
+    * @dev checks if the migration of the source contract to the proxy contract was successful
+    * @param sourceAccountProof contains source contract account information and the merkle patricia proof of the account
+    * @param proxyAccountProof contains proxy contract account information and the merkle patricia proof of the account
+    * @param proxyChainBlockHeader latest block header of the proxy contract's chain
+    */
     function verifyMigrateContract(bytes memory sourceAccountProof, bytes memory proxyAccountProof, bytes memory proxyChainBlockHeader) public {
         // compare block header hashes
         bytes32 givenBlockHeaderHash = keccak256(proxyChainBlockHeader);
