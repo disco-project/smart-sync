@@ -327,6 +327,8 @@ contract ProxyContract {
         // First verify stateRoot -> account (account proof)
 
         RelayContract relay = getRelay();
+        require(relay.getMigrationState(address(this)), 'migration not completed');
+        
         // get the current state root of the source chain
         bytes32 root = relay.getStateRoot();
         // validate that the proof was obtained for the source contract and the account's storage is part of the current state

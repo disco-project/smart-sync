@@ -1,7 +1,7 @@
 import {RelayContract__factory, SyncCandidate, SyncCandidate__factory, CallRelayContract__factory, CallRelayContract} from "../src-gen/types";
 import {ethers} from "hardhat";
 import {expect} from "chai";
-import {GetProof} from "../src/verify-proof";
+import {GetProof, encodeBlockHeader} from "../src/verify-proof";
 import {getAllKeys} from "../src/utils";
 import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
@@ -9,6 +9,7 @@ import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
 import { logger } from "../src/logger"
 import { isRawNode } from "merkle-patricia-tree/dist/trieNode";
+import Web3 from 'web3';
 
 describe("Deploy proxy and logic contract", async function () {
     let deployer;
@@ -22,6 +23,7 @@ describe("Deploy proxy and logic contract", async function () {
     let proxyContract: Contract;
     let callRelayContract: CallRelayContract;
     let storageRoot;
+    let proof;
 
     before(async () => {
         logger.setSettings({minLevel: 'info', name: 'proxy-deploy-test.ts'});
@@ -47,7 +49,7 @@ describe("Deploy proxy and logic contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
         // create a proof of the source contract's storage
-        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
+        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         storageRoot = proof.storageHash;
@@ -61,7 +63,15 @@ describe("Deploy proxy and logic contract", async function () {
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
 
-        proxyContract = await proxyFactory.deploy(encodedProof);
+        proxyContract = await proxyFactory.deploy();
+
+        let proxyKeys: Array<string> = [];
+        let proxyValues: Array<string> = [];
+        for (const storageProof of proof.storageProof) {
+            proxyKeys.push(ethers.utils.hexZeroPad(storageProof.key, 32));
+            proxyValues.push(ethers.utils.hexZeroPad(storageProof.value, 32));
+        }
+        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: 8000000 });
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         const differ = new StorageDiffer(provider);
@@ -86,7 +96,7 @@ describe("Deploy proxy and logic contract", async function () {
         let keys = await getAllKeys(srcContract.address, provider);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
-        let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
+        proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
         encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         storageRoot = proof.storageHash;
@@ -98,7 +108,40 @@ describe("Deploy proxy and logic contract", async function () {
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
 
-        proxyContract = await proxyFactory.deploy(encodedProof);
+        proxyContract = await proxyFactory.deploy();
+
+        let proxyKeys: Array<string> = [];
+        let proxyValues: Array<string> = [];
+        for (const storageProof of proof.storageProof) {
+            proxyKeys.push(ethers.utils.hexZeroPad(storageProof.key, 32));
+            proxyValues.push(ethers.utils.hexZeroPad(storageProof.value, 32));
+        }
+        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: 8000000 });
+
+        // validate migration
+        //  getting account proof from source contract
+        const sourceAccountProof = await proof.optimizedProof(latestBlock.stateRoot, false);
+
+        //  getting account proof from proxy contract
+        const proxyProvider = new ethers.providers.JsonRpcProvider('http://localhost:8545');
+        const latestProxyChainBlock = await proxyProvider.send('eth_getBlockByNumber', ["latest", false]);
+        const proxyChainProof = new GetProof(await proxyProvider.send("eth_getProof", [proxyContract.address, []]));
+        const proxyAccountProof = await proxyChainProof.optimizedProof(latestProxyChainBlock.stateRoot, false);
+
+        //  getting encoded block header
+        const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
+
+        // need to use web3 here as hardhat/ethers mine another block before actually executing the method on the bc.
+        // therefore, block.number - 1 in the function verifyMigrateContract doesn't work anymore.
+        const web3 = new Web3('http://localhost:8545');
+        const contractInstance = new web3.eth.Contract(compiledProxy.abi, proxyContract.address);
+        await contractInstance.methods.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader).send({
+            from: '0x00ce0c25d2a45e2f22d4416606d928b8c088f8db'
+        });
+
+        //  validating
+        const migrationValidated = await relayContract.getMigrationState(proxyContract.address);
+        expect(migrationValidated).to.be.true;
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
