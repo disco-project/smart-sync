@@ -1,6 +1,7 @@
 import {SimpleStorage, SimpleStorage__factory,} from "../src-gen/types";
 import {ethers} from "hardhat";
 import {GetProof} from "../src/verify-proof";
+import { logger } from "../src/logger";
 
 describe("Test storage proof optimization", async function () {
     let deployer;
@@ -12,6 +13,7 @@ describe("Test storage proof optimization", async function () {
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
         provider = new ethers.providers.JsonRpcProvider();
+        logger.setSettings({minLevel: 'info', name: 'scale_test.ts'});
     });
 
     it("Should insert some mappings and create a nested optimized proof", async function () {

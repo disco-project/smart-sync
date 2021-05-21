@@ -77,7 +77,7 @@ library RLPWriter {
  * @param _x The integer to encode.
  * @return RLP encoded bytes.
  */
-    function toBinary(uint _x) private pure returns (bytes memory) {
+    function toBinary(uint _x) internal pure returns (bytes memory) {
         bytes memory b = new bytes(32);
         assembly {
             mstore(add(b, 32), _x)

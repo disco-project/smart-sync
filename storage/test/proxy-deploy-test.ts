@@ -7,6 +7,7 @@ import {StorageDiffer} from "../src/get-diff";
 import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
+import { logger } from "../src/logger"
 import { isRawNode } from "merkle-patricia-tree/dist/trieNode";
 
 describe("Deploy proxy and logic contract", async function () {
@@ -21,6 +22,10 @@ describe("Deploy proxy and logic contract", async function () {
     let proxyContract: Contract;
     let callRelayContract: CallRelayContract;
     let storageRoot;
+
+    before(async () => {
+        logger.setSettings({minLevel: 'info', name: 'proxy-deploy-test.ts'});
+    });
 
     it("Should deploy initial contract and set an initial value", async function () {
         [deployer] = await ethers.getSigners();
