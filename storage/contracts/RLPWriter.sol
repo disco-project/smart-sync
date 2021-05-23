@@ -72,11 +72,11 @@ library RLPWriter {
     }
 
     /**
- * @dev Encode integer in big endian binary form with no leading zeroes.
- * @notice TODO: This should be optimized with assembly to save gas costs.
- * @param _x The integer to encode.
- * @return RLP encoded bytes.
- */
+    * @dev Encode integer in big endian binary form with no leading zeroes.
+    * @notice TODO: This should be optimized with assembly to save gas costs.
+    * @param _x The integer to encode.
+    * @return RLP encoded bytes.
+    */
     function toBinary(uint _x) internal pure returns (bytes memory) {
         bytes memory b = new bytes(32);
         assembly {

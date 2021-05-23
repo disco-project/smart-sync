@@ -32,6 +32,7 @@
     "@types/mocha": "^8.0.4",
     "@types/node": "^14.14.9",
     "chai": "^4.2.0",
+    "csv-stringify": "^5.6.2",
     "ethereum-waffle": "^3.2.0",
     "ethers": "^5.0.21",
     "hardhat": "^2.0.3",

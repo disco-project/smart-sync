@@ -249,7 +249,13 @@ contract ProxyContract {
                         bytes memory encodedList = restoreOldValueState(valueNode);
                         
                         if (encodedList.length > 32) {
-                            lastBranch[i] = RLPReader.toRlpItem(RLPWriter.encodeUint(uint256(keccak256(encodedList))));
+                            bytes32 listHash = keccak256(encodedList);
+                            bytes memory hashBytes = new bytes(32);
+                            assembly {
+                                mstore(add(hashBytes, 32), listHash)
+                            }
+                            // return encodedList;
+                            lastBranch[i] = RLPReader.toRlpItem(RLPWriter.encodeBytes(hashBytes));
                         } else {
                             lastBranch[i] = encodedList.toRlpItem();
                         }
@@ -265,6 +271,7 @@ contract ProxyContract {
 
         // hash the last branch to get the reference hash
         if (lastBranch.length == 2) {
+            // its an extension
             bytes[] memory _list = new bytes[](2);
             for (uint j = 0; j < 2; j++) {
                 _list[j] = lastBranch[j].toRlpBytes();

@@ -174,7 +174,7 @@ describe("Test scaling of contract", async function () {
         // update the proxy storage
         let txResponse = await proxyContract.updateStorage(rlpProof);
         let receipt = await txResponse.wait();
-        logger.info("Gas used for updating 1 value in map with 50 values: ", receipt.gasUsed.toNumber());
+        logger.info("Gas used for updating 20 values in map with 1000 values: ", receipt.gasUsed.toNumber());
 
         // after update storage layouts are equal, no diffs
         diff = await differ.getDiff(srcContract.address, proxyContract.address);

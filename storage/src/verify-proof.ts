@@ -424,7 +424,6 @@ class ProofPathBuilder {
                 if (childBranch.children[i] instanceof BranchNode || childBranch.children[i] instanceof ExtensionNode) {
                     let newNode = this.insertChild(childBranch.children[i] as ParentNode, node, parentNode, storageKey, isLeaf);
                     if (newNode !== undefined) {
-                        this.logger.debug('new subnode');
                         return newNode;
                     }
                 }
@@ -474,8 +473,6 @@ class ProofPathBuilder {
                 if (this.children[i] instanceof BranchNode || this.children[i] instanceof ExtensionNode) {
                     let newNode = this.insertChild(this.children[i] as ParentNode, node, parentNode, storageKey, isLeaf);
                     if (newNode !== undefined) {
-                        this.logger.debug('new subnode');
-                        
                         return newNode;
                     }
                 }
