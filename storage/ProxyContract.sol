@@ -96,6 +96,45 @@ contract ProxyContract {
         return RelayContract(RELAY_ADDRESS);
     }
 
+    /**
+  * @dev Sets the contract's storage based on the encoded storage
+  * @param rlpStorageKeyProofs the rlp encoded list of storage proofs
+  * @param storageHash the hash of the contract's storage
+  */
+    function updateStorageKeys(bytes memory rlpStorageKeyProofs, bytes32 storageHash) internal {
+        RLPReader.Iterator memory it = rlpStorageKeyProofs.toRlpItem().iterator();
+
+        while (it.hasNext()) {
+            setStorageKey(it.next(), storageHash);
+        }
+    }
+
+
+    /**
+    * @dev Update a single storage key after validating against the storage key
+    */
+    function setStorageKey(RLPReader.RLPItem memory rlpStorageKeyProof, bytes32 storageHash) internal {
+        // parse the rlp encoded storage proof
+        GetProofLib.StorageProof memory proof = GetProofLib.parseStorageProof(rlpStorageKeyProof.toBytes());
+
+        // get the path in the trie leading to the value
+        bytes memory path = GetProofLib.triePath(abi.encodePacked(proof.key));
+
+        // verify the storage proof
+        require(MerklePatriciaProof.verify(
+                proof.value, path, proof.proof, storageHash
+            ), "Failed to verify the storage proof");
+
+        // decode the rlp encoded value
+        bytes32 value = bytes32(proof.value.toRlpItem().toUint());
+
+        // store the value in the right slot
+        bytes32 slot = proof.key;
+        assembly {
+            sstore(slot, value)
+        }
+    }
+
     function _beforeFallback() internal {
         address addr = address(this);
         bytes4 sig = bytes4(keccak256("emitEvent()"));
@@ -353,6 +392,31 @@ contract ProxyContract {
         relay.updateProxyInfo(account.storageHash);
     }
 
+    function updateStorageValue(RLPReader.RLPItem[] memory valueNode) internal {
+        // leaf value, where the is the value of the latest branch node at index i
+        uint byte0;
+        bytes32 value;
+        uint memPtr = valueNode[2].memPtr;
+        assembly {
+            byte0 := byte(0, mload(memPtr))
+        }
+
+        if (byte0 > 127) {
+            // leaf is double encoded when greater than 127
+            valueNode[2].memPtr += 1;
+            valueNode[2].len -= 1;
+            value = bytes32(valueNode[2].toUint());
+        } else {
+            value = bytes32(byte0);
+        }
+        if (value != 0x0) {
+            bytes32 slot = bytes32(valueNode[0].toUint());
+            assembly {
+                sstore(slot, value)
+            }
+        }
+    }
+
     /**
     * @dev Recursively set contract's storage based on the provided proof nodes
     * @param rlpProofNode the rlp encoded storage proof nodes, starting with the root node
@@ -373,28 +437,7 @@ contract ProxyContract {
                     // the value node either holds the [key, value]directly or another proofnode
                     RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
                     if (valueNode.length == 3) {
-                        // leaf value, where the is the value of the latest branch node at index i
-                        uint byte0;
-                        bytes32 value;
-                        uint memPtr = valueNode[2].memPtr;
-                        assembly {
-                            byte0 := byte(0, mload(memPtr))
-                        }
-
-                        if (byte0 > 127) {
-                            // leaf is double encoded when greater than 127
-                            valueNode[2].memPtr += 1;
-                            valueNode[2].len -= 1;
-                            value = bytes32(valueNode[2].toUint());
-                        } else {
-                            value = bytes32(byte0);
-                        }
-                        if (value != 0x0) {
-                            bytes32 slot = bytes32(valueNode[0].toUint());
-                            assembly {
-                                sstore(slot, value)
-                            }
-                        }
+                        updateStorageValue(valueNode);
                     } else if (valueNode.length == 2) {
                         setStorageValues(latestCommonBranchValues[i].toRlpBytes());
                     }
@@ -402,28 +445,7 @@ contract ProxyContract {
             }
         } else {
             // its only one value
-            // leaf value, where the is the value of the latest branch node at index i
-            uint byte0;
-            bytes32 value;
-            uint memPtr = proofNode[2].memPtr;
-            assembly {
-                byte0 := byte(0, mload(memPtr))
-            }
-
-            if (byte0 > 127) {
-                // leaf is double encoded when greater than 127
-                proofNode[2].memPtr += 1;
-                proofNode[2].len -= 1;
-                value = bytes32(proofNode[2].toUint());
-            } else {
-                value = bytes32(byte0);
-            }
-            if (value != 0x0) {
-                bytes32 slot = bytes32(proofNode[0].toUint());
-                assembly {
-                    sstore(slot, value)
-                }
-            }
+            updateStorageValue(proofNode);
         }
     }
 }
