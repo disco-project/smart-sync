@@ -414,6 +414,7 @@ class ProofPathBuilder {
                         // insert branch
                         childBranch.children[i] = new BranchNode(node, storageKey);
                     } else if (storageKey && !((childBranch.children[i] as BranchNode).children[16])) {
+                        logger.debug('value at branch');
                         (childBranch.children[i] as BranchNode).children[16] = new LeafNode(rlp.decode(node[16]) as any, storageKey);
                     }
                 }
@@ -463,6 +464,7 @@ class ProofPathBuilder {
                         // insert branch
                         this.children[i] = new BranchNode(node, storageKey);
                     } else if (storageKey && !((this.children[i] as BranchNode).children[16])) {
+                        logger.debug('value at branch');
                         (this.children[i] as BranchNode).children[16] = new LeafNode(rlp.decode(node[16]) as any, storageKey);
                     }
                 }

@@ -237,7 +237,7 @@ contract ProxyContract {
             if (latestCommonBranchValues.length == 1) {
                 // its an extension
                 bytes32 newReferenceHash = computeRoot(latestCommonBranchValues[0].toRlpBytes(), isOldContractStateProof);
-                lastBranch[1] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
+                lastBranch[1] = RLPWriter.encodeKeccak256Hash(newReferenceHash).toRlpItem();
             } else {
                 // its a branch
                 // loop through every value
@@ -250,20 +250,14 @@ contract ProxyContract {
                         
                         if (encodedList.length > 32) {
                             bytes32 listHash = keccak256(encodedList);
-                            bytes memory hashBytes = new bytes(32);
-                            assembly {
-                                mstore(add(hashBytes, 32), listHash)
-                            }
-                            // return encodedList;
-                            lastBranch[i] = RLPReader.toRlpItem(RLPWriter.encodeBytes(hashBytes));
+                            lastBranch[i] = RLPReader.toRlpItem(RLPWriter.encodeKeccak256Hash(listHash));
                         } else {
                             lastBranch[i] = encodedList.toRlpItem();
                         }
                     } else if (valueNode.length == 2) {
                         // branch or extension
-                        // another proofNode [branches], values | proofnode, key
                         bytes32 newReferenceHash = computeRoot(latestCommonBranchValues[i].toRlpBytes(), isOldContractStateProof);
-                        lastBranch[i] = RLPWriter.encodeUint(uint256(newReferenceHash)).toRlpItem();
+                        lastBranch[i] = RLPWriter.encodeKeccak256Hash(newReferenceHash).toRlpItem();
                     }
                 }
             }            
@@ -281,27 +275,6 @@ contract ProxyContract {
             bytes[] memory _list = new bytes[](17);
             for (uint j = 0; j < 17; j++) {
                 _list[j] = lastBranch[j].toRlpBytes();
-            }
-            newParentHash = keccak256(RLPWriter.encodeList(_list));
-        }
-        
-        // adjust all the common parent branches
-        bytes32 keccakParentHash = keccak256(abi.encodePacked(parentHash));
-        // todo why is it i > 0 and not i>=0 and i = commonBranches.length -2? commonBranches.length-1 is not a common branch, but the rootNode...
-        for (uint i = commonBranches.length - 1; i > 0; i--) {
-            RLPReader.RLPItem[] memory branchNode = RLPReader.toList(commonBranches[i]);
-
-            bytes[] memory _list = new bytes[](17);
-            for (uint j = 0; j < 17; j++) {
-                // find the reference hash
-                bytes memory val = branchNode[i].toBytes();
-                if (keccak256(val) == keccakParentHash) {
-                    // found the position that references the next node
-                    // update the index with the adapted hash of the next node
-                    _list[j] = RLPWriter.encodeUint(uint256(newParentHash));
-                } else {
-                    _list[j] = branchNode[j].toRlpBytes();
-                }
             }
             newParentHash = keccak256(RLPWriter.encodeList(_list));
         }
@@ -351,7 +324,6 @@ contract ProxyContract {
 
         // Third verify proof is valid according to current block in relay contract
         require(computeRoot(getProof.storageProofs, false) == account.storageHash, "Failed to verify new contract state proof");
-
 
         // update the storage or revert on error
         setStorageValues(getProof.storageProofs);

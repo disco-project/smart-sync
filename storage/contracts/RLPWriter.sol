@@ -72,6 +72,19 @@ library RLPWriter {
     }
 
     /**
+    * @dev Encodes a keccak256 hash value
+    * @param _hash The hash to encode.
+    * @return The RLP encoded hash in bytes
+    */
+    function encodeKeccak256Hash(bytes32 _hash) internal pure returns (bytes memory) {
+        bytes memory hashBytes = new bytes(32);
+        assembly {
+            mstore(add(hashBytes, 32), _hash)
+        }
+        return encodeBytes(hashBytes);
+    }
+
+    /**
     * @dev Encode integer in big endian binary form with no leading zeroes.
     * @notice TODO: This should be optimized with assembly to save gas costs.
     * @param _x The integer to encode.
