@@ -9,7 +9,6 @@ import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
 import { logger } from "../src/logger"
 const rlp = require('rlp');
-import Web3 from 'web3';
 import stringify from 'csv-stringify';
 import fs, { write } from 'fs';
 import { ChildProcess } from "child_process";
@@ -155,13 +154,7 @@ describe("Test scaling of contract", async function () {
         //  getting encoded block header
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
-        // need to use web3 here as hardhat/ethers mine another block before actually executing the method on the bc.
-        // therefore, block.number - 1 in the function verifyMigrateContract doesn't work anymore.
-        const web3 = new Web3(httpConfig.url);
-        const contractInstance = new web3.eth.Contract(compiledProxy.abi, proxyContract.address);
-        await contractInstance.methods.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader).send({
-            from: '0x00ce0c25d2a45e2f22d4416606d928b8c088f8db'
-        });
+        await relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), { gasLimit: httpConfig.gas });
 
         //  validating
         const migrationValidated = await relayContract.getMigrationState(proxyContract.address);
@@ -349,13 +342,7 @@ describe("Test scaling of contract", async function () {
         //  getting encoded block header
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
-        // need to use web3 here as hardhat/ethers mine another block before actually executing the method on the bc.
-        // therefore, block.number - 1 in the function verifyMigrateContract doesn't work anymore.
-        const web3 = new Web3('ws://localhost:8546');
-        const contractInstance = new web3.eth.Contract(compiledProxy.abi, proxyContract.address);
-        await contractInstance.methods.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader).send({
-            from: '0x00ce0c25d2a45e2f22d4416606d928b8c088f8db'
-        });
+        await relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), { gasLimit: httpConfig.gas });
 
         //  validating
         const migrationValidated = await relayContract.getMigrationState(proxyContract.address);
@@ -549,13 +536,7 @@ describe("Test scaling of contract", async function () {
         //  getting encoded block header
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
-        // need to use web3 here as hardhat/ethers mine another block before actually executing the method on the bc.
-        // therefore, block.number - 1 in the function verifyMigrateContract doesn't work anymore.
-        const web3 = new Web3('ws://localhost:8546');
-        const contractInstance = new web3.eth.Contract(compiledProxy.abi, proxyContract.address);
-        await contractInstance.methods.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader).send({
-            from: '0x00ce0c25d2a45e2f22d4416606d928b8c088f8db'
-        });
+        await relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), { gasLimit: httpConfig.gas });
 
         //  validating
         const migrationValidated = await relayContract.getMigrationState(proxyContract.address);

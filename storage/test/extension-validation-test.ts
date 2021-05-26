@@ -8,7 +8,7 @@ import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
 import { logger } from "../src/logger";
-const rlp = require('rlp');
+import { HttpNetworkConfig } from "hardhat/types";
 
 describe("Test scaling of contract", async function () {
     let deployer;
@@ -22,6 +22,11 @@ describe("Test scaling of contract", async function () {
     let proxyContract: Contract;
     let callRelayContract: CallRelayContract;
     let storageRoot;
+    let httpConfig: HttpNetworkConfig;
+
+    before(() => {
+        httpConfig = network.config as HttpNetworkConfig;
+    })
 
     beforeEach(async () => {
         [deployer] = await ethers.getSigners();
@@ -100,7 +105,7 @@ describe("Test scaling of contract", async function () {
             proxyKeys.push(ethers.utils.hexZeroPad(storageProof.key, 32));
             proxyValues.push(ethers.utils.hexZeroPad(storageProof.value, 32));
         }
-        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: 8000000 });
+        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: httpConfig.gas });
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);

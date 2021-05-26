@@ -53,47 +53,17 @@ contract ProxyContract {
     }
 
     /**
-    * @dev checks if the migration of the source contract to the proxy contract was successful
-    * @param sourceAccountProof contains source contract account information and the merkle patricia proof of the account
-    * @param proxyAccountProof contains proxy contract account information and the merkle patricia proof of the account
-    * @param proxyChainBlockHeader latest block header of the proxy contract's chain
-    */
-    function verifyMigrateContract(bytes memory sourceAccountProof, bytes memory proxyAccountProof, bytes memory proxyChainBlockHeader) public {
-        // compare block header hashes
-        bytes32 givenBlockHeaderHash = keccak256(proxyChainBlockHeader);
-        bytes32 actualBlockHeaderHash = blockhash(block.number - 1);
-        require(givenBlockHeaderHash == actualBlockHeaderHash, 'Given proxy chain block header is faulty');
-
-        // verify sourceAccountProof
-        RelayContract relay = getRelay();
-        // get the current state root of the source chain
-        bytes32 sourceChainStorageRoot = relay.getStateRoot();
-        // validate that the proof was obtained for the source contract and the account's storage is part of the current state
-        bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
-        GetProofLib.GetProof memory getProof = GetProofLib.parseProof(sourceAccountProof);
-        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, sourceChainStorageRoot), "Failed to verify the account proof");
-        GetProofLib.Account memory sourceAccount = GetProofLib.parseAccount(getProof.account);
-
-        // verify proxyAccountProof
-        // validate that the proof was obtained for the source contract and the account's storage is part of the current state
-        path = GetProofLib.encodedAddress(address(this));
-        getProof = GetProofLib.parseProof(proxyAccountProof);
-        bytes32 proxyChainStorageRoot = GetProofLib.parseStorageRootFromBlockHeader(proxyChainBlockHeader);
-        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, proxyChainStorageRoot), "Failed to verify the account proof");
-        GetProofLib.Account memory proxyAccount = GetProofLib.parseAccount(getProof.account);
-
-        // compare storageRootHashes
-        require(sourceAccount.storageHash == proxyAccount.storageHash, 'storageHashes of the contracts dont match');
-
-        // update relay contract -> complete migration
-        relay.updateProxyInfo(proxyAccount.storageHash);
-    }
-
-    /**
     * @dev Used to access the Relay's abi
     */
     function getRelay() internal view returns (RelayContract) {
         return RelayContract(RELAY_ADDRESS);
+    }
+
+    /**
+    * @dev Used to get the source address
+    */
+    function getSourceAddress() public view returns (address) {
+        return SOURCE_ADDRESS;
     }
 
     /**
@@ -108,7 +78,6 @@ contract ProxyContract {
             setStorageKey(it.next(), storageHash);
         }
     }
-
 
     /**
     * @dev Update a single storage key after validating against the storage key
@@ -177,7 +146,7 @@ contract ProxyContract {
      * @dev Fallback function that delegates calls to the address returned by `_implementation()`. Will run if no other
      * function in the contract matches the call data.
      */
-    fallback() external payable {
+    function fallback() external payable {
         _fallback();
     }
 
