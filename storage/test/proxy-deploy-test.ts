@@ -32,10 +32,6 @@ describe("Deploy proxy and logic contract", async function () {
         logger.setSettings({minLevel: 'info', name: 'proxy-deploy-test.ts'});
     });
 
-    before(async () => {
-        logger.setSettings({minLevel: 'info', name: 'proxy-deploy-test.ts'});
-    });
-
     it("Should deploy initial contract and set an initial value", async function () {
         [deployer] = await ethers.getSigners();
         factory = new SyncCandidate__factory(deployer);
