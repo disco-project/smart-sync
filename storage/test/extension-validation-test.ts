@@ -1,5 +1,5 @@
 import {RelayContract__factory, SyncCandidate, SyncCandidate__factory, CallRelayContract} from "../src-gen/types";
-import {ethers} from "hardhat";
+import {ethers, network} from "hardhat";
 import {expect} from "chai";
 import {GetProof} from "../src/verify-proof";
 import {getAllKeys} from "../src/utils";
