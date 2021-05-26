@@ -34,7 +34,7 @@ describe("Test scaling of contract", async function () {
         provider = new ethers.providers.JsonRpcProvider();
         await srcContract.setValueA(42);
         await srcContract.setValueB(100);
-        logger.setSettings({minLevel: 'info', name: 'scale_test.ts'});
+        logger.setSettings({minLevel: 'info', name: 'extension-validation-test.ts'});
     });
 
     it("It should create an optimized proof with extension nodes in it", async function () {
