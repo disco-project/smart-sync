@@ -23,17 +23,17 @@ describe("Test scaling of contract", async function () {
     before(async () => {
         httpConfig = network.config as HttpNetworkConfig;
         logger.setSettings({minLevel: 'info', name: 'scale_test.ts'});
+        [deployer] = await ethers.getSigners();
+        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
     });
 
     beforeEach(async () => {
-        [deployer] = await ethers.getSigners();
         factory = new MappingContract__factory(deployer);
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        provider = new ethers.providers.JsonRpcProvider();
         chainProxy = new ChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
     });
 

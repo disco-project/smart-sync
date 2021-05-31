@@ -25,8 +25,9 @@ describe("Test scaling of contract", async function () {
 
     before(() => {
         httpConfig = network.config as HttpNetworkConfig;
-        logger.setSettings({minLevel: 'info', name: 'update-multiple-values-with-map-sizes-1-1000.ts'});\
+        logger.setSettings({minLevel: 'info', name: 'update-multiple-values-with-map-sizes-1-1000.ts'});
         csvManager = new CSVManager<CSVDataTemplateMultipleValues>(`measurements-multiple-values-with-map-sizes-1-to-1000.csv`);
+        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
     });
 
     after(async () => {
@@ -41,7 +42,6 @@ describe("Test scaling of contract", async function () {
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
         chainProxy = new ChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
     });
 

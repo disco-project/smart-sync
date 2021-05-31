@@ -1,4 +1,4 @@
-import {RelayContract__factory, SyncCandidate, SyncCandidate__factory, CallRelayContract__factory, CallRelayContract} from "../src-gen/types";
+import {RelayContract__factory, SyncCandidate, SyncCandidate__factory, CallRelayContract__factory, CallRelayContract, RelayContract} from "../src-gen/types";
 import {ethers, network} from "hardhat";
 import {expect} from "chai";
 import {GetProof, encodeBlockHeader} from "../src/verify-proof";
@@ -9,36 +9,36 @@ import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
 import { logger } from "../src/logger"
 import { HttpNetworkConfig } from "hardhat/types";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { JsonRpcProvider } from "@ethersproject/providers";
 
 describe("Deploy proxy and logic contract", async function () {
-    let deployer;
+    let deployer: SignerWithAddress;
     let srcContract: SyncCandidate;
     let logicContract: SyncCandidate;
-    let provider;
+    let provider: JsonRpcProvider;
     let factory: SyncCandidate__factory;
-    let relayContract;
-    let encodedProof;
+    let relayContract: RelayContract;
     let latestBlock;
     let proxyContract: Contract;
     let callRelayContract: CallRelayContract;
-    let storageRoot;
     let proof;
     let httpConfig: HttpNetworkConfig;
 
     before(async () => {
         httpConfig = network.config as HttpNetworkConfig;
         logger.setSettings({minLevel: 'info', name: 'proxy-deploy-test.ts'});
+        [deployer] = await ethers.getSigners();
+        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
     });
 
     it("Should deploy initial contract and set an initial value", async function () {
-        [deployer] = await ethers.getSigners();
         factory = new SyncCandidate__factory(deployer);
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        provider = new ethers.providers.JsonRpcProvider();
         await srcContract.setValueA(42);
         await srcContract.setValueB(100);
         expect(await srcContract.getValueA()).to.be.equal(ethers.BigNumber.from(42));
@@ -51,9 +51,6 @@ describe("Deploy proxy and logic contract", async function () {
 
         // create a proof of the source contract's storage
         proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
-        encodedProof = await proof.encoded(latestBlock.stateRoot);
-
-        storageRoot = proof.storageHash;
 
         await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
     })
@@ -98,9 +95,6 @@ describe("Deploy proxy and logic contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
         proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
-        encodedProof = await proof.encoded(latestBlock.stateRoot);
-
-        storageRoot = proof.storageHash;
 
         await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 
