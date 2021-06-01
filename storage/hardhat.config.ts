@@ -22,8 +22,7 @@ export default {
     hardhat: {
     },
     disco: {
-      url: "http://127.0.0.1:8545",
-      gas: 1000000000
+      url: "http://127.0.0.1:8545"
     }
   },
   typechain: {

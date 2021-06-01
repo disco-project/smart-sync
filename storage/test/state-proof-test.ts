@@ -1,28 +1,22 @@
-import {ethers, network} from "hardhat";
+import * as hre from "hardhat";
+import {ethers} from "hardhat";
+import * as rlp from "rlp";
 import {expect} from "chai";
 import {BaseTrie as Trie} from "merkle-patricia-tree";
 import {SimpleStorage, SimpleStorage__factory} from "../src-gen/types";
-import {GetProof, hexStringToBuffer} from "../src/verify-proof";
+import {format_proof_nodes, GetProof, hexStringToBuffer} from "../src/verify-proof";
 import * as utils from "../src/utils";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { HttpNetworkConfig } from "hardhat/types";
-import { JsonRpcProvider } from "@ethersproject/providers";
 
 describe("Validate old contract state", function () {
-    let deployer: SignerWithAddress;
+    let deployer;
     let storage: SimpleStorage;
-    let httpConfig: HttpNetworkConfig;
-    let provider: JsonRpcProvider;
 
-    before(async () => {
-        httpConfig = network.config as HttpNetworkConfig;
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
+    it("Should validate contract state proof", async function () {
         [deployer] = await ethers.getSigners();
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
-    });
+        const provider = new hre.ethers.providers.JsonRpcProvider();
 
-    it("Should validate contract state proof", async function () {
         const oldValue = 1;
 
         await storage.setA(oldValue);

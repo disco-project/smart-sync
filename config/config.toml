@@ -18,14 +18,12 @@ hosts = ["all"]
 cors = ["all"]
 # necessary for EIP1186 eth_getProof
 experimental_rpcs = true
-port = 8545
 
 [websockets]
 interface = "all"
 apis = ["all"]
 hosts = ["all"]
 origins = ["all"]
-port = 8546
 
 [mining]
 reseal_min_period = 0

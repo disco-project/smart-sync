@@ -1,26 +1,16 @@
 import {SimpleStorage, SimpleStorage__factory,} from "../src-gen/types";
-import {ethers, network} from "hardhat";
+import * as hre from "hardhat";
+import {ethers} from "hardhat";
 import {expect} from "chai";
 import {BaseTrie as Trie} from "merkle-patricia-tree";
 import {GetProof, verify_eth_getProof} from "../src/verify-proof";
 import {Proof} from "merkle-patricia-tree/dist.browser/baseTrie";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { HttpNetworkConfig } from "hardhat/types";
-import { JsonRpcProvider } from "@ethersproject/providers";
 
 describe("Verify State proof", function () {
-    let deployer: SignerWithAddress;
+    let deployer;
     let storage: SimpleStorage;
-    let provider: JsonRpcProvider;
-    let httpConfig: HttpNetworkConfig;
-
-    before(async () => {
-        httpConfig = network.config as HttpNetworkConfig;
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
-        [deployer] = await ethers.getSigners();
-    });
-
     it("Should deploy and return default values", async function () {
+        [deployer] = await ethers.getSigners();
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
 
@@ -30,6 +20,8 @@ describe("Verify State proof", function () {
     });
 
     it("Should read correct storage after transactions", async function () {
+        const provider = new hre.ethers.providers.JsonRpcProvider();
+
         // assign a value to `a`
         const newValue = 1337;
         expect(await storage.setA(newValue)).to.exist;
@@ -42,9 +34,11 @@ describe("Verify State proof", function () {
         // `a` is the first field of the contract and its value is stored at slot 0
         const aValue = await provider.getStorageAt(storage.address, 0);
         expect(aValue).to.equal(ethers.BigNumber.from(newValue));
-    });
+    })
 
     it("Should read correct mapping storage", async function () {
+        const provider = new hre.ethers.providers.JsonRpcProvider();
+
         const value = 1000;
         expect(await storage.setValue(value)).to.exist;
         const keys = await provider.send("parity_listStorageKeys", [
@@ -63,9 +57,20 @@ describe("Verify State proof", function () {
 
         const storedValue = await provider.getStorageAt(storage.address, storageKey);
         expect(ethers.BigNumber.from(storedValue).toNumber()).to.equal(value);
-    });
+    })
+
+    async function verifyProof(rootHash: Buffer, key: Buffer, proof: Proof): Promise<Buffer | null> {
+        let proofTrie = new Trie(null, rootHash)
+        try {
+            proofTrie = await Trie.fromProof(proof, proofTrie)
+        } catch (e) {
+            throw new Error('Invalid proof nodes given')
+        }
+        return proofTrie.get(key)
+    }
 
     it("Should return a valid proof", async function () {
+        const provider = new hre.ethers.providers.JsonRpcProvider();
         const keys = await provider.send("parity_listStorageKeys", [
             storage.address, 5, null
         ]);
@@ -78,5 +83,5 @@ describe("Verify State proof", function () {
 
         // verify the proof against the block's state root
         expect(await verify_eth_getProof(proof, block.stateRoot)).to.be.true;
-    });
+    })
 });

@@ -21,10 +21,6 @@ library GetProofLib {
         bytes storageProofs;
     }
 
-    struct BlockHeader {
-        bytes32 storageRoot;
-    }
-
     struct StorageProof {
         // key of the storage
         bytes32 key;
@@ -69,21 +65,18 @@ library GetProofLib {
         return proof;
     }
 
-    // todo only parses storageRoot for now.
-    function parseBlockHeader(bytes memory _blockHeader) internal pure returns (BlockHeader memory blockHeader) {
-        RLPReader.Iterator memory it = _blockHeader.toRlpItem().iterator();
+    function parseStorageRootFromBlockHeader(bytes memory blockHeader) internal pure returns (bytes32 stateRoot) {
+        RLPReader.Iterator memory it = blockHeader.toRlpItem().iterator();
 
         uint idx;
         while (it.hasNext()) {
             if (idx == 3) {
-                // storageRoot is at index 3
-                bytes32 storageRoot;
-                bytes memory storageRootBytes = it.next().toBytes();
+                // stateRoot is at index 3
+                bytes memory stateRootBytes = it.next().toBytes();
                 assembly {
-                    storageRoot := mload(add(storageRootBytes, 32))
+                    stateRoot := mload(add(stateRootBytes, 32))
                 }
-                blockHeader.storageRoot = storageRoot;
-                return blockHeader;
+                return stateRoot;
             } else {
                 it.next();
             }

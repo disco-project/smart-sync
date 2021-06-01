@@ -1,23 +1,13 @@
 import {SimpleStorage, SimpleStorage__factory,} from "../src-gen/types";
-import {ethers, network} from "hardhat";
+import {ethers} from "hardhat";
 import {expect} from "chai";
 import {StorageDiffer} from "../src/get-diff";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { JsonRpcProvider } from "@ethersproject/providers";
-import { HttpNetworkConfig } from "hardhat/types";
 
 describe("Get contract storage diff", function () {
-    let deployer: SignerWithAddress;
+    let deployer;
     let storageSrc: SimpleStorage;
     let storageTarget: SimpleStorage;
     let differ: StorageDiffer;
-    let provider: JsonRpcProvider;
-    let httpConfig: HttpNetworkConfig;
-
-    before(async () => {
-        httpConfig = network.config as HttpNetworkConfig;
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
-    });
 
     it("Should deploy contracts", async function () {
         [deployer] = await ethers.getSigners();
@@ -37,7 +27,7 @@ describe("Get contract storage diff", function () {
     it("Should get a single additional key in diff after setting a value", async function () {
         // set value at storage slot 0
         const tx = await storageSrc.setA(1337);
-        const blockNum = tx.blockNumber ?? await provider.getBlockNumber();
+        const blockNum = tx.blockNumber ?? await deployer.getBlock().number;
         // compare the second latest block against the block
         // that includes the tx that set the value of storage key 0
         let diff = await differ.getDiff(storageSrc.address, blockNum - 1);
@@ -58,7 +48,7 @@ describe("Get contract storage diff", function () {
 
     it("Should get a single changed key in diff after changing a value in the same contract", async function () {
         const tx = await storageSrc.setA(42);
-        const blockNum = tx.blockNumber ?? await provider.getBlockNumber();
+        const blockNum = tx.blockNumber ?? await deployer.getBlock().number;
 
         let diff = await differ.getDiff(storageSrc.address, blockNum - 1);
         expect(diff.diffs.length).to.equal(1);
