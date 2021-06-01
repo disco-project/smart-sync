@@ -12,7 +12,7 @@ import { HttpNetworkConfig } from "hardhat/types";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
-describe("Test scaling of contract", async function () {
+describe("Extension Validation", async function () {
     let deployer: SignerWithAddress;
     let srcContract: SyncCandidate;
     let logicContract: SyncCandidate;
@@ -102,7 +102,7 @@ describe("Test scaling of contract", async function () {
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        let diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         const rlpOptimized = proof.optimizedStorageProof();

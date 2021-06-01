@@ -304,7 +304,7 @@ export class GetProof implements IGetProof {
             }
         }
         // return the encoded proof
-        return pathNodes ? pathNodes.encode() : undefined;
+        return pathNodes ? pathNodes.encode() : [];
     }
 
     async encoded(stateRoot): Promise<Buffer> {

@@ -55,7 +55,7 @@ describe("Test scaling of contract", async function () {
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiff(srcContract.address, initialization.proxyContract.address);
+        let diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         for (let i = 1; i < map_size; i++) {
@@ -84,7 +84,7 @@ describe("Test scaling of contract", async function () {
             });
 
             // after update storage layouts are equal, no diffs
-            diff = await differ.getDiff(srcContract.address, initialization.proxyContract.address);
+            diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
             expect(diff.isEmpty()).to.be.true;
         }
     });
@@ -96,7 +96,7 @@ describe("Test scaling of contract", async function () {
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiff(srcContract.address, initialization.proxyContract.address);
+        let diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         for (let i = 1; i < map_size; i++) {
@@ -125,7 +125,7 @@ describe("Test scaling of contract", async function () {
             });
 
             // after update storage layouts are equal, no diffs
-            diff = await differ.getDiff(srcContract.address, initialization.proxyContract.address);
+            diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
             expect(diff.isEmpty()).to.be.true;
         }
     });
@@ -137,7 +137,7 @@ describe("Test scaling of contract", async function () {
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiff(srcContract.address, initialization.proxyContract.address);
+        let diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         for (let i = 1; i < MAX_CHANGED_VALUES; i++) {
@@ -166,7 +166,7 @@ describe("Test scaling of contract", async function () {
             });
 
             // after update storage layouts are equal, no diffs
-            diff = await differ.getDiff(srcContract.address, initialization.proxyContract.address);
+            diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
             expect(diff.isEmpty()).to.be.true;
         }
     });

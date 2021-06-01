@@ -1,7 +1,7 @@
 import { Contract } from "@ethersproject/contracts";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { ethers } from "ethers";
+import { BigNumberish, ethers } from "ethers";
 import { HttpNetworkConfig } from "hardhat/types";
 import { MappingContract, RelayContract } from "../src-gen/types";
 import { PROXY_INTERFACE } from "../src/config";
@@ -305,8 +305,8 @@ export class ChainProxy {
             return { migrationResult: false };
         }
         // get the diff set, the storage keys for the changed values
-        let diff = await this.differ.getDiff(this.srcContract.address, this.proxyContract.address);
-        const changedKeys = diff.diffs.map(c => c.key);
+        let diff = await this.differ.getDiffFromTxs(this.srcContract.address, this.proxyContract.address);
+        const changedKeys: Array<BigNumberish> = diff.getKeys();
 
         if (changedKeys.length < 1) {
             return {

@@ -73,7 +73,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         const differ = new StorageDiffer(provider);
-        const diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        const diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
 
         expect(diff.isEmpty()).to.be.true;
     })
@@ -134,7 +134,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        let diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         // change all the previous synced values
@@ -150,7 +150,7 @@ describe("Deploy proxy and logic contract", async function () {
         await srcContract.insert(333, 33);
 
         // get the diff set, the storage keys for the changed values
-        diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
         const changedKeys = diff.diffs.map(c => c.key);
 
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
@@ -174,7 +174,7 @@ describe("Deploy proxy and logic contract", async function () {
         console.log("Gas used for updating 8 and adding 1 value: ", receipt.gasUsed.toNumber());
 
         // after update storage layouts are equal, no diffs
-        diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
     })
 
@@ -186,7 +186,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         // get the diff set, the storage keys for the changed values
         const differ = new StorageDiffer(provider);
-        let diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        let diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
         const changedKeys = diff.diffs.map(c => c.key);
 
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
@@ -200,7 +200,7 @@ describe("Deploy proxy and logic contract", async function () {
         await proxyContract.updateStorage(rlpProof);
 
         // after update storage layouts are equal, no diffs
-        diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
     })
 
@@ -211,7 +211,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         // get the diff set, the storage keys for the changed values
         const differ = new StorageDiffer(provider);
-        const diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        const diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         const keys = diff.diffs.map(c => c.key);
 
