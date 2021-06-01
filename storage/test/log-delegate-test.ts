@@ -8,12 +8,14 @@ import {
 } from "../src-gen/types";
 import {ethers} from "hardhat";
 import {expect} from "chai";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 describe("Test static proxy calls", function () {
-    let deployer;
+    let deployer: SignerWithAddress;
     let logic: TestLogicContract;
     let proxy: TestProxyContract;
     let caller: CallingContract;
+    
     const abi = [
         "function getValue() view returns (uint256)",
         "function setValue(uint256 value)",

@@ -1,4 +1,4 @@
-import {RelayContract__factory, SyncCandidate, SyncCandidate__factory, CallRelayContract} from "../src-gen/types";
+import {RelayContract__factory, SyncCandidate, SyncCandidate__factory, CallRelayContract, RelayContract} from "../src-gen/types";
 import {ethers, network} from "hardhat";
 import {expect} from "chai";
 import {GetProof} from "../src/verify-proof";
@@ -8,33 +8,37 @@ import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
 import { logger } from "../src/logger";
-const rlp = require('rlp');
+import { HttpNetworkConfig } from "hardhat/types";
+import { JsonRpcProvider } from "@ethersproject/providers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 describe("Test scaling of contract", async function () {
-    let deployer;
+    let deployer: SignerWithAddress;
     let srcContract: SyncCandidate;
     let logicContract: SyncCandidate;
     let factory: SyncCandidate__factory;
-    let provider;
-    let relayContract;
-    let encodedProof;
+    let provider: JsonRpcProvider;
+    let relayContract: RelayContract;
     let latestBlock;
     let proxyContract: Contract;
-    let callRelayContract: CallRelayContract;
-    let storageRoot;
+    let httpConfig: HttpNetworkConfig;
+
+    before(async () => {
+        [deployer] = await ethers.getSigners();
+        httpConfig = network.config as HttpNetworkConfig;
+        logger.setSettings({minLevel: 'info', name: 'extension-validation-test.ts'});
+        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
+    });
 
     beforeEach(async () => {
-        [deployer] = await ethers.getSigners();
         factory = new SyncCandidate__factory(deployer);
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        provider = new ethers.providers.JsonRpcProvider();
         await srcContract.setValueA(42);
         await srcContract.setValueB(100);
-        logger.setSettings({minLevel: 'info', name: 'extension-validation-test.ts'});
     });
 
     it("It should create an optimized proof with extension nodes in it", async function () {
@@ -59,8 +63,6 @@ describe("Test scaling of contract", async function () {
         // create a proof of the source contract's storage
 
         let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
-      
-        encodedProof = await proof.encoded(latestBlock.stateRoot);
 
         const rlpOptimized = proof.optimizedStorageProof();
         expect(rlpOptimized).to.not.be.undefined;
@@ -81,11 +83,7 @@ describe("Test scaling of contract", async function () {
         // create a proof of the source contract's storage
         let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 
-        encodedProof = await proof.encoded(latestBlock.stateRoot);
-
-        storageRoot = proof.storageHash;
-
-        let response = await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 
         const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
 
@@ -100,7 +98,7 @@ describe("Test scaling of contract", async function () {
             proxyKeys.push(ethers.utils.hexZeroPad(storageProof.key, 32));
             proxyValues.push(ethers.utils.hexZeroPad(storageProof.value, 32));
         }
-        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: 8000000 });
+        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: httpConfig.gas });
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);

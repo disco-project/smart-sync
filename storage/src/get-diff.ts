@@ -1,6 +1,7 @@
-import {ethers} from "hardhat";
+import {ethers, network} from "hardhat";
 import assert from "assert";
 import {getAllKeys, toParityQuantity} from "./utils";
+import { HttpNetworkConfig } from "hardhat/types";
 
 export class StorageDiffer {
     /**
@@ -26,7 +27,7 @@ export class StorageDiffer {
      * @param targetProvider an `ethers` JsonRpcProvider used to connect to the target chain
      * @param batchSize how many keys to retrieve per request [parity_liststoragekeys](https://openethereum.github.io/JSONRPC-parity-module#parity_liststoragekeys)
      */
-    constructor(srcProvider = new ethers.providers.JsonRpcProvider(), targetProvider = srcProvider, batchSize = 50) {
+    constructor(srcProvider = new ethers.providers.JsonRpcProvider((network.config as HttpNetworkConfig).url), targetProvider = srcProvider, batchSize = 50) {
         this.srcProvider = srcProvider;
         this.targetProvider = targetProvider;
         this.batchSize = batchSize;
