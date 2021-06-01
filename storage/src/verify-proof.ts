@@ -414,6 +414,7 @@ class ProofPathBuilder {
                         // insert branch
                         childBranch.children[i] = new BranchNode(node, storageKey);
                     } else if (storageKey && !((childBranch.children[i] as BranchNode).children[16])) {
+                        logger.debug('value at branch');
                         (childBranch.children[i] as BranchNode).children[16] = new LeafNode(rlp.decode(node[16]) as any, storageKey);
                     }
                 }
@@ -424,7 +425,6 @@ class ProofPathBuilder {
                 if (childBranch.children[i] instanceof BranchNode || childBranch.children[i] instanceof ExtensionNode) {
                     let newNode = this.insertChild(childBranch.children[i] as ParentNode, node, parentNode, storageKey, isLeaf);
                     if (newNode !== undefined) {
-                        this.logger.debug('new subnode');
                         return newNode;
                     }
                 }
@@ -464,6 +464,7 @@ class ProofPathBuilder {
                         // insert branch
                         this.children[i] = new BranchNode(node, storageKey);
                     } else if (storageKey && !((this.children[i] as BranchNode).children[16])) {
+                        logger.debug('value at branch');
                         (this.children[i] as BranchNode).children[16] = new LeafNode(rlp.decode(node[16]) as any, storageKey);
                     }
                 }
@@ -474,8 +475,6 @@ class ProofPathBuilder {
                 if (this.children[i] instanceof BranchNode || this.children[i] instanceof ExtensionNode) {
                     let newNode = this.insertChild(this.children[i] as ParentNode, node, parentNode, storageKey, isLeaf);
                     if (newNode !== undefined) {
-                        this.logger.debug('new subnode');
-                        
                         return newNode;
                     }
                 }

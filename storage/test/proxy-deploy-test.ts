@@ -1,5 +1,5 @@
 import {RelayContract__factory, SyncCandidate, SyncCandidate__factory, CallRelayContract__factory, CallRelayContract} from "../src-gen/types";
-import {ethers} from "hardhat";
+import {ethers, network} from "hardhat";
 import {expect} from "chai";
 import {GetProof, encodeBlockHeader} from "../src/verify-proof";
 import {getAllKeys} from "../src/utils";
@@ -10,6 +10,7 @@ import {Contract} from "ethers";
 import { logger } from "../src/logger"
 import { isRawNode } from "merkle-patricia-tree/dist/trieNode";
 import Web3 from 'web3';
+import { HttpNetworkConfig } from "hardhat/types";
 
 describe("Deploy proxy and logic contract", async function () {
     let deployer;
@@ -24,12 +25,10 @@ describe("Deploy proxy and logic contract", async function () {
     let callRelayContract: CallRelayContract;
     let storageRoot;
     let proof;
+    let httpConfig: HttpNetworkConfig;
 
     before(async () => {
-        logger.setSettings({minLevel: 'info', name: 'proxy-deploy-test.ts'});
-    });
-
-    before(async () => {
+        httpConfig = network.config as HttpNetworkConfig;
         logger.setSettings({minLevel: 'info', name: 'proxy-deploy-test.ts'});
     });
 
@@ -127,7 +126,7 @@ describe("Deploy proxy and logic contract", async function () {
         const sourceAccountProof = await proof.optimizedProof(latestBlock.stateRoot, false);
 
         //  getting account proof from proxy contract
-        const proxyProvider = new ethers.providers.JsonRpcProvider('http://localhost:8545');
+        const proxyProvider = new ethers.providers.JsonRpcProvider(httpConfig.url);
         const latestProxyChainBlock = await proxyProvider.send('eth_getBlockByNumber', ["latest", false]);
         const proxyChainProof = new GetProof(await proxyProvider.send("eth_getProof", [proxyContract.address, []]));
         const proxyAccountProof = await proxyChainProof.optimizedProof(latestProxyChainBlock.stateRoot, false);
@@ -137,7 +136,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         // need to use web3 here as hardhat/ethers mine another block before actually executing the method on the bc.
         // therefore, block.number - 1 in the function verifyMigrateContract doesn't work anymore.
-        const web3 = new Web3('http://localhost:8545');
+        const web3 = new Web3(httpConfig.url);
         const contractInstance = new web3.eth.Contract(compiledProxy.abi, proxyContract.address);
         await contractInstance.methods.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader).send({
             from: '0x00ce0c25d2a45e2f22d4416606d928b8c088f8db'
