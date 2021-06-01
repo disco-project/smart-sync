@@ -92,7 +92,15 @@ describe("Test scaling of contract", async function () {
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
 
-        proxyContract = await proxyFactory.deploy(encodedProof);
+        proxyContract = await proxyFactory.deploy();
+
+        let proxyKeys: Array<string> = [];
+        let proxyValues: Array<string> = [];
+        for (const storageProof of proof.storageProof) {
+            proxyKeys.push(ethers.utils.hexZeroPad(storageProof.key, 32));
+            proxyValues.push(ethers.utils.hexZeroPad(storageProof.value, 32));
+        }
+        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: 8000000 });
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);

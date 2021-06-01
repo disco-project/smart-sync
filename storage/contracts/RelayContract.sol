@@ -10,14 +10,22 @@ contract RelayContract {
         uint256 blockNumber;
     }
 
-    mapping(address => bytes32) proxyStorageRoots;
+    struct ProxyContractInfo {
+        // The root of storage trie of the contract.
+        bytes32 storageRoot;
+        // State of migration if successfull or not
+        bool migrationState;
+    }
+
+    mapping(address => ProxyContractInfo) proxyStorageInfos;
     BlockInfo currentBlock;
 
     /**
-     * @dev Called by the proxy to update its state
+     * @dev Called by the proxy to update its state, only after migrationState validation
      */
-    function updateProxyStorage(bytes32 _newStorage) public {
-        proxyStorageRoots[msg.sender] = _newStorage;
+    function updateProxyInfo(bytes32 _newStorage) public {
+        proxyStorageInfos[msg.sender].storageRoot = _newStorage;
+        proxyStorageInfos[msg.sender].migrationState = true;
     }
 
     function updateBlock(bytes32 _stateRoot, uint256 _blockNumber) public {
@@ -36,7 +44,10 @@ contract RelayContract {
     * @dev return the calling contract's storage root (only correct if stored by the contract before only!)
     */
     function getStorageRoot() public view returns (bytes32) {
-        return proxyStorageRoots[msg.sender];
+        return proxyStorageInfos[msg.sender].storageRoot;
     }
 
+    function getMigrationState(address contractAddress) public view returns (bool) {
+        return proxyStorageInfos[contractAddress].migrationState;
+    }
 }

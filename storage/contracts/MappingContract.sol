@@ -12,6 +12,12 @@ contract MappingContract {
         map[_key] = _value;
     }
 
+    function insertMultiple(uint[] memory _keys, uint[] memory _values) public {
+        for (uint i = 0; i < _keys.length; i++) {
+            map[_keys[i]] = _values[i];
+        }
+    }
+
     function getValue(uint _key) public view returns (uint256) {
         return map[_key];
     }

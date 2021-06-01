@@ -29,33 +29,64 @@ contract ProxyContract {
     */
     address internal constant LOGIC_ADDRESS = 0x55f2155f2fEdbf701262573Be477A6562E09AeE0;
 
-    /**
-    * @dev initialize the storage of this contract based on the provided proof.
-    * @param proof rlp encoded EIP1186 proof
-    */
-    constructor(bytes memory proof) public {
-        // initialize the contract's storage
-        initialize(proof);
+    constructor() public {
     }
 
     /**
-    * @dev initialize the storage of this contract based on the provided proof.
-    * @param proof rlp encoded EIP1186 proof
+    * @dev Adds values to the storage. Used for initialization.
+    * @param keys -> Array of keys for storage
+    * @param values -> Array of values corresponding to the array keys.
     */
-    function initialize(bytes memory proof) internal {
+    function addStorage(bytes32[] memory keys, bytes32[] memory values) public {
+        require(keys.length == values.length, 'arrays keys and values do not have the same length');
+        require(!(getRelay().getMigrationState(address(this))), 'Migration is already completed');
+
+        bytes32 key;
+        bytes32 value;
+        for (uint i = 0; i < keys.length; i++) {
+            key = keys[i];
+            value = values[i];
+            assembly {
+                sstore(key, value)
+            }
+        }
+    }
+
+    /**
+    * @dev checks if the migration of the source contract to the proxy contract was successful
+    * @param sourceAccountProof contains source contract account information and the merkle patricia proof of the account
+    * @param proxyAccountProof contains proxy contract account information and the merkle patricia proof of the account
+    * @param proxyChainBlockHeader latest block header of the proxy contract's chain
+    */
+    function verifyMigrateContract(bytes memory sourceAccountProof, bytes memory proxyAccountProof, bytes memory proxyChainBlockHeader) public {
+        // compare block header hashes
+        bytes32 givenBlockHeaderHash = keccak256(proxyChainBlockHeader);
+        bytes32 actualBlockHeaderHash = blockhash(block.number - 1);
+        require(givenBlockHeaderHash == actualBlockHeaderHash, 'Given proxy chain block header is faulty');
+
+        // verify sourceAccountProof
         RelayContract relay = getRelay();
-        bytes32 root = relay.getStateRoot();
+        // get the current state root of the source chain
+        bytes32 sourceChainStorageRoot = relay.getStateRoot();
+        // validate that the proof was obtained for the source contract and the account's storage is part of the current state
         bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
-        GetProofLib.GetProof memory getProof = GetProofLib.parseProof(proof);
-        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, root), "Failed to verify the account proof");
+        GetProofLib.GetProof memory getProof = GetProofLib.parseProof(sourceAccountProof);
+        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, sourceChainStorageRoot), "Failed to verify the account proof");
+        GetProofLib.Account memory sourceAccount = GetProofLib.parseAccount(getProof.account);
 
-        GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
+        // verify proxyAccountProof
+        // validate that the proof was obtained for the source contract and the account's storage is part of the current state
+        path = GetProofLib.encodedAddress(address(this));
+        getProof = GetProofLib.parseProof(proxyAccountProof);
+        bytes32 proxyChainStorageRoot = GetProofLib.parseStorageRootFromBlockHeader(proxyChainBlockHeader);
+        require(GetProofLib.verifyProof(getProof.account, getProof.accountProof, path, proxyChainStorageRoot), "Failed to verify the account proof");
+        GetProofLib.Account memory proxyAccount = GetProofLib.parseAccount(getProof.account);
 
-        // update the storage or revert on error
-        updateStorageKeys(getProof.storageProofs, account.storageHash);
+        // compare storageRootHashes
+        require(sourceAccount.storageHash == proxyAccount.storageHash, 'storageHashes of the contracts dont match');
 
-        // update the state in the relay
-        relay.updateProxyStorage(account.storageHash);
+        // update relay contract -> complete migration
+        relay.updateProxyInfo(proxyAccount.storageHash);
     }
 
     /**
@@ -335,6 +366,8 @@ contract ProxyContract {
         // First verify stateRoot -> account (account proof)
 
         RelayContract relay = getRelay();
+        require(relay.getMigrationState(address(this)), 'migration not completed');
+        
         // get the current state root of the source chain
         bytes32 root = relay.getStateRoot();
         // validate that the proof was obtained for the source contract and the account's storage is part of the current state
@@ -356,7 +389,7 @@ contract ProxyContract {
         setStorageValues(getProof.storageProofs);
 
         // update the state in the relay
-        relay.updateProxyStorage(account.storageHash);
+        relay.updateProxyInfo(account.storageHash);
     }
 
     function updateStorageValue(RLPReader.RLPItem[] memory valueNode) internal {

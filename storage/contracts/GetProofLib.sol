@@ -65,6 +65,26 @@ library GetProofLib {
         return proof;
     }
 
+    function parseStorageRootFromBlockHeader(bytes memory blockHeader) internal pure returns (bytes32 stateRoot) {
+        RLPReader.Iterator memory it = blockHeader.toRlpItem().iterator();
+
+        uint idx;
+        while (it.hasNext()) {
+            if (idx == 3) {
+                // stateRoot is at index 3
+                bytes memory stateRootBytes = it.next().toBytes();
+                assembly {
+                    stateRoot := mload(add(stateRootBytes, 32))
+                }
+                return stateRoot;
+            } else {
+                it.next();
+            }
+
+            idx++;
+        }
+    }
+
     function parseAccount(bytes memory rlpAccount) internal pure returns (Account memory account) {
         RLPReader.Iterator memory it =
         rlpAccount.toRlpItem().iterator();
