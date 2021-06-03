@@ -50,8 +50,12 @@ describe("Test scaling of contract", async function () {
         // change all the previous synced values
         await chainProxy.changeValues(1, MAX_VALUE);
 
+        // get changed keys
+        diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
+        const changedKeys = diff.getKeys();
+
         // migrate changes to proxy contract
-        const migrationResult = await chainProxy.migrateChangesToProxy();
+        const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
         expect(migrationResult.migrationResult).to.be.true;
         if (!migrationResult.receipt) {
             logger.fatal('No receipt provided');
@@ -77,8 +81,12 @@ describe("Test scaling of contract", async function () {
         // change all the previous synced values
         await chainProxy.changeValueAtIndex(0, MAX_VALUE);
 
+        // get changed keys
+        diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
+        const changedKeys = diff.getKeys();
+
         // migrate changes to proxy contract
-        const migrationResult = await chainProxy.migrateChangesToProxy();
+        const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
         expect(migrationResult.migrationResult).to.be.true;
         if (!migrationResult.receipt) {
             logger.fatal('No receipt provided');
@@ -104,8 +112,12 @@ describe("Test scaling of contract", async function () {
         // change all the previous synced values
         await chainProxy.changeValues(5, MAX_VALUE);
 
+        // get changed keys
+        diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
+        const changedKeys = diff.getKeys();
+
         // migrate changes to proxy contract
-        const migrationResult = await chainProxy.migrateChangesToProxy();
+        const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
         expect(migrationResult.migrationResult).to.be.true;
         if (!migrationResult.receipt) {
             logger.fatal('No receipt provided');
@@ -131,8 +143,12 @@ describe("Test scaling of contract", async function () {
         // change all the previous synced values
         await chainProxy.changeValues(5, MAX_VALUE, 5);
 
+        // get changed keys
+        diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
+        const changedKeys = diff.getKeys();
+
         // migrate changes to proxy contract
-        const migrationResult = await chainProxy.migrateChangesToProxy();
+        const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
         expect(migrationResult.migrationResult).to.be.true;
         if (!migrationResult.receipt) {
             logger.fatal('No receipt provided');
@@ -158,8 +174,12 @@ describe("Test scaling of contract", async function () {
         // change all the previous synced values
         await chainProxy.changeValues(10, MAX_VALUE);
 
+        // get changed keys
+        diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
+        const changedKeys = diff.getKeys();
+
         // migrate changes to proxy contract
-        const migrationResult = await chainProxy.migrateChangesToProxy();
+        const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
         expect(migrationResult.migrationResult).to.be.true;
         if (!migrationResult.receipt) {
             logger.fatal('No receipt provided');

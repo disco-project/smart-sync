@@ -57,8 +57,11 @@ describe("New Initialization", async function () {
         const result = await chainProxy.changeDeepestValues(20, MAX_VALUE);
         expect(result).to.be.true;
 
+        diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
+        const changedKeys = diff.getKeys();
+
         // migrate changes to proxy contract
-        const migrationResult = await chainProxy.migrateChangesToProxy();
+        const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
         expect(migrationResult.migrationResult).to.be.true;
         if (!migrationResult.receipt) {
             logger.fatal('No receipt provided');
