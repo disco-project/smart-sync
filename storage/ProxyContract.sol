@@ -312,8 +312,8 @@ contract ProxyContract {
     * @param proof The rlp encoded optimized proof
     */
     function updateStorage(bytes memory proof) public {
+        // todo removing values is not considered here
         // First verify stateRoot -> account (account proof)
-
         RelayContract relay = getRelay();
         require(relay.getMigrationState(address(this)), 'migration not completed');
         

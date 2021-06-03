@@ -151,7 +151,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         // get the diff set, the storage keys for the changed values
         diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
-        const changedKeys = diff.diffs.map(c => c.key);
+        const changedKeys = diff.getKeys();
 
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
@@ -187,7 +187,7 @@ describe("Deploy proxy and logic contract", async function () {
         // get the diff set, the storage keys for the changed values
         const differ = new StorageDiffer(provider);
         let diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
-        const changedKeys = diff.diffs.map(c => c.key);
+        const changedKeys = diff.getKeys();
 
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
@@ -213,7 +213,7 @@ describe("Deploy proxy and logic contract", async function () {
         const differ = new StorageDiffer(provider);
         const diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
-        const keys = diff.diffs.map(c => c.key);
+        const keys = diff.getKeys();
 
         const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 

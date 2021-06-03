@@ -1,9 +1,10 @@
 import {ethers, network} from "hardhat";
 import assert from "assert";
-import {getAllKeys, toParityQuantity, TransactionHandler } from "./utils";
+import {getAllKeys, toBlockNumber, toParityQuantity, TransactionHandler } from "./utils";
 import { HttpNetworkConfig } from "hardhat/types";
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { BigNumberish } from "@ethersproject/bignumber";
+import { logger } from "./logger";
 
 export class StorageDiffer {
     /**
@@ -49,34 +50,32 @@ export class StorageDiffer {
      * @returns the diff between the storage of the two contracts at their specific blocks as list of `StorageDiff`
      */
     async getDiffFromStorage(srcAddress: string, targetAddress?: string, srcBlock?: string | number,  targetBlock?: string | number): Promise<StorageDiff> {
-        const processedParameters: ProcessedParameters = this.processParameters(srcAddress, srcBlock, targetAddress, targetBlock);
+        const processedParameters: ProcessedParameters = await this.processParameters(srcAddress, srcBlock, targetAddress, targetBlock);
 
         let toKeys: Array<BigNumberish> = await getAllKeys(processedParameters.targetAddress, this.targetProvider, processedParameters.targetBlock, this.batchSize);
         let fromKeys: Array<BigNumberish> = await getAllKeys(processedParameters.srcAddress, this.srcProvider, processedParameters.srcBlock, this.batchSize);
 
         const diffs: StorageKeyDiff[] = [];
 
-        for (let i = 0; i < toKeys.length; i++) {
-            let key: BigNumberish = toKeys[i];
-            const index: number = fromKeys.indexOf(key);
+        for (let i = 0; i < fromKeys.length; i++) {
+            let key: BigNumberish = fromKeys[i];
+            const index: number = toKeys.indexOf(key);
             if (index !== -1) {
-                fromKeys.splice(index, 1);
+                toKeys.splice(index, 1);
                 // check if there are any differences in the values
                 let valueFrom = await this.srcProvider.getStorageAt(processedParameters.srcAddress, key, processedParameters.srcBlock);
                 let valueTo = await this.targetProvider.getStorageAt(processedParameters.targetAddress, key, processedParameters.targetBlock);
                 if (valueFrom !== valueTo) {
-                    diffs.push(
-                        new Change(key, valueFrom, valueTo)
-                    );
+                    diffs.push(new Change(key, valueFrom, valueTo));
                 }
             } else {
-                // key is only present in `targetAddress`
-                diffs.push(new Add(key, await this.targetProvider.getStorageAt(processedParameters.targetAddress, key, processedParameters.targetBlock)));
+                // key is only present in `sourceAddress`
+                diffs.push(new Add(key, await this.targetProvider.getStorageAt(processedParameters.srcAddress, key, processedParameters.srcBlock)));
             }
         }
         // keys that are present in block `srcBlock` but not in `targetBlock`.
-        for (let key of fromKeys) {
-            diffs.push(new Remove(key, await this.srcProvider.getStorageAt(processedParameters.srcAddress, key, processedParameters.srcBlock)))
+        for (let key of toKeys) {
+            diffs.push(new Remove(key, await this.srcProvider.getStorageAt(processedParameters.targetAddress, key, processedParameters.targetBlock)))
         }
         return new StorageDiff(diffs);
     }
@@ -90,40 +89,85 @@ export class StorageDiffer {
      * @returns the diff between the storage of the two contracts at their specific blocks as list of `StorageDiff`
      */
     async getDiffFromTxs(srcAddress: string, targetAddress?: string, latestSrcBlock?: string | number, latestTargetBlock?: string | number): Promise<StorageDiff> {
-        const processedParameters: ProcessedParameters = this.processParameters(srcAddress, latestSrcBlock, targetAddress, latestTargetBlock);
+        const processedParameters: ProcessedParameters = await this.processParameters(srcAddress, latestSrcBlock, targetAddress, latestTargetBlock);
 
         const diffs: StorageKeyDiff[] = [];
         const srcTxHandler = new TransactionHandler(processedParameters.srcAddress, this.srcProvider);
         const srcStorage: { [key: string]: string } = await srcTxHandler.getContractStorageFromTxs(processedParameters.srcBlock);
-        const srcKeys = Object.keys(srcStorage);
 
         const targetTxHandler = new TransactionHandler(processedParameters.targetAddress, this.targetProvider);
         const targetStorage: { [key: string]: string } = await targetTxHandler.getContractStorageFromTxs(processedParameters.targetBlock);
+        const targetKeys = Object.keys(targetStorage);
 
-        for (const targetKey in targetStorage) {
-            const srcValue = srcStorage[targetKey];
-            const targetValue = targetStorage[targetKey];
-            if (srcValue) {
+        for (const srcKey in srcStorage) {
+            const srcValue = srcStorage[srcKey];
+            const targetValue = targetStorage[srcKey];
+            if (targetValue) {
                 if (srcValue !== targetValue) {
                     // value of respective key changed
-                    diffs.push(new Change(targetKey, srcValue, targetValue));
+                    diffs.push(new Change(srcKey, srcValue, targetValue));
                 }
-                srcKeys.splice(srcKeys.indexOf(targetKey), 1);
-            } else if (!srcValue) {
+                targetKeys.splice(targetKeys.indexOf(srcKey), 1);
+            } else {
                 // key is only present in `targetAddress`
-                diffs.push(new Add(targetKey, targetValue));
+                diffs.push(new Add(srcKey, targetValue));
             }
         }
 
         // keys that are present in block `srcBlock` but not in `targetBlock`.
-        for (const srcKey of srcKeys) {
-            diffs.push(new Remove(srcKey, srcStorage[srcKey]));
+        for (const targetKey of targetKeys) {
+            diffs.push(new Remove(targetKey, srcStorage[targetKey]));
         }
 
         return new StorageDiff(diffs);
     }
 
-    private processParameters(srcAddress: string, srcBlock?: string | number, targetAddress?: string, targetBlock?: string | number): ProcessedParameters {
+    async getDiffFromSrcContractTxs(srcAddress: string, latestSrcBlock?: string | number, earliestSrcBlock?: string | number): Promise<StorageDiff> {
+        const processedParameters: ProcessedParameters = await this.processParameters(srcAddress, latestSrcBlock, srcAddress, earliestSrcBlock);
+        earliestSrcBlock = earliestSrcBlock ? toParityQuantity(earliestSrcBlock) : undefined;
+
+        const diffs: StorageKeyDiff[] = [];
+        const srcTxHandler = new TransactionHandler(processedParameters.srcAddress, this.srcProvider);
+
+        // getting all tx from srcAddress
+        const txs = await srcTxHandler.getTransactions(processedParameters.srcBlock, earliestSrcBlock);
+        const oldKeys = await getAllKeys(srcAddress, this.srcProvider, processedParameters.srcBlock - 1);
+
+        const changedStorage: { [ key: string ]: string } = {};
+
+        // replay storage changes
+        let i = 0;
+        for (const tx of txs) {
+            const txStorage = await srcTxHandler.replayTransaction(tx, i++);
+            if (txStorage) {
+                logger.debug('srcTx txStorage: ', txStorage);
+
+                for (const key in txStorage) {
+                    changedStorage[key] = txStorage[key];
+                }
+            }
+        }
+
+        // gather diffs
+        const newKeys = Object.keys(changedStorage);
+        newKeys.forEach((key) => {
+            const oldIndex = oldKeys.indexOf(key);
+            if (oldIndex === -1) {
+                // newly added key
+                diffs.push(new Add(key, changedStorage[key]));
+            } else if (!changedStorage[key].match(/0x[0]{64}/g)) {
+                // changed key
+                diffs.push(new Change(key, 0, changedStorage[key]));
+            } else {
+                // removed key
+                diffs.push(new Remove(key, 0));
+            }
+        });
+
+        return new StorageDiff(diffs);
+    }
+
+    private async processParameters(srcAddress: string, srcBlock?: string | number, targetAddress?: string, targetBlock?: string | number): Promise<ProcessedParameters> {
         assert(ethers.utils.isAddress(srcAddress), "contract address is not a valid address");
 
         if (targetAddress !== undefined && !ethers.utils.isAddress(targetAddress)) {
@@ -134,8 +178,8 @@ export class StorageDiffer {
         srcBlock = srcBlock ?? "latest";
         targetBlock = targetBlock ?? "latest";
 
-        srcBlock = toParityQuantity(srcBlock);
-        targetBlock = toParityQuantity(targetBlock);
+        srcBlock = await toBlockNumber(srcBlock);
+        targetBlock = await toBlockNumber(targetBlock);
 
         return {
             srcAddress,
@@ -255,7 +299,7 @@ export enum DiffKind {
 
 interface ProcessedParameters {
     srcAddress: string;
-    srcBlock: string;
+    srcBlock: number;
     targetAddress: string;
-    targetBlock: string;
+    targetBlock: number;
 }

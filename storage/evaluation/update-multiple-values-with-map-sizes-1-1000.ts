@@ -2,14 +2,14 @@ import {RelayContract__factory, MappingContract, MappingContract__factory, Relay
 import {ethers, network} from "hardhat";
 import {expect} from "chai";
 import { JsonRpcProvider } from "@ethersproject/providers";
-import {StorageDiffer} from "../src/get-diff";
+import {StorageDiff, StorageDiffer} from "../src/get-diff";
 import { logger } from "../src/logger";
 import { HttpNetworkConfig } from "hardhat/types";
 import { ChainProxy } from "../test/test-utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { CSVDataTemplateMultipleValues, CSVManager } from "./eval-utils";
+import { BigNumberish } from "@ethersproject/bignumber";
 
-const MAX_CHANGED_VALUES = 100;
 const MAX_VALUE = 1000000;
 
 describe("Test scaling of contract", async function () {
@@ -22,12 +22,15 @@ describe("Test scaling of contract", async function () {
     let httpConfig: HttpNetworkConfig;
     let chainProxy: ChainProxy;
     let csvManager: CSVManager<CSVDataTemplateMultipleValues>;
+    let differ: StorageDiffer;
+    let currBlockNr: number;
 
     before(() => {
         httpConfig = network.config as HttpNetworkConfig;
         logger.setSettings({minLevel: 'info', name: 'update-multiple-values-with-map-sizes-1-1000.ts'});
         csvManager = new CSVManager<CSVDataTemplateMultipleValues>(`measurements-multiple-values-with-map-sizes-1-to-1000.csv`);
         provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
+        differ = new StorageDiffer(provider);
     });
 
     after(async () => {
@@ -52,11 +55,7 @@ describe("Test scaling of contract", async function () {
         const map_size = 10;
         const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
-
-        // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
-        let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
-        expect(diff.isEmpty()).to.be.true;
+        currBlockNr = await provider.getBlockNumber() + 1;
 
         for (let i = 1; i < map_size; i++) {
             const value_count = i + 1;
@@ -66,7 +65,12 @@ describe("Test scaling of contract", async function () {
             expect(result).to.be.true;
 
             // migrate changes to proxy contract
-            const migrationResult = await chainProxy.migrateChangesToProxy();
+            // get the diff set, the storage keys for the changed values
+            let diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
+            const changedKeys: Array<BigNumberish> = diff.getKeys();
+            logger.debug(`valueCount: ${value_count}, changedKeys: ${changedKeys.length}`);
+            currBlockNr = await provider.getBlockNumber() + 1;
+            const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
             expect(migrationResult.migrationResult).to.be.true;
             if (!migrationResult.receipt) {
                 logger.fatal('No receipt provided');
@@ -82,10 +86,6 @@ describe("Test scaling of contract", async function () {
                 changed_value_count: value_count,
                 max_mpt_depth: initialization.max_mpt_depth
             });
-
-            // after update storage layouts are equal, no diffs
-            diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
-            expect(diff.isEmpty()).to.be.true;
         }
     });
 
@@ -93,11 +93,7 @@ describe("Test scaling of contract", async function () {
         const map_size = 100;
         const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
-
-        // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
-        let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
-        expect(diff.isEmpty()).to.be.true;
+        currBlockNr = await provider.getBlockNumber() + 1;
 
         for (let i = 1; i < map_size; i++) {
             const value_count = i + 1;
@@ -107,7 +103,12 @@ describe("Test scaling of contract", async function () {
             expect(result).to.be.true;
 
             // migrate changes to proxy contract
-            const migrationResult = await chainProxy.migrateChangesToProxy();
+            // get the diff set, the storage keys for the changed values
+            let diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
+            const changedKeys: Array<BigNumberish> = diff.getKeys();
+            logger.debug(`valueCount: ${value_count}, changedKeys: ${changedKeys.length}`);
+            currBlockNr = await provider.getBlockNumber() + 1;
+            const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
             expect(migrationResult.migrationResult).to.be.true;
             if (!migrationResult.receipt) {
                 logger.fatal('No receipt provided');
@@ -123,10 +124,6 @@ describe("Test scaling of contract", async function () {
                 changed_value_count: value_count,
                 max_mpt_depth: initialization.max_mpt_depth
             });
-
-            // after update storage layouts are equal, no diffs
-            diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
-            expect(diff.isEmpty()).to.be.true;
         }
     });
 
@@ -134,13 +131,9 @@ describe("Test scaling of contract", async function () {
         const map_size = 1000;
         const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
+        currBlockNr = await provider.getBlockNumber() + 1;
 
-        // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
-        let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
-        expect(diff.isEmpty()).to.be.true;
-
-        for (let i = 1; i < MAX_CHANGED_VALUES; i++) {
+        for (let i = 1; i < map_size; i++) {
             const value_count = i + 1;
 
             // changing values at srcContract
@@ -148,7 +141,12 @@ describe("Test scaling of contract", async function () {
             expect(result).to.be.true;
 
             // migrate changes to proxy contract
-            const migrationResult = await chainProxy.migrateChangesToProxy();
+            // get the diff set, the storage keys for the changed values
+            let diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
+            const changedKeys: Array<BigNumberish> = diff.getKeys();
+            logger.debug(`valueCount: ${value_count}, changedKeys: ${changedKeys.length}`);
+            currBlockNr = await provider.getBlockNumber() + 1;
+            const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
             expect(migrationResult.migrationResult).to.be.true;
             if (!migrationResult.receipt) {
                 logger.fatal('No receipt provided');
@@ -164,10 +162,6 @@ describe("Test scaling of contract", async function () {
                 changed_value_count: value_count,
                 max_mpt_depth: initialization.max_mpt_depth
             });
-
-            // after update storage layouts are equal, no diffs
-            diff = await differ.getDiffFromTxs(srcContract.address, initialization.proxyContract.address);
-            expect(diff.isEmpty()).to.be.true;
         }
     });
 });

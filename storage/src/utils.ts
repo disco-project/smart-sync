@@ -7,12 +7,20 @@ import { Block, TransactionResponse, TransactionReceipt } from '@ethersproject/a
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { Input } from 'rlp';
 
+const BLOCKNUMBER_TAGS = ["latest", "earliest", "pending"];
+
 export function toParityQuantity(val: string | number): string {
-    const tags = ["latest", "earliest", "pending"];
-    if (typeof(val) === 'string' && tags.indexOf(val) > -1) {
+    if (typeof(val) === 'string' && BLOCKNUMBER_TAGS.indexOf(val) > -1) {
         return val;
     }
     return ethers.BigNumber.from(val).toHexString();
+}
+
+export async function toBlockNumber(val: BigNumberish, provider: JsonRpcProvider = new ethers.providers.JsonRpcProvider((network.config as HttpNetworkConfig).url)): Promise<number> {
+    if (typeof(val) === 'string' && BLOCKNUMBER_TAGS.indexOf(val) > -1) {
+        return (await provider.getBlock(val)).number;
+    }
+    return ethers.BigNumber.from(val).toNumber();
 }
 
 export function encode(input: Input): Buffer {
@@ -59,6 +67,7 @@ export async function getAllKeys(contractAddress: string, provider = new ethers.
     let keys: Array<BigNumberish> = [];
     let batch: Array<BigNumberish> = [];
     let batchCounter = 1;
+    blockNum = toParityQuantity(blockNum);
 
     do {
         let offset = (batchCounter > 1) ? keys[keys.length - 1] : null;
@@ -81,8 +90,8 @@ export class TransactionHandler {
         this.provider = provider;
     }
 
-    async getContractStorageFromTxs(latestBlockNumber: string | number = 'latest'): Promise<{ [ key: string ]: string }> {
-        const txs = await this.getTransactions(latestBlockNumber);
+    async getContractStorageFromTxs(latestBlockNumber: string | number = 'latest', earliest_block_number?: string | number): Promise<{ [ key: string ]: string }> {
+        const txs = await this.getTransactions(latestBlockNumber, earliest_block_number);
         const contractStorage: { [key: string]: string } = {};
 
         // getting all tx from srcAddress
@@ -132,22 +141,25 @@ export class TransactionHandler {
         return undefined;
     };
     
-    async getTransactions(block_number: number | string): Promise<Array<string>> {
+    async getTransactions(latest_block_number: number | string, earliest_block_number?: number | string): Promise<Array<string>> {
         logger.debug('Called getTransactions');
-        const contract_address = this.contractAddress.toUpperCase();
+        const contract_address: string = this.contractAddress.toUpperCase();
         let relatedTransactions: Array<string> = [];
-        if (typeof(block_number) === 'string')
-            block_number = (await this.provider.getBlock(block_number)).number;
+        if (typeof(latest_block_number) === 'string')
+            latest_block_number = await toBlockNumber(latest_block_number);
         
-        // first find deployment block for more efficiency
-        const deploymentBlockNumber: number = await findDeploymentBlock(this.contractAddress);
-        if (block_number < deploymentBlockNumber) {
-            logger.debug('Given block number older than block number the contract was deployed on.');
+        // first find deployment block for more efficiently
+        earliest_block_number = earliest_block_number ? earliest_block_number : await findDeploymentBlock(this.contractAddress);
+        if (typeof(earliest_block_number) === 'string')
+            earliest_block_number = await toBlockNumber(earliest_block_number);
+        
+        if (latest_block_number < earliest_block_number) {
+            logger.debug('Given latest block number older than earliest block number.');
             return [];
         }
 
         // gather all transactions
-        for(let i = deploymentBlockNumber; i <= block_number; i++) {
+        for(let i = earliest_block_number; i <= latest_block_number; i++) {
             const block: Block = await this.provider.getBlock(i);
             const transactions: Array<string> = block.transactions;
     

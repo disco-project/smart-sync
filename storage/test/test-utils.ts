@@ -299,14 +299,11 @@ export class ChainProxy {
         return true;
     }
 
-    async migrateChangesToProxy(): Promise<MigrationResult> {
+    async migrateChangesToProxy(changedKeys: Array<BigNumberish>): Promise<MigrationResult> {
         if (!this.migrationState) {
             logger.error('Proxy contract is not initialized yet.');
             return { migrationResult: false };
         }
-        // get the diff set, the storage keys for the changed values
-        let diff = await this.differ.getDiffFromTxs(this.srcContract.address, this.proxyContract.address);
-        const changedKeys: Array<BigNumberish> = diff.getKeys();
 
         if (changedKeys.length < 1) {
             return {
