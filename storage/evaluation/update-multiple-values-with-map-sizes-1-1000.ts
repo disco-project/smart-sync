@@ -11,6 +11,7 @@ import { CSVDataTemplateMultipleValues, CSVManager } from "./eval-utils";
 import { BigNumberish } from "@ethersproject/bignumber";
 
 const MAX_VALUE = 1000000;
+const MAX_CHANGED_VALUES = 100;
 
 describe("Test scaling of contract", async function () {
     let deployer: SignerWithAddress;
@@ -133,7 +134,7 @@ describe("Test scaling of contract", async function () {
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 1; i < map_size; i++) {
+        for (let i = 1; i < MAX_CHANGED_VALUES; i++) {
             const value_count = i + 1;
 
             // changing values at srcContract
