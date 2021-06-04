@@ -41,11 +41,10 @@ export class CSVManager<T> {
         return new Promise(resolve => {
             const writeStream = fs.createWriteStream(`${this.dir}/${timeString}_${this.fileName}`);
             const csvStringifier = stringify(this.data, { header: true });
-    
-            csvStringifier.on('end', () => {
-                writeStream.end();
+
+            writeStream.on('finish', () => {
                 resolve(resolve);
-            });
+            })
             csvStringifier.pipe(writeStream);
         });
     }

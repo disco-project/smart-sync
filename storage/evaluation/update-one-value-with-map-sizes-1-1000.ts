@@ -28,7 +28,7 @@ describe("Test scaling of contract", async function () {
     before(() => {
         httpConfig = network.config as HttpNetworkConfig;
         logger.setSettings({minLevel: 'info', name: 'update-one-value-with-map-sizes-1-1000.ts'});
-        csvManager = new CSVManager<CSVDataTemplateSingleValue>(`measurements-update-one-value-per-mpt-height-with-map-sizes-1-to-1000.csv`);
+        csvManager = new CSVManager<CSVDataTemplateSingleValue>(`measurements-update-one-value-with-map-sizes-1-to-1000.csv`);
         provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
         differ = new StorageDiffer(provider);
     });
