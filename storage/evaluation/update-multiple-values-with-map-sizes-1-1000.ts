@@ -58,7 +58,7 @@ describe("Test scaling of contract", async function () {
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 1; i < map_size; i++) {
+        for (let i = 0; i < map_size; i++) {
             const value_count = i + 1;
 
             // changing values at srcContract
@@ -96,7 +96,7 @@ describe("Test scaling of contract", async function () {
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 1; i < map_size; i++) {
+        for (let i = 0; i < map_size; i++) {
             const value_count = i + 1;
 
             // changing values at srcContract
@@ -134,7 +134,7 @@ describe("Test scaling of contract", async function () {
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 1; i < MAX_CHANGED_VALUES; i++) {
+        for (let i = 0; i < MAX_CHANGED_VALUES; i++) {
             const value_count = i + 1;
 
             // changing values at srcContract
