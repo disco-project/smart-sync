@@ -12,7 +12,7 @@ import { BigNumberish } from "@ethersproject/bignumber";
 
 const MAX_VALUE = 1000000;
 
-describe("Test scaling of contract", async function () {
+describe("update-one-value-per-mpt-height-with-map-sizes-1-to-1000", async function () {
     let deployer: SignerWithAddress;
     let srcContract: MappingContract;
     let logicContract: MappingContract;
