@@ -5,13 +5,13 @@ import {StorageDiff, StorageDiffer} from "../src/get-diff";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { logger } from "../src/logger"
 import { HttpNetworkConfig } from "hardhat/types";
-import { ChainProxy } from "../test/test-utils";
-import { CSVDataTemplateSingleValue, CSVManager } from "./eval-utils";
+import { ChainProxy, ChangeValueAtIndexResult } from "../test/test-utils";
+import { CSVDataTemplateSingleValueMultiple, CSVManager } from "./eval-utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumberish } from "@ethersproject/bignumber";
 
 const MAX_VALUE = 1000000;
-const ITERATIONS = 100;
+const ITERATIONS = 20;
 
 describe("update-same-value-in-map-sizes-1-1000", async function () {
     let deployer: SignerWithAddress;
@@ -22,14 +22,14 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
     let relayContract: RelayContract;
     let httpConfig: HttpNetworkConfig;
     let chainProxy: ChainProxy;
-    let csvManager: CSVManager<CSVDataTemplateSingleValue>;
+    let csvManager: CSVManager<CSVDataTemplateSingleValueMultiple>;
     let differ: StorageDiffer;
     let currBlockNr: number;
 
     before(() => {
         httpConfig = network.config as HttpNetworkConfig;
         logger.setSettings({minLevel: 'info', name: 'update-same-value-in-map-sizes-1-1000.ts'});
-        csvManager = new CSVManager<CSVDataTemplateSingleValue>(`update-same-value-in-map-sizes-1-1000.csv`);
+        csvManager = new CSVManager<CSVDataTemplateSingleValueMultiple>(`update-same-value-with-map-sizes-1-1000-iterations=${ITERATIONS}.csv`);
         provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
         differ = new StorageDiffer(provider);
     });
@@ -78,7 +78,8 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
 
             csvManager.pushData({
                 map_size: 1,
-                changed_value_index: i,
+                changed_value_index: 1,
+                iteration: i,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
                 value_mpt_depth: migrationResult.max_value_mpt_depth
@@ -92,32 +93,35 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 0; i < ITERATIONS; i++) {
-            // change previous synced value
-            const result = await chainProxy.changeDeepestValues(1, MAX_VALUE);
-            expect(result).to.be.true;
-
-            // migrate changes to proxy contract
-            // get the diff set, the storage keys for the changed values
-            let diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
-            const changedKeys: Array<BigNumberish> = diff.getKeys();
-            logger.debug(changedKeys);
-            currBlockNr = await provider.getBlockNumber() + 1;
-            const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
-            if (!migrationResult.receipt) {
-                logger.fatal('No receipt provided');
-                process.exit(-1);
+        for (let i = 0; i < map_size; i++) {
+            for (let j = 0; j < ITERATIONS; j++) {
+                // change previous synced value
+                 const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(1, MAX_VALUE);
+            expect(result.success).to.be.true;
+    
+                // migrate changes to proxy contract
+                // get the diff set, the storage keys for the changed values
+                let diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
+                const changedKeys: Array<BigNumberish> = diff.getKeys();
+                logger.debug(changedKeys);
+                currBlockNr = await provider.getBlockNumber() + 1;
+                const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
+                if (!migrationResult.receipt) {
+                    logger.fatal('No receipt provided');
+                    process.exit(-1);
+                }
+    
+                logger.info(`Update value at ${i}, map_size: ${map_size}, iteration: ${j}: `, migrationResult.receipt.gasUsed.toNumber());
+    
+                csvManager.pushData({
+                    map_size,
+                    iteration: j,
+                    changed_value_index: i,
+                    used_gas: migrationResult.receipt.gasUsed.toNumber(),
+                    max_mpt_depth: initialization.max_mpt_depth,
+                    value_mpt_depth: migrationResult.max_value_mpt_depth
+                });
             }
-
-            logger.info(`Update 1 value, map_size: ${map_size}, iteration: ${i}: `, migrationResult.receipt.gasUsed.toNumber());
-
-            csvManager.pushData({
-                map_size,
-                changed_value_index: i,
-                used_gas: migrationResult.receipt.gasUsed.toNumber(),
-                max_mpt_depth: initialization.max_mpt_depth,
-                value_mpt_depth: migrationResult.max_value_mpt_depth
-            });
         }
     });
 
@@ -128,32 +132,35 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
         logger.debug(`correct storage root: ${initialization.initialValuesProof.storageHash}`);
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 0; i < ITERATIONS; i++) {
-            // change previous synced value
-            const result = await chainProxy.changeDeepestValues(1, MAX_VALUE);
-            expect(result).to.be.true;
-
-            // migrate changes to proxy contract
-            // get the diff set, the storage keys for the changed values
-            let diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
-            const changedKeys: Array<BigNumberish> = diff.getKeys();
-            logger.debug(changedKeys);
-            currBlockNr = await provider.getBlockNumber() + 1;
-            const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
-            if (!migrationResult.receipt) {
-                logger.fatal('No receipt provided');
-                process.exit(-1);
+        for (let i = 0; i < map_size; i++) {
+            for (let j = 0; j < ITERATIONS; j++) {
+                // change previous synced value
+                 const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(1, MAX_VALUE);
+            expect(result.success).to.be.true;
+    
+                // migrate changes to proxy contract
+                // get the diff set, the storage keys for the changed values
+                let diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
+                const changedKeys: Array<BigNumberish> = diff.getKeys();
+                logger.debug(changedKeys);
+                currBlockNr = await provider.getBlockNumber() + 1;
+                const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
+                if (!migrationResult.receipt) {
+                    logger.fatal('No receipt provided');
+                    process.exit(-1);
+                }
+    
+                logger.info(`Update value at ${i}, map_size: ${map_size}, iteration: ${j}: `, migrationResult.receipt.gasUsed.toNumber());
+    
+                csvManager.pushData({
+                    map_size,
+                    iteration: j,
+                    changed_value_index: i,
+                    used_gas: migrationResult.receipt.gasUsed.toNumber(),
+                    max_mpt_depth: initialization.max_mpt_depth,
+                    value_mpt_depth: migrationResult.max_value_mpt_depth
+                });
             }
-
-            logger.info(`Update 1 value, map_size: ${map_size}, iteration: ${i}: `, migrationResult.receipt.gasUsed.toNumber());
-
-            csvManager.pushData({
-                map_size,
-                changed_value_index: i,
-                used_gas: migrationResult.receipt.gasUsed.toNumber(),
-                max_mpt_depth: initialization.max_mpt_depth,
-                value_mpt_depth: migrationResult.max_value_mpt_depth
-            });
         }
     });
 
@@ -164,33 +171,35 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
         logger.debug(`correct storage root: ${initialization.initialValuesProof.storageHash}`);
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 0; i < ITERATIONS; i++) {
-            // change previous synced value
-            const result = await chainProxy.changeDeepestValues(1, MAX_VALUE);
-            expect(result).to.be.true;
-
-            // migrate changes to proxy contract
-            // get the diff set, the storage keys for the changed values
-            let diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
-            const changedKeys: Array<BigNumberish> = diff.getKeys();
-            logger.debug(changedKeys);
-            currBlockNr = await provider.getBlockNumber() + 1;
-            const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
-            expect(migrationResult.migrationResult).to.be.true;
-            if (!migrationResult.receipt) {
-                logger.fatal('No receipt provided');
-                process.exit(-1);
+        for (let i = 0; i < map_size; i++) {
+            for (let j = 0; j < ITERATIONS; j++) {
+                // change previous synced value
+                 const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(1, MAX_VALUE);
+            expect(result.success).to.be.true;
+    
+                // migrate changes to proxy contract
+                // get the diff set, the storage keys for the changed values
+                let diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
+                const changedKeys: Array<BigNumberish> = diff.getKeys();
+                logger.debug(changedKeys);
+                currBlockNr = await provider.getBlockNumber() + 1;
+                const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
+                if (!migrationResult.receipt) {
+                    logger.fatal('No receipt provided');
+                    process.exit(-1);
+                }
+    
+                logger.info(`Update value at ${i}, map_size: ${map_size}, iteration: ${j}: `, migrationResult.receipt.gasUsed.toNumber());
+    
+                csvManager.pushData({
+                    map_size,
+                    iteration: j,
+                    changed_value_index: i,
+                    used_gas: migrationResult.receipt.gasUsed.toNumber(),
+                    max_mpt_depth: initialization.max_mpt_depth,
+                    value_mpt_depth: migrationResult.max_value_mpt_depth
+                });
             }
-
-            logger.info(`Update 1 value, map_size: ${map_size}, iteration: ${i}: `, migrationResult.receipt.gasUsed.toNumber());
-
-            csvManager.pushData({
-                map_size,
-                changed_value_index: i,
-                used_gas: migrationResult.receipt.gasUsed.toNumber(),
-                max_mpt_depth: initialization.max_mpt_depth,
-                value_mpt_depth: migrationResult.max_value_mpt_depth
-            });
         }
     });
 });

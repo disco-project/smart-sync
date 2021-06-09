@@ -29,6 +29,12 @@ export interface MigrationResult {
         gasUsed: ethers.BigNumber;
     };
     max_value_mpt_depth?: number;
+    proofs?: GetProof;
+}
+
+export interface ChangeValueAtIndexResult {
+    success: Boolean;
+    newValue?: BigNumberish;
 }
 
 export class ChainProxy {
@@ -285,18 +291,21 @@ export class ChainProxy {
         return true;
     }
 
-    async changeValueAtIndex(valueIndex: number, max_value: number): Promise<Boolean> {
+    async changeValueAtIndex(valueIndex: number, max_value: number): Promise<ChangeValueAtIndexResult> {
         if (!this.migrationState) {
             logger.error('Proxy contract is not initialized yet.');
-            return false;
+            return { success: false };
         }
         if (this.keys.findIndex(key => key === valueIndex) < 0) {
             logger.error(`Index ${valueIndex} does not exist on srcContract`);
-            return false;
+            return { success: false };
         }
         const value = Math.floor(Math.random() * max_value);
         await this.srcContract.insert(valueIndex, value);
-        return true;
+        return { 
+            newValue: value, 
+            success: true 
+        };
     }
 
     async migrateChangesToProxy(changedKeys: Array<BigNumberish>): Promise<MigrationResult> {
@@ -372,7 +381,7 @@ export class ChainProxy {
             receipt,
             max_value_mpt_depth,
             migrationResult: true,
-
+            proofs: changedKeysProof
         };
     }
 
