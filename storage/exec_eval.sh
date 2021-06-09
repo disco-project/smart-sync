@@ -27,7 +27,7 @@ echo "Done."
 
 # exec tests
 echo "Exec tests..."
-NODE_OPTIONS=--max_old_space_size=4096 ./node_modules/hardhat/internal/cli/cli.js --network ${network} test evaluation/*
+NODE_OPTIONS=--max_old_space_size=4096 ./node_modules/hardhat/internal/cli/cli.js --network ${network} test evaluation/*.ts
 echo "Done."
 
 # stop chains
