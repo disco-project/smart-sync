@@ -23,7 +23,7 @@ describe("Test scaling of contract", async function () {
     before(async () => {
         httpConfig = network.config as HttpNetworkConfig;
         logger.setSettings({minLevel: 'info', name: 'scale_test.ts'});
-        [deployer] = await ethers.getSigners();
+        deployer = await SignerWithAddress.create(provider.getSigner());
         provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
     });
 

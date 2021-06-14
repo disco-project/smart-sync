@@ -23,7 +23,7 @@ describe("Test static proxy calls", function () {
     ];
 
     it("Should deploy the contracts", async function () {
-        [deployer] = await ethers.getSigners();
+        deployer = await SignerWithAddress.create(provider.getSigner());
         const Logic = new TestLogicContract__factory(deployer);
         logic = await Logic.deploy();
         const Proxy = new TestProxyContract__factory(deployer);

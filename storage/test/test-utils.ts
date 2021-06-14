@@ -202,30 +202,35 @@ export class ChainProxy {
             valueIndices.push(valueIndex)
             srcKeys.push(valueIndex);
             srcValues.push(value);
-            // change previous synced value in batches
-            if (srcKeys.length >= KEY_VALUE_PAIR_PER_BATCH) {
-                try {
-                    await this.srcContract.insertMultiple(srcKeys, srcValues);
-                } catch(e) {
-                    logger.error('Could not insert multiple values in srcContract');
-                    logger.error(e);
-                    return false;
-                }
-                srcKeys = [];
-                srcValues = [];
-            }
-        }
-        if (srcKeys.length !== 0) {
-            try {
-                await this.srcContract.insertMultiple(srcKeys, srcValues);
-            } catch(e) {
-                logger.error('Could not insert multiple values in srcContract');
-                logger.error(e);
-                return false;
-            }
         }
 
-        return true;
+        return await this.insertValues(srcKeys, srcValues);
+    }
+
+    async changeRandomValues(valueCount: number, max_value: number): Promise<Boolean> {
+        if (valueCount > this.values.length) {
+            logger.error('Requested more value changes than values in contract');
+            return false;
+        } else if (!this.migrationState) {
+            logger.error('contract is not migrated yet.');
+            return false;
+        }
+
+        let usedKeys: Array<number> = [];
+        let srcKeys: Array<number> = [];
+        let srcValues: Array<number> = [];
+        for (let i = 0; i < valueCount; i++) {
+            const value = Math.floor(Math.random() * max_value);
+            srcValues.push(value);
+
+            let newKey = Math.floor(Math.random() * this.keys.length);
+            while (usedKeys.findIndex(key => key === this.keys[newKey]) > -1) {
+                newKey = Math.floor(Math.random() * this.keys.length);
+            }
+            srcKeys.push(this.keys[newKey]);
+            usedKeys.push(this.keys[newKey]);
+        }
+        return await this.insertValues(srcKeys, srcValues);
     }
 
     async changeValues(valueCount: number, max_value: number, offset?: number): Promise<Boolean> {
@@ -244,22 +249,15 @@ export class ChainProxy {
             const value = Math.floor(Math.random() * max_value);
             srcValues.push(value);
             srcKeys.push(this.keys[i]);
-            if (srcValues.length >= KEY_VALUE_PAIR_PER_BATCH) {
-                try {
-                    await this.srcContract.insertMultiple(srcKeys, srcValues);
-                } catch(e) {
-                    logger.error('Could not insert multiple values in srcContract');
-                    logger.error(e);
-                    return false;
-                }
-                srcValues = [];
-                srcKeys = [];
-            } 
         }
-        if (srcValues.length !== 0) {
+        return await this.insertValues(srcKeys, srcValues);
+    }
+
+    private async insertValues(srcKeys: Array<number>, srcValues: Array<number>): Promise<Boolean> {
+        while(srcKeys.length > 0) {
             try {
-                await this.srcContract.insertMultiple(srcKeys, srcValues);
-            } catch(e) {
+                await this.srcContract.insertMultiple(srcKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), srcValues.splice(0, KEY_VALUE_PAIR_PER_BATCH));
+            } catch (e) {
                 logger.error('Could not insert multiple values in srcContract');
                 logger.error(e);
                 return false;

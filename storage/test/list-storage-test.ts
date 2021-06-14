@@ -20,7 +20,7 @@ describe("Storage", function () {
     });
 
     it("Should deploy and return default values", async function () {
-        [deployer] = await ethers.getSigners();
+        deployer = await SignerWithAddress.create(provider.getSigner());
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
 

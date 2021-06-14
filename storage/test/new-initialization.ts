@@ -24,7 +24,7 @@ describe("New Initialization", async function () {
         httpConfig = network.config as HttpNetworkConfig;
         logger.setSettings({ minLevel: 'info', name: 'new-initialization.ts' });
         provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
-        [deployer] = await ethers.getSigners();
+        deployer = await SignerWithAddress.create(provider.getSigner());
     });
 
     beforeEach(async () => {

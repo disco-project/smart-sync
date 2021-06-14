@@ -16,7 +16,7 @@ describe("Get contract storage diff", function () {
     let httpConfig: HttpNetworkConfig;
 
     before(async () => {
-        [deployer] = await ethers.getSigners();
+        deployer = await SignerWithAddress.create(provider.getSigner());
         httpConfig = network.config as HttpNetworkConfig;
         provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
         logger.setSettings({minLevel: 'info', name: 'get-diff-test.ts'});

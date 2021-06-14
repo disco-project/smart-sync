@@ -38,7 +38,7 @@ describe("update-one-value-with-map-sizes-1-1000", async function () {
     });
 
     beforeEach(async () => {
-        [deployer] = await ethers.getSigners();
+        deployer = await SignerWithAddress.create(provider.getSigner());
         factory = new MappingContract__factory(deployer);
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
@@ -71,9 +71,9 @@ describe("update-one-value-with-map-sizes-1-1000", async function () {
             process.exit(-1);
         }
 
-        const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs.storageProof);
+        const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs?.storageProof);
 
-        logger.info("Gas used for updating 1 value in map with 1 value: ", migrationResult.receipt.gasUsed.toNumber());
+        logger.info(`Update value at ${1}, map_size: ${1}, value_depth: ${migrationResult.max_value_mpt_depth}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
 
         csvManager.pushData({
             extensionsCounter,
@@ -109,9 +109,9 @@ describe("update-one-value-with-map-sizes-1-1000", async function () {
                 process.exit(-1);
             }
 
-            const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs.storageProof);
+            const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs?.storageProof);
 
-            logger.info(`Gas used for updating 1 value in map with ${map_size} values: `, migrationResult.receipt.gasUsed.toNumber());
+            logger.info(`Update value at ${i}, map_size: ${map_size}, value_depth: ${migrationResult.max_value_mpt_depth}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
 
             csvManager.pushData({
                 extensionsCounter,
@@ -148,9 +148,9 @@ describe("update-one-value-with-map-sizes-1-1000", async function () {
                 process.exit(-1);
             }
 
-            const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs.storageProof);
+            const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs?.storageProof);
 
-            logger.info(`Gas used for updating 1 value in map with ${map_size} values: `, migrationResult.receipt.gasUsed.toNumber());
+            logger.info(`Update value at ${i}, map_size: ${map_size}, value_depth: ${migrationResult.max_value_mpt_depth}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
 
             csvManager.pushData({
                 extensionsCounter,
@@ -188,9 +188,9 @@ describe("update-one-value-with-map-sizes-1-1000", async function () {
                 process.exit(-1);
             }
 
-            const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs.storageProof);
+            const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs?.storageProof);
 
-            logger.info(`Gas used for updating 1 value in map with ${map_size} values: `, migrationResult.receipt.gasUsed.toNumber());
+            logger.info(`Update value at ${i}, map_size: ${map_size}, value_depth: ${migrationResult.max_value_mpt_depth}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
 
             csvManager.pushData({
                 extensionsCounter,

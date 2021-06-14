@@ -17,7 +17,7 @@ describe("Validate old contract state", function () {
     before(async () => {
         httpConfig = network.config as HttpNetworkConfig;
         provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
-        [deployer] = await ethers.getSigners();
+        deployer = await SignerWithAddress.create(provider.getSigner());
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
     });

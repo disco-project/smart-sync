@@ -3,6 +3,11 @@ import { BigNumberish, ethers } from 'ethers';
 import fs from 'fs';
 import { StorageProof } from '../src/verify-proof';
 import * as rlp from 'rlp';
+
+export interface CSVDataTemplateBasicMTEdge {
+    from: string;
+    to: string;
+}
 export interface CSVDataTemplateSingleValueMultiple extends CSVDataTemplateSingleValue {
     iteration: number | undefined;
 }
@@ -16,6 +21,7 @@ export interface CSVDataTemplateMultipleValues {
     changed_value_count: number;
     max_mpt_depth: number;
     used_gas: number;
+    sequential: Boolean;
 }
 
 export interface CSVDataTemplatePerMTHeight {
@@ -56,11 +62,19 @@ export class CSVManager<T> {
     }
 }
 
-export function getExtensionsAmountLeadingToValue(value: BigNumberish, storageProofs: StorageProof[]): number {
+export function getExtensionsAmountLeadingToValue(value: BigNumberish | undefined, storageProofs: StorageProof[] | undefined): number {
+    if (value === undefined || storageProofs === undefined) {
+        return 0;
+    }
+
     // find proof with value
     const storageProof = storageProofs.find((storageProof: StorageProof) => {
         return ethers.BigNumber.from(storageProof.value).eq(ethers.BigNumber.from(value));
     });
+
+    if (storageProof === undefined) {
+        return 0;
+    }
 
     // count extensions
     let extensionsCounter = 0;

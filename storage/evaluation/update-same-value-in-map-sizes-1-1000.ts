@@ -5,8 +5,8 @@ import {StorageDiff, StorageDiffer} from "../src/get-diff";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { logger } from "../src/logger"
 import { HttpNetworkConfig } from "hardhat/types";
-import { ChainProxy, ChangeValueAtIndexResult } from "../test/test-utils";
-import { CSVDataTemplateSingleValueMultiple, CSVManager } from "./eval-utils";
+import { ChainProxy, ChangeValueAtIndexResult, MigrationResult } from "../test/test-utils";
+import { CSVDataTemplateSingleValueMultiple, CSVManager, getExtensionsAmountLeadingToValue } from "./eval-utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumberish } from "@ethersproject/bignumber";
 
@@ -39,7 +39,7 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
     });
 
     beforeEach(async () => {
-        [deployer] = await ethers.getSigners();
+        deployer = await SignerWithAddress.create(provider.getSigner());
         factory = new MappingContract__factory(deployer);
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
@@ -59,8 +59,8 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
 
         for (let i = 0; i < ITERATIONS; i++) {
             // change previous synced value
-            const result = await chainProxy.changeDeepestValues(1, MAX_VALUE);
-            expect(result).to.be.true;
+            const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(1, MAX_VALUE);
+            expect(result.success).to.be.true;
 
             // migrate changes to proxy contract
             // get the diff set, the storage keys for the changed values
@@ -68,18 +68,21 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
             const changedKeys: Array<BigNumberish> = diff.getKeys();
             logger.debug(changedKeys);
             currBlockNr = await provider.getBlockNumber() + 1;
-            const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
+            const migrationResult: MigrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
             if (!migrationResult.receipt) {
                 logger.fatal('No receipt provided');
                 process.exit(-1);
             }
 
-            logger.info(`Update 1 value, map_size: ${1}, iteration: ${i}: `, migrationResult.receipt.gasUsed.toNumber());
+            const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs?.storageProof);
+
+            logger.info(`${1}: Update value at ${i}, map_size: ${1}, value_depth: ${migrationResult.max_value_mpt_depth}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
 
             csvManager.pushData({
+                extensionsCounter,
                 map_size: 1,
-                changed_value_index: 1,
-                iteration: i,
+                iteration: 1,
+                changed_value_index: i,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
                 value_mpt_depth: migrationResult.max_value_mpt_depth
@@ -96,8 +99,8 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
         for (let i = 0; i < map_size; i++) {
             for (let j = 0; j < ITERATIONS; j++) {
                 // change previous synced value
-                 const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(1, MAX_VALUE);
-            expect(result.success).to.be.true;
+                const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
+                expect(result.success).to.be.true;
     
                 // migrate changes to proxy contract
                 // get the diff set, the storage keys for the changed values
@@ -110,10 +113,13 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
                     logger.fatal('No receipt provided');
                     process.exit(-1);
                 }
+
+                const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs?.storageProof);
     
-                logger.info(`Update value at ${i}, map_size: ${map_size}, iteration: ${j}: `, migrationResult.receipt.gasUsed.toNumber());
+                logger.info(`${j}: Update value at ${i}, map_size: ${map_size}, value_depth: ${migrationResult.max_value_mpt_depth}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
     
                 csvManager.pushData({
+                    extensionsCounter,
                     map_size,
                     iteration: j,
                     changed_value_index: i,
@@ -135,8 +141,8 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
         for (let i = 0; i < map_size; i++) {
             for (let j = 0; j < ITERATIONS; j++) {
                 // change previous synced value
-                 const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(1, MAX_VALUE);
-            expect(result.success).to.be.true;
+                const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
+                expect(result.success).to.be.true;
     
                 // migrate changes to proxy contract
                 // get the diff set, the storage keys for the changed values
@@ -149,10 +155,13 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
                     logger.fatal('No receipt provided');
                     process.exit(-1);
                 }
+
+                const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs?.storageProof);
     
-                logger.info(`Update value at ${i}, map_size: ${map_size}, iteration: ${j}: `, migrationResult.receipt.gasUsed.toNumber());
+                logger.info(`${j}: Update value at ${i}, map_size: ${map_size}, value_depth: ${migrationResult.max_value_mpt_depth}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
     
                 csvManager.pushData({
+                    extensionsCounter,
                     map_size,
                     iteration: j,
                     changed_value_index: i,
@@ -168,14 +177,15 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
         const map_size = 1000;
         const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
+
         logger.debug(`correct storage root: ${initialization.initialValuesProof.storageHash}`);
         currBlockNr = await provider.getBlockNumber() + 1;
 
         for (let i = 0; i < map_size; i++) {
             for (let j = 0; j < ITERATIONS; j++) {
                 // change previous synced value
-                 const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(1, MAX_VALUE);
-            expect(result.success).to.be.true;
+                const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
+                expect(result.success).to.be.true;
     
                 // migrate changes to proxy contract
                 // get the diff set, the storage keys for the changed values
@@ -188,10 +198,13 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
                     logger.fatal('No receipt provided');
                     process.exit(-1);
                 }
+
+                const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs.storageProof);
     
-                logger.info(`Update value at ${i}, map_size: ${map_size}, iteration: ${j}: `, migrationResult.receipt.gasUsed.toNumber());
+                logger.info(`${j}: Update value at ${i}, map_size: ${map_size}, value_depth: ${migrationResult.max_value_mpt_depth}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
     
                 csvManager.pushData({
+                    extensionsCounter,
                     map_size,
                     iteration: j,
                     changed_value_index: i,

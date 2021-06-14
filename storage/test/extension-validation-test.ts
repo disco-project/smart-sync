@@ -11,6 +11,7 @@ import { logger } from "../src/logger";
 import { HttpNetworkConfig } from "hardhat/types";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { getExtensionsAmountLeadingToValue } from '../evaluation/eval-utils';
 
 describe("Extension Validation", async function () {
     let deployer: SignerWithAddress;
@@ -24,7 +25,7 @@ describe("Extension Validation", async function () {
     let httpConfig: HttpNetworkConfig;
 
     before(async () => {
-        [deployer] = await ethers.getSigners();
+        deployer = await SignerWithAddress.create(provider.getSigner());
         httpConfig = network.config as HttpNetworkConfig;
         logger.setSettings({minLevel: 'info', name: 'extension-validation-test.ts'});
         provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
@@ -82,6 +83,8 @@ describe("Extension Validation", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
         let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
+
+        const extensionCounter = getExtensionsAmountLeadingToValue(33, proof.storageProof);
 
         await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 

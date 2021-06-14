@@ -14,7 +14,7 @@ describe("Test storage proof optimization", async function () {
 
     before(async function () {
         httpConfig = network.config as HttpNetworkConfig;
-        [deployer] = await ethers.getSigners();
+        deployer = await SignerWithAddress.create(provider.getSigner());
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
         provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
