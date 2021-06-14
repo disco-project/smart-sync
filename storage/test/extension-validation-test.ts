@@ -102,7 +102,7 @@ describe("Extension Validation", async function () {
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
+        let diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         const rlpOptimized = proof.optimizedStorageProof();
