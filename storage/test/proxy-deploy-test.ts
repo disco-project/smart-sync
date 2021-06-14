@@ -1,4 +1,4 @@
-import {RelayContract__factory, SyncCandidate, SyncCandidate__factory, CallRelayContract__factory, CallRelayContract} from "../src-gen/types";
+import {RelayContract__factory, SyncCandidate, SyncCandidate__factory, CallRelayContract__factory, CallRelayContract, RelayContract} from "../src-gen/types";
 import {ethers, network} from "hardhat";
 import {expect} from "chai";
 import {GetProof, encodeBlockHeader} from "../src/verify-proof";
@@ -8,39 +8,37 @@ import {DeployProxy} from "../src/deploy-proxy";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
 import { logger } from "../src/logger"
-import { isRawNode } from "merkle-patricia-tree/dist/trieNode";
-import Web3 from 'web3';
 import { HttpNetworkConfig } from "hardhat/types";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { JsonRpcProvider } from "@ethersproject/providers";
 
 describe("Deploy proxy and logic contract", async function () {
-    let deployer;
+    let deployer: SignerWithAddress;
     let srcContract: SyncCandidate;
     let logicContract: SyncCandidate;
-    let provider;
+    let provider: JsonRpcProvider;
     let factory: SyncCandidate__factory;
-    let relayContract;
-    let encodedProof;
+    let relayContract: RelayContract;
     let latestBlock;
     let proxyContract: Contract;
     let callRelayContract: CallRelayContract;
-    let storageRoot;
     let proof;
     let httpConfig: HttpNetworkConfig;
 
     before(async () => {
         httpConfig = network.config as HttpNetworkConfig;
         logger.setSettings({minLevel: 'info', name: 'proxy-deploy-test.ts'});
+        [deployer] = await ethers.getSigners();
+        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
     });
 
     it("Should deploy initial contract and set an initial value", async function () {
-        [deployer] = await ethers.getSigners();
         factory = new SyncCandidate__factory(deployer);
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        provider = new ethers.providers.JsonRpcProvider();
         await srcContract.setValueA(42);
         await srcContract.setValueB(100);
         expect(await srcContract.getValueA()).to.be.equal(ethers.BigNumber.from(42));
@@ -53,9 +51,6 @@ describe("Deploy proxy and logic contract", async function () {
 
         // create a proof of the source contract's storage
         proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
-        encodedProof = await proof.encoded(latestBlock.stateRoot);
-
-        storageRoot = proof.storageHash;
 
         await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
     })
@@ -74,11 +69,11 @@ describe("Deploy proxy and logic contract", async function () {
             proxyKeys.push(ethers.utils.hexZeroPad(storageProof.key, 32));
             proxyValues.push(ethers.utils.hexZeroPad(storageProof.value, 32));
         }
-        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: 8000000 });
+        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: httpConfig.gas });
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         const differ = new StorageDiffer(provider);
-        const diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        const diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
 
         expect(diff.isEmpty()).to.be.true;
     })
@@ -100,9 +95,6 @@ describe("Deploy proxy and logic contract", async function () {
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
         // create a proof of the source contract's storage
         proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
-        encodedProof = await proof.encoded(latestBlock.stateRoot);
-
-        storageRoot = proof.storageHash;
 
         await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 
@@ -119,7 +111,7 @@ describe("Deploy proxy and logic contract", async function () {
             proxyKeys.push(ethers.utils.hexZeroPad(storageProof.key, 32));
             proxyValues.push(ethers.utils.hexZeroPad(storageProof.value, 32));
         }
-        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: 8000000 });
+        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: httpConfig.gas });
 
         // validate migration
         //  getting account proof from source contract
@@ -134,13 +126,7 @@ describe("Deploy proxy and logic contract", async function () {
         //  getting encoded block header
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
-        // need to use web3 here as hardhat/ethers mine another block before actually executing the method on the bc.
-        // therefore, block.number - 1 in the function verifyMigrateContract doesn't work anymore.
-        const web3 = new Web3(httpConfig.url);
-        const contractInstance = new web3.eth.Contract(compiledProxy.abi, proxyContract.address);
-        await contractInstance.methods.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader).send({
-            from: '0x00ce0c25d2a45e2f22d4416606d928b8c088f8db'
-        });
+        await relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), { gasLimit: httpConfig.gas });
 
         //  validating
         const migrationValidated = await relayContract.getMigrationState(proxyContract.address);
@@ -148,7 +134,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        let diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         // change all the previous synced values
@@ -164,8 +150,8 @@ describe("Deploy proxy and logic contract", async function () {
         await srcContract.insert(333, 33);
 
         // get the diff set, the storage keys for the changed values
-        diff = await differ.getDiff(srcContract.address, proxyContract.address);
-        const changedKeys = diff.diffs.map(c => c.key);
+        diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
+        const changedKeys = diff.getKeys();
 
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
@@ -188,7 +174,7 @@ describe("Deploy proxy and logic contract", async function () {
         console.log("Gas used for updating 8 and adding 1 value: ", receipt.gasUsed.toNumber());
 
         // after update storage layouts are equal, no diffs
-        diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
     })
 
@@ -200,8 +186,8 @@ describe("Deploy proxy and logic contract", async function () {
 
         // get the diff set, the storage keys for the changed values
         const differ = new StorageDiffer(provider);
-        let diff = await differ.getDiff(srcContract.address, proxyContract.address);
-        const changedKeys = diff.diffs.map(c => c.key);
+        let diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
+        const changedKeys = diff.getKeys();
 
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
 
@@ -214,7 +200,7 @@ describe("Deploy proxy and logic contract", async function () {
         await proxyContract.updateStorage(rlpProof);
 
         // after update storage layouts are equal, no diffs
-        diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
     })
 
@@ -225,9 +211,9 @@ describe("Deploy proxy and logic contract", async function () {
 
         // get the diff set, the storage keys for the changed values
         const differ = new StorageDiffer(provider);
-        const diff = await differ.getDiff(srcContract.address, proxyContract.address);
+        const diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
         latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
-        const keys = diff.diffs.map(c => c.key);
+        const keys = diff.getKeys();
 
         const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 

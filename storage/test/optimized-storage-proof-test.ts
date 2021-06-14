@@ -1,19 +1,24 @@
 import {SimpleStorage, SimpleStorage__factory,} from "../src-gen/types";
-import {ethers} from "hardhat";
+import {ethers, network} from "hardhat";
 import {GetProof} from "../src/verify-proof";
 import { logger } from "../src/logger";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { JsonRpcProvider } from "@ethersproject/providers";
+import { HttpNetworkConfig } from "hardhat/types";
 
 describe("Test storage proof optimization", async function () {
-    let deployer;
+    let deployer: SignerWithAddress;
     let storage: SimpleStorage;
-    let provider;
+    let provider: JsonRpcProvider;
+    let httpConfig: HttpNetworkConfig;
 
     before(async function () {
+        httpConfig = network.config as HttpNetworkConfig;
         [deployer] = await ethers.getSigners();
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
-        provider = new ethers.providers.JsonRpcProvider();
-        logger.setSettings({minLevel: 'info', name: 'scale_test.ts'});
+        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
+        logger.setSettings({minLevel: 'info', name: 'optimized-storage-proof-test.ts'});
     });
 
     it("Should insert some mappings and create a nested optimized proof", async function () {

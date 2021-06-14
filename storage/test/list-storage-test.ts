@@ -1,14 +1,24 @@
 import {SimpleStorage, SimpleStorage__factory,} from "../src-gen/types";
-import * as hre from "hardhat";
-import {ethers} from "hardhat";
+import {ethers, network} from "hardhat";
 import {expect} from "chai";
 import {BaseTrie as Trie} from "merkle-patricia-tree";
 import {GetProof, verify_eth_getProof} from "../src/verify-proof";
 import {Proof} from "merkle-patricia-tree/dist.browser/baseTrie";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { HttpNetworkConfig } from "hardhat/types";
+import { JsonRpcProvider } from "@ethersproject/providers";
 
 describe("Storage", function () {
-    let deployer;
+    let deployer: SignerWithAddress;
     let storage: SimpleStorage;
+    let httpConfig: HttpNetworkConfig;
+    let provider: JsonRpcProvider;
+
+    before(async () => {
+        httpConfig = network.config as HttpNetworkConfig;
+        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
+    });
+
     it("Should deploy and return default values", async function () {
         [deployer] = await ethers.getSigners();
         const Storage = new SimpleStorage__factory(deployer);
@@ -20,8 +30,6 @@ describe("Storage", function () {
     });
 
     it("Should read correct storage after transactions", async function () {
-        const provider = new hre.ethers.providers.JsonRpcProvider();
-
         // assign a value to `a`
         const newValue = 1337;
         expect(await storage.setA(newValue)).to.exist;
@@ -37,7 +45,6 @@ describe("Storage", function () {
     })
 
     it("Should read correct mapping storage", async function () {
-        const provider = new hre.ethers.providers.JsonRpcProvider();
 
         const value = 1000;
         expect(await storage.setValue(value)).to.exist;
@@ -70,7 +77,6 @@ describe("Storage", function () {
     }
 
     it("Should return a valid proof", async function () {
-        const provider = new hre.ethers.providers.JsonRpcProvider();
         const keys = await provider.send("parity_listStorageKeys", [
             storage.address, 5, null
         ]);
