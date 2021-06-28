@@ -5,7 +5,7 @@ import { BigNumberish, ethers } from "ethers";
 import { HttpNetworkConfig } from "hardhat/types";
 import { MappingContract, RelayContract } from "../src-gen/types";
 import { PROXY_INTERFACE } from "../src/config";
-import { DeployProxy } from "../src/deploy-proxy";
+import { ProxyContractBuilder } from "../src/proxy-contract-builder";
 import { StorageDiffer } from "../src/get-diff";
 import { logger } from "../src/logger";
 import { getAllKeys } from "../src/utils";
@@ -113,7 +113,7 @@ export class TestChainProxy {
     
         await this.relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
     
-        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(this.relayContract.address, this.logicContract.address, this.srcContract.address);
+        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract.address, this.logicContract.address, this.srcContract.address);
     
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
@@ -147,7 +147,7 @@ export class TestChainProxy {
         //  getting encoded block header
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
     
-        await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), { gasLimit: this.httpConfig.gas });
+        await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), ethers.BigNumber.from(latestBlock.number).toNumber(), { gasLimit: this.httpConfig.gas });
     
         //  validating
         const migrationValidated = await this.relayContract.getMigrationState(this.proxyContract.address);
@@ -354,7 +354,7 @@ export class TestChainProxy {
         let txResponse;
         let receipt;
         try {
-            txResponse = await this.proxyContract.updateStorage(rlpProof);
+            txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number);
             receipt = await txResponse.wait();
         } catch (e) {
             logger.error('something went wrong');

@@ -7,7 +7,7 @@ import { logger } from "../src/logger";
 import { HttpNetworkConfig } from "hardhat/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { execSync } from "child_process";
-import { DeployProxy } from "../src/deploy-proxy";
+import { ProxyContractBuilder } from "../src/proxy-contract-builder";
 import { PROXY_INTERFACE } from "../src/config";
 import { InitializationResult, TestChainProxy } from "./test-utils";
 import { Contract } from "@ethersproject/contracts";
@@ -43,6 +43,7 @@ describe("Test CLI", async function () {
     });
 
     beforeEach(async () => {
+        logger.setSettings({ name: 'beforeEach' });
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
         // deploy the relay contract
@@ -64,7 +65,7 @@ describe("Test CLI", async function () {
         let output = execSync(forkCommand);
         logger.debug(`\n${output}`);
 
-        const matcher = output.toString().match(/[\w\W]+LogicContract address: (0x[\w\d]{40})[\w\W]+Address of proxyContract: (0x[\w\d]{40})/);
+        const matcher = output.toString().match(/[\w\W]+Logic contract address: (0x[\w\d]{40})[\w\W]+Address of proxyContract: (0x[\w\d]{40})/);
 
         expect(matcher).to.not.be.null;
         if (matcher === null) return false;
@@ -83,7 +84,7 @@ describe("Test CLI", async function () {
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
         expect(proxyStorageRoot).to.equal(srcStorageRoot);
 
-        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, logicContractAddress, srcContract.address);
+        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContractAddress, srcContract.address);
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
         const proxyContract = proxyFactory.attach(proxyContractAddress);
 
@@ -104,7 +105,7 @@ describe("Test CLI", async function () {
             expect(initialization.migrationState).to.be.true;
         } catch(e) {
             logger.fatal(e);
-            process.exit(-1);
+            return false;
         }
 
         // get blocknumber before changing src contract
@@ -137,7 +138,7 @@ describe("Test CLI", async function () {
             expect(initialization.migrationState).to.be.true;
         } catch(e) {
             logger.fatal(e);
-            process.exit(-1);
+            return false;
         }
 
         // get blocknumber before changing src contract
@@ -164,7 +165,7 @@ describe("Test CLI", async function () {
         logger.setSettings({ name: 'should get migration-state'});
 
         // deploy the proxy with the state of the `srcContract`
-        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
+        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
         let cleanSlateProxy: Contract;
         try {
@@ -210,7 +211,7 @@ describe("Test CLI", async function () {
             expect(initialization.migrationState).to.be.true;
         } catch(e) {
             logger.fatal(e);
-            process.exit(-1);
+            return false;
         }
 
         let diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} -c ${TestCLI.default_test_config_file} --relay-contract-address ${relayContract.address}`;
@@ -254,7 +255,7 @@ describe("Test CLI", async function () {
             expect(initialization.migrationState).to.be.true;
         } catch(e) {
             logger.fatal(e);
-            process.exit(-1);
+            return false;
         }
 
         let diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.default_test_config_file} --diff-mode storage --relay-contract-address ${relayContract.address}`;

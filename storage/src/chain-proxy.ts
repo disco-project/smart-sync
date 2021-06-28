@@ -5,7 +5,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumberish, ethers } from "ethers";
 import { RelayContract, RelayContract__factory } from "../src-gen/types";
 import { PROXY_INTERFACE } from "../src/config";
-import { DeployProxy } from "../src/deploy-proxy";
+import { ProxyContractBuilder } from "./proxy-contract-builder";
 import { StorageDiff, StorageDiffer } from "../src/get-diff";
 import { logger } from "../src/logger";
 import { getAllKeys, toParityQuantity, EVMOpcodes } from "../src/utils";
@@ -86,7 +86,7 @@ export class ChainProxy {
 
             try {
                 // attach to proxy
-                const compiledProxy = await DeployProxy.compiledAbiAndBytecode(this.relayContract.address ?? this.proxyContractAddress, this.logicContractAddress ?? this.proxyContractAddress, this.srcContractAddress ?? this.proxyContractAddress);
+                const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract.address ?? this.proxyContractAddress, this.logicContractAddress ?? this.proxyContractAddress, this.srcContractAddress ?? this.proxyContractAddress);
                 const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
                 this.proxyContract = proxyFactory.attach(this.proxyContractAddress);
 
@@ -121,18 +121,39 @@ export class ChainProxy {
             logger.error('No address for relayContract given.');
             return false;
         }
-        srcBlock = toParityQuantity(srcBlock);
         let keys = await getAllKeys(this.srcContractAddress, this.srcProvider);
+        srcBlock = toParityQuantity(srcBlock);
         let latestBlock = await this.srcProvider.send('eth_getBlockByNumber', [srcBlock, true]);
         // create a proof of the source contract's storage
         const initialValuesProof = new GetProof(await this.srcProvider.send("eth_getProof", [this.srcContractAddress, keys]));
     
         // update relay
-        // todo anpassen weil updateBlock nicht mehr hinhaut wegen umtauschen zu mapping
         await this.relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
     
         // deploy logic contract
-        logger.debug('deploying logic contract...');
+        let result = await this.cloneLogic();
+        if (!result) return false;
+
+        // deploy empty proxy
+        result = await this.deployProxy();
+        if (!result) return false;
+
+        // migrate storage
+        result = await this.initialStorageMigration(initialValuesProof, latestBlock.stateRoot, latestBlock.number);
+        if (!result) return false;
+
+        logger.info(`Address of proxyContract: ${this.proxyContract.address}`);
+
+        // todo write out all the addresses into a file?
+        return true;
+    }
+
+    /**
+     * deploy logic of source contract to target chain
+     * @returns address of logic contract or undefined if error
+     */ 
+    private async cloneLogic(): Promise<Boolean> {
+        logger.debug('cloning logic to target chain...');
         const logicContractByteCode: string = await this.createDeployingByteCode(this.srcContractAddress, this.srcProvider);
         const logicFactory = new ethers.ContractFactory([], logicContractByteCode, this.deployer);
         try {
@@ -143,10 +164,20 @@ export class ChainProxy {
             return false;
         }
         logger.debug('done.');
-        logger.info(`LogicContract address: ${this.logicContractAddress}`);
+        logger.info(`Logic contract address: ${this.logicContractAddress}`);
+        return true;
+    }
 
-        // deploy the proxy with the state of the `srcContract`
-        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(this.relayContract.address, this.logicContractAddress, this.srcContractAddress);
+    /**
+     * deploy proxy contract to target chain
+     * @returns address of proxy contract or undefined if error
+     */
+    private async deployProxy(): Promise<boolean> {
+        if (this.logicContractAddress === undefined) {
+            logger.error('Cannot deploy proxy when logic contract is still undefined.');
+            return false;
+        }
+        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract.address, this.logicContractAddress, this.srcContractAddress);
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
         try {
             this.proxyContract = await proxyFactory.deploy();
@@ -154,7 +185,10 @@ export class ChainProxy {
             logger.error(e);
             return false;
         }
-    
+        return true;
+    }
+
+    private async initialStorageMigration(initialValuesProof: GetProof, stateRoot: string, blockNumber: string): Promise<boolean> {
         // migrate storage
         logger.debug('migrating storage');
         let proxyKeys: Array<String> = [];
@@ -170,7 +204,7 @@ export class ChainProxy {
     
         // validate migration
         //  getting account proof from source contract
-        const sourceAccountProof = await initialValuesProof.optimizedProof(latestBlock.stateRoot, false);
+        const sourceAccountProof = await initialValuesProof.optimizedProof(stateRoot, false);
     
         //  getting account proof from proxy contract
         const latestProxyChainBlock = await this.srcProvider.send('eth_getBlockByNumber', ["latest", false]);
@@ -181,7 +215,7 @@ export class ChainProxy {
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
         try {
-            await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), { gasLimit: this.targetRPCConfig.gasLimit });
+            await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), blockNumber, { gasLimit: this.targetRPCConfig.gasLimit });
         } catch(e) {
             logger.error(e);
             return false;
@@ -194,10 +228,6 @@ export class ChainProxy {
             logger.error('Could not migrate srcContract.');
             return false;
         }
-
-        logger.info(`Address of proxyContract: ${this.proxyContract.address}`);
-
-        // todo write out all the addresses into a file
         return true;
     }
 
@@ -250,8 +280,9 @@ export class ChainProxy {
         let txResponse: ContractTransaction;
         let receipt: ContractReceipt;
         try {
-            txResponse = await this.proxyContract.updateStorage(rlpProof);
+            txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number);
             receipt = await txResponse.wait();
+            logger.debug(receipt);
         } catch (e) {
             logger.error('something went wrong');
             const regexr = new RegExp(/Reverted 0x(.*)/);

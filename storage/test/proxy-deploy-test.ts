@@ -4,7 +4,7 @@ import {expect} from "chai";
 import {GetProof, encodeBlockHeader} from "../src/verify-proof";
 import {getAllKeys} from "../src/utils";
 import {StorageDiffer} from "../src/get-diff";
-import {DeployProxy} from "../src/deploy-proxy";
+import {ProxyContractBuilder} from "../src/proxy-contract-builder";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
 import { logger } from "../src/logger"
@@ -56,7 +56,7 @@ describe("Deploy proxy and logic contract", async function () {
     })
 
     it("Should compile and deploy the proxy", async function () {
-        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
+        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
 
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
@@ -98,7 +98,7 @@ describe("Deploy proxy and logic contract", async function () {
 
         await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 
-        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
+        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
 
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
@@ -126,7 +126,7 @@ describe("Deploy proxy and logic contract", async function () {
         //  getting encoded block header
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
-        await relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), { gasLimit: httpConfig.gas });
+        await relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), ethers.BigNumber.from(latestBlock.number).toNumber(), { gasLimit: httpConfig.gas });
 
         //  validating
         const migrationValidated = await relayContract.getMigrationState(proxyContract.address);
@@ -169,7 +169,7 @@ describe("Deploy proxy and logic contract", async function () {
         await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
-        let txResponse = await proxyContract.updateStorage(rlpProof);
+        let txResponse = await proxyContract.updateStorage(rlpProof, latestBlock.number);
         let receipt = await txResponse.wait();
         console.log("Gas used for updating 8 and adding 1 value: ", receipt.gasUsed.toNumber());
 
@@ -197,7 +197,7 @@ describe("Deploy proxy and logic contract", async function () {
         await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
-        await proxyContract.updateStorage(rlpProof);
+        await proxyContract.updateStorage(rlpProof, latestBlock.number);
 
         // after update storage layouts are equal, no diffs
         diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
