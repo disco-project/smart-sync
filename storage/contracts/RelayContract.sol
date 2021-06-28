@@ -57,7 +57,7 @@ contract RelayContract {
     /**
     * @dev Used to access the Proxy's abi
     */
-    function getProxy(address proxyAddress) internal view returns (ProxyContract) {
+    function getProxy(address proxyAddress) internal pure returns (ProxyContract) {
         return ProxyContract(proxyAddress);
     }
 

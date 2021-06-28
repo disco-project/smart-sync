@@ -31,7 +31,7 @@ export interface MigrationResult {
     max_value_mpt_depth?: number;
 }
 
-export class ChainProxy {
+export class TestChainProxy {
     // todo currently does not change the value when calling changing values functions
     readonly values: Array<number> = [];
     readonly keys: Array<number> = [];

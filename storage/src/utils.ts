@@ -2,6 +2,7 @@ import { BigNumberish, ethers} from "ethers";
 import { network } from "hardhat";
 import { HttpNetworkConfig } from "hardhat/types";
 import * as rlp from "rlp";
+import * as fs from 'fs';
 import { logger } from "./logger";
 import { Block, TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider';
 import { JsonRpcProvider } from '@ethersproject/providers';
@@ -9,7 +10,17 @@ import { Input } from 'rlp';
 
 const BLOCKNUMBER_TAGS = ["latest", "earliest", "pending"];
 
-export function toParityQuantity(val: string | number): string {
+export namespace EVMOpcodes {
+    export const contractByteCodeDeploymentPreamble = '608060405234801561001057600080fd5b50';
+    export const PUSH1 = '60';
+    export const DUP1 = '80';
+    export const CODECOPY = '39';
+    export const RETURN = 'F3';
+    export const STOP = '00';
+    export const SSTORE = '55';
+}
+
+export function toParityQuantity(val: BigNumberish): string {
     if (typeof(val) === 'string' && BLOCKNUMBER_TAGS.indexOf(val) > -1) {
         return val;
     }
@@ -19,8 +30,14 @@ export function toParityQuantity(val: string | number): string {
 export async function toBlockNumber(val: BigNumberish, provider: JsonRpcProvider = new ethers.providers.JsonRpcProvider((network.config as HttpNetworkConfig).url)): Promise<number> {
     if (typeof(val) === 'string' && BLOCKNUMBER_TAGS.indexOf(val) > -1) {
         return (await provider.getBlock(val)).number;
+    } 
+    try { 
+        return ethers.BigNumber.from(val).toNumber();
+    } catch(e) {
+        logger.error(`Given val (${val}) is not a valid block identifier.`);
+        logger.error(e);
+        throw new Error();
     }
-    return ethers.BigNumber.from(val).toNumber();
 }
 
 export function encode(input: Input): Buffer {
@@ -81,6 +98,39 @@ export async function getAllKeys(contractAddress: string, provider = new ethers.
     return keys;
 }
 
+export class FileHandler {
+    private filePath: string;
+
+    constructor(filePath: string) {
+        this.filePath = filePath;
+        try {
+            if (!fs.statSync(this.filePath).isFile) {
+                logger.error(`Given filePath ${this.filePath} does not lead to a file`);
+            }
+        } catch(e) {
+            logger.error(e);
+        }
+    }
+
+    getJSON<T>(): T | undefined {
+        try {
+            return JSON.parse(this.read() ?? '{}');
+        } catch (e) {
+            logger.error(e);
+            return undefined;
+        }
+    }
+
+    read(): string | undefined {
+        try {
+            return fs.readFileSync(this.filePath).toString('utf-8');
+        } catch (e) {
+            logger.error(e);
+            return undefined;
+        }
+    }
+}
+
 export class TransactionHandler {
     private contractAddress: string;
     private provider: JsonRpcProvider;
@@ -122,14 +172,15 @@ export class TransactionHandler {
                 if (tx) {
                     const txStorage = tx.storage;
                     const keys = Object.keys(txStorage);
-                    let obj = {};
+                    let obj: { [ key: string ]: string } = {};
                     keys.forEach(key => {
                         // First case: normal tx
                         // Second case: deploying tx
-                        if(txStorage[key].hasOwnProperty('*'))
-                            obj[key] = txStorage[key]['*']['to'];
-                        else
-                            obj[key] = txStorage[key]['+']
+                        let keyObject: KeyObject = txStorage[key];
+                        if(keyObject['*'] !== undefined)
+                            obj[key] = keyObject['*'].to;
+                        else if (keyObject['+'] !== undefined)
+                            obj[key] = keyObject['+']
                     });
                     return obj;
                 }
@@ -150,6 +201,7 @@ export class TransactionHandler {
         
         // first find deployment block for more efficiently
         earliest_block_number = earliest_block_number ? earliest_block_number : await findDeploymentBlock(this.contractAddress);
+        earliest_block_number = earliest_block_number === 'earliest' ? await findDeploymentBlock(this.contractAddress) : earliest_block_number;
         if (typeof(earliest_block_number) === 'string')
             earliest_block_number = await toBlockNumber(earliest_block_number);
         
@@ -183,8 +235,19 @@ export class TransactionHandler {
 
 }
  
-export interface ParityResponseData {
+export type ParityResponseData = {
     stateDiff: {
-        contract_address: string;
+        [ contract_address: string ]: {
+            storage: {
+                [ key: string ] : KeyObject
+            }
+        };
     }
+}
+
+type KeyObject = {
+    '*'?: {
+        'to': string
+    },
+    '+'?: string
 }

@@ -153,14 +153,14 @@ export function hexStringToBuffer(hexString: string): Buffer {
 /**
  * Represents a account object
  */
-export interface Account {
+export type Account = {
     nonce: string;
     balance: string;
     storageHash: string;
     codeHash: string;
 }
 
-export interface BlockHeader {
+export type BlockHeader = {
     difficulty: string;
     extraData: string;
     miner: string;
@@ -623,7 +623,7 @@ export class ProofPath {
     }
 }
 
-export interface StorageProof {
+export type StorageProof = {
     key: string;
     value: string;
     proof: string[];

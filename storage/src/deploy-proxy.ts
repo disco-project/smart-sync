@@ -10,6 +10,7 @@ import {
 import {ethers} from "ethers";
 import * as solc from "solc";
 import chalk from "chalk";
+import { logger } from "./logger";
 
 export class DeployProxy {
 
@@ -19,7 +20,7 @@ export class DeployProxy {
      * @param logicAddress the address of the relay contract that the proxy should use as constant
      * @return the proxy contract source code
      */
-    static async readProxyContract(relayAddress, logicAddress, sourceAddress): Promise<string> {
+    static async readProxyContract(relayAddress: string, logicAddress: string, sourceAddress: string): Promise<string> {
         const source = await fs.readFile(__dirname + "/../" + PROXY_CONTRACT_FILE_NAME, "utf8");
         return source.replace(RELAY_CONTRACT_PLACEHOLDER_ADDRESS, ethers.utils.getAddress(relayAddress))
                         .replace(LOGIC_CONTRACT_PLACEHOLDER_ADDRESS, ethers.utils.getAddress(logicAddress))
@@ -82,7 +83,6 @@ export class DeployProxy {
         // resolve the used libraries
         function findImports(path) {
             let file = __dirname + "/../";
-            console.log(path);
             if (path.startsWith("contracts")) {
                 file += path;
             } else {
@@ -162,7 +162,7 @@ export class DeployProxy {
 function logSolcErrors(output) {
     for (let error of JSON.parse(output).errors) {
         if (error.severity === "error") {
-            console.error(chalk.red(`Failed to compile Proxy: type: ${error.type} formattedMessage: '${error.formattedMessage}' , message: '${error.message}' sourceLocation: ${JSON.stringify(error.sourceLocation)}`));
+            logger.error(chalk.red(`Failed to compile Proxy: type: ${error.type} formattedMessage: '${error.formattedMessage}' , message: '${error.message}' sourceLocation: ${JSON.stringify(error.sourceLocation)}`));
         }
     }
 }

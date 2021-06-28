@@ -55,15 +55,22 @@ contract ProxyContract {
     /**
     * @dev Used to access the Relay's abi
     */
-    function getRelay() internal view returns (RelayContract) {
+    function getRelay() internal pure returns (RelayContract) {
         return RelayContract(RELAY_ADDRESS);
     }
 
     /**
     * @dev Used to get the source address
     */
-    function getSourceAddress() public view returns (address) {
+    function getSourceAddress() public pure returns (address) {
         return SOURCE_ADDRESS;
+    }
+
+    /**
+    * @dev Used to get the logic address
+    */
+    function getLogicAddress() public pure returns (address) {
+        return LOGIC_ADDRESS;
     }
 
     /**
@@ -128,7 +135,7 @@ contract ProxyContract {
     /*
      * The address of the implementation contract
      */
-    function _implementation() internal returns (address) {
+    function _implementation() internal pure returns (address) {
         return LOGIC_ADDRESS;
     }
 

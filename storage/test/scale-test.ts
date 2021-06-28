@@ -5,7 +5,7 @@ import {StorageDiffer} from "../src/get-diff";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { logger } from "../src/logger"
 import { HttpNetworkConfig } from "hardhat/types";
-import { ChainProxy } from "./test-utils";
+import { TestChainProxy } from "./test-utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 const MAX_VALUE = 1000000;
@@ -18,7 +18,7 @@ describe("Test scaling of contract", async function () {
     let provider: JsonRpcProvider;
     let relayContract: RelayContract;
     let httpConfig: HttpNetworkConfig;
-    let chainProxy: ChainProxy;
+    let chainProxy: TestChainProxy;
 
     before(async () => {
         httpConfig = network.config as HttpNetworkConfig;
@@ -34,7 +34,8 @@ describe("Test scaling of contract", async function () {
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        chainProxy = new ChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
+        logger.debug(`srcContractAddress: ${srcContract.address}, relayContract: ${relayContract.address}`);
+        chainProxy = new TestChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
     });
 
     it("Contract with map containing 1 value, update 1 value", async function () {
