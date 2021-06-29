@@ -98,6 +98,38 @@ migrationStatus
         logger.info(`migration-status: ${chainProxy.migrationState}`);
     });
 
+let get_curr_block_number = program.command('get-curr-blocknr') as Command;
+get_curr_block_number = commonOptions(get_curr_block_number);
+get_curr_block_number
+    .alias('blocknr')
+    .description('Get latest synched block number from src chain')
+    .action(async (options) => {
+        // override options here if config file was added
+        if (options.configFile) {
+            options = overrideOptions<TxContractInteractionOptions>(options.configFile, options);
+        }
+        logger.setSettings({ minLevel: options.logLevel });
+
+        const contractAddressMap: ContractAddressMap = {
+            relayContract: options.relayContractAddress
+        };
+        const srcConnectionInfo: ConnectionInfo = {
+            url: options.srcChainUrl,
+            timeout: BigNumber.from(options.connectionTimeout).toNumber()
+        };
+        const targetConnectionInfo: ConnectionInfo = {
+            url: options.targetChainUrl,
+            timeout: BigNumber.from(options.connectionTimeout).toNumber()
+        };
+        const rpcConfig: RPCConfig = {
+            gasLimit: options.gasLimit
+        };
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, targetConnectionInfo, rpcConfig);
+        await chainProxy.init();
+        const latestBlockNumber = await chainProxy.getLatestBlockNumber();
+        logger.info(`Latest block number from src chain: ${latestBlockNumber.toNumber()}`);
+    });
+
 let state_diff = program.command('state-diff') as Command;
 state_diff = commonOptions(state_diff);
 state_diff

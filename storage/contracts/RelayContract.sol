@@ -17,6 +17,11 @@ contract RelayContract {
 
     mapping(address => ProxyContractInfo) proxyStorageInfos;
     mapping(uint => bytes32) srcContractStateRoots;
+    uint latestBlockNr;
+
+    constructor() public {
+        latestBlockNr = block.number;
+    }
 
     /**
      * @dev Called by the proxy to update its state, only after migrationState validation
@@ -25,10 +30,12 @@ contract RelayContract {
         proxyStorageInfos[msg.sender].storageRoot = _newStorage;
         proxyStorageInfos[msg.sender].migrationState = true;
         proxyStorageInfos[msg.sender].blockNumber = _blockNumber;
+        if (_blockNumber > latestBlockNr) latestBlockNr = _blockNumber;
     }
 
     function updateBlock(bytes32 _stateRoot, uint256 _blockNumber) public {
         srcContractStateRoots[_blockNumber] = _stateRoot;
+        if (_blockNumber > latestBlockNr) latestBlockNr = _blockNumber;
     }
 
     /**
@@ -59,6 +66,10 @@ contract RelayContract {
     */
     function getCurrentBlockNumber(address _proxyContractAddress) public view returns (uint) {
         return proxyStorageInfos[_proxyContractAddress].blockNumber;
+    }
+
+    function getLatestBlockNumber() public view returns (uint) {
+        return latestBlockNr;
     }
 
     /**

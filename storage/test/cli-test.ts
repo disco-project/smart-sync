@@ -288,4 +288,19 @@ describe("Test CLI", async function () {
             expect(currResult).to.not.be.null;
         });
     });
+
+    it("should get latest blocknr", async () => {
+        logger.setSettings({ name: 'should get latest blocknr'});
+
+        let latestBlock = await provider.send('eth_getBlockByNumber', ['latest', true]);
+        logger.debug(`Latest block before exec command: ${latestBlock.number}`);
+        let stateCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} blocknr --relay-contract-address ${relayContract.address} -c ${TestCLI.default_test_config_file}`;
+        logger.debug(`Executing:\n${stateCommand}`);
+        let output = execSync(stateCommand);
+        logger.debug(output.toString());
+
+        const regexr = new RegExp(`[\\w\\W]+Latest block number from src chain: ${ethers.BigNumber.from(latestBlock.number).toNumber()}`);
+        let result = regexr.exec(output.toString());
+        expect(result).to.not.be.null;
+    });
 });

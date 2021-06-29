@@ -2,7 +2,7 @@ import { Contract, ContractReceipt, ContractTransaction } from "@ethersproject/c
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { ConnectionInfo } from "@ethersproject/web";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumberish, ethers } from "ethers";
+import { BigNumber, BigNumberish, ethers } from "ethers";
 import { RelayContract, RelayContract__factory } from "../src-gen/types";
 import { PROXY_INTERFACE } from "../src/config";
 import { ProxyContractBuilder } from "./proxy-contract-builder";
@@ -51,10 +51,7 @@ export class ChainProxy {
     private initialized: Boolean;
 
     constructor(contractAddresses: ContractAddressMap, srcProviderConnectionInfo: ConnectionInfo, targetProviderConnectionInfo: ConnectionInfo, targetRPCConfig: RPCConfig) {
-        if (!contractAddresses.srcContract && !contractAddresses.proxyContract) {
-            logger.error('SrcContract or proxyContract has to be given for ChainProxy.');
-            throw new Error();
-        } else if (contractAddresses.srcContract) {
+        if (contractAddresses.srcContract) {
             this.srcContractAddress = contractAddresses.srcContract;
         }
         this.logicContractAddress = contractAddresses.logicContract;
@@ -318,6 +315,18 @@ export class ChainProxy {
             default:
                 return this.differ.getDiffFromSrcContractTxs(this.srcContractAddress, parameters.targetBlock, parameters.srcBlock);
         }
+    }
+
+    async getLatestBlockNumber(): Promise<BigNumber> {
+        if (!this.initialized) {
+            logger.error('ChainProxy is not initialized yet.');
+            return BigNumber.from(-1);
+        }  else if (!this.relayContract) {
+            logger.error('No address for relayContract given.');
+            return BigNumber.from(-1);
+        }
+
+        return await this.relayContract.getLatestBlockNumber();
     }
 
     hex_to_ascii(str1) {
