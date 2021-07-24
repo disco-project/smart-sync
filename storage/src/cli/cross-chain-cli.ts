@@ -14,10 +14,9 @@ const program = new Command();
 
 // get options from config to insert them as default
 const fileHandler = new FileHandler(DEFAULT_CONFIG_FILE_PATH);
-let defaultOptions: ConfigTypish | undefined = fileHandler.getJSON<ConfigTypish>();
+let defaultOptions: ConfigTypish | any | undefined = fileHandler.getJSON<ConfigTypish>();
 if (!defaultOptions) {
-    logger.fatal(`default config file in variable DEFAULT_CONFIG_FILE_PATH does not exist: ${DEFAULT_CONFIG_FILE_PATH}`);
-    process.exit(-1);
+    defaultOptions = {};
 }
 
 // general information
@@ -30,23 +29,23 @@ let fork: Command = program.command('fork') as Command;
 fork = commonOptions(fork);
 fork
     .alias('f')
-    .description('Migrates a given contract address to a target chain and deploys a proxy contract.')
-    .arguments('<src_contract_address>')
+    .description('Migrates a given contract address to a target chain and deploys a proxy contract. If no relay contract is provided, a relay contract will be deployed too.')
+    .arguments('<src_contract_address> [relay_contract_address]')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use')
             .choices(['storage', 'srcTx'])
     )
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
-    .action(async (srcContract: string, options: TxContractInteractionOptions) => {
+    .action(async (srcContract: string, relayContractAddress: string | undefined, options: TxContractInteractionOptions) => {
         // override options here if config file was added
         if (options.configFile) {
-            options = overrideOptions<TxContractInteractionOptions>(options.configFile, options);
+            options = overrideFileOptions<TxContractInteractionOptions>(options.configFile, options);
         }
         logger.setSettings({ minLevel: options.logLevel });
 
         const contractAddressMap: ContractAddressMap = {
             srcContract,
-            relayContract: options.relayContractAddress
+            relayContract: relayContractAddress ? relayContractAddress : options.relayContractAddress
         };
         const srcConnectionInfo: ConnectionInfo = {
             url: options.srcChainUrl,
@@ -69,17 +68,18 @@ let migrationStatus = program.command('migration-status') as Command;
 migrationStatus = commonOptions(migrationStatus);
 migrationStatus
     .alias('status')
-    .arguments('<proxy_contract_address>')
-    .action(async (proxyContractAddress, options) => {
+    .description('Checks if the storage root of the proxy contract equals the current storage root of the source contract in the relay contract on the target chain.')
+    .arguments('<proxy_contract_address> [relay_contract_address]')
+    .action(async (proxyContractAddress: string, relayContractAddress: string | undefined, options) => {
         // override options here if config file was added
         if (options.configFile) {
-            options = overrideOptions<TxContractInteractionOptions>(options.configFile, options);
+            options = overrideFileOptions<TxContractInteractionOptions>(options.configFile, options);
         }
         logger.setSettings({ minLevel: options.logLevel });
 
         const contractAddressMap: ContractAddressMap = {
             proxyContract: proxyContractAddress,
-            relayContract: options.relayContractAddress
+            relayContract: relayContractAddress ? relayContractAddress : options.relayContractAddress
         };
         const srcConnectionInfo: ConnectionInfo = {
             url: options.srcChainUrl,
@@ -102,16 +102,18 @@ let get_curr_block_number = program.command('get-curr-blocknr') as Command;
 get_curr_block_number = commonOptions(get_curr_block_number);
 get_curr_block_number
     .alias('blocknr')
-    .description('Get latest synched block number from src chain')
-    .action(async (options) => {
+    .description('Get the latest synched block number of src chain from relay contract across all managed proxy contracts or latest synched block nr for a specific proxy contract if its address is provided.')
+    .arguments('<relay_contract_address> [proxy_contract_address]')
+    .action(async (relayContractAddress: string, proxyContractAddress: string | undefined, options) => {
         // override options here if config file was added
         if (options.configFile) {
-            options = overrideOptions<TxContractInteractionOptions>(options.configFile, options);
+            options = overrideFileOptions<TxContractInteractionOptions>(options.configFile, options);
         }
         logger.setSettings({ minLevel: options.logLevel });
 
         const contractAddressMap: ContractAddressMap = {
-            relayContract: options.relayContractAddress
+            relayContract: relayContractAddress,
+            proxyContract: proxyContractAddress ? proxyContractAddress : options.proxyContractAddress
         };
         const srcConnectionInfo: ConnectionInfo = {
             url: options.srcChainUrl,
@@ -134,24 +136,24 @@ let state_diff = program.command('state-diff') as Command;
 state_diff = commonOptions(state_diff);
 state_diff
     .alias('diff')
-    .arguments('<source_contract_address> [proxy_contract_address]')
-    .description('If diff-mode == storage, proxy_contract_address has to be provided.')
+    .arguments('<source_contract_address> [proxy_contract_address] [relay_contract_address]')
+    .description('Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address and relay_contract_address have to be provided.')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr. If no blocks are given when using srcTx, then only the latest block is examined.')
             .choices(['storage', 'srcTx'])
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
-    .action(async (srcContractAddress, proxyContractAddress, options) => {
+    .action(async (srcContractAddress: string, proxyContractAddress: string | undefined, relayContractAddress: string | undefined, options) => {
         // override options here if config file was added
         if (options.configFile) {
-            options = overrideOptions<TxContractInteractionOptions>(options.configFile, options);
+            options = overrideFileOptions<TxContractInteractionOptions>(options.configFile, options);
         }
         logger.setSettings({ minLevel: options.logLevel });
 
         const contractAddressMap: ContractAddressMap = {
             srcContract: srcContractAddress,
             proxyContract: proxyContractAddress,
-            relayContract: options.relayContractAddress
+            relayContract: relayContractAddress ? relayContractAddress : options.relayContractAddress
         };
         const srcConnectionInfo: ConnectionInfo = {
             url: options.srcChainUrl,
@@ -179,23 +181,24 @@ let synchronize: Command = program.command('synchronize') as Command;
 synchronize = commonOptions(synchronize);
 synchronize
     .alias('s')
-    .arguments('<proxy_contract_address>')
+    .description('Synchronizes the storage of a proxy contract with its source contracts storage up to an optionally provided block nr on the source chain.')
+    .arguments('<proxy_contract_address> [relay_contract_address]')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr.')
             .choices(['storage', 'srcTx'])
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
-    .action(async (proxyContract: string, options: TxContractInteractionOptions) => {
+    .action(async (proxyContract: string, relayContractAddress: string | undefined, options: TxContractInteractionOptions) => {
         // override options here if config file was added
         if (options.configFile) {
-            options = overrideOptions<TxContractInteractionOptions>(options.configFile, options);
+            options = overrideFileOptions<TxContractInteractionOptions>(options.configFile, options);
         }
         logger.setSettings({ minLevel: options.logLevel });
 
         const contractAddressMap: ContractAddressMap = {
             proxyContract,
-            relayContract: options.relayContractAddress
+            relayContract: relayContractAddress ? relayContractAddress : options.relayContractAddress
         };
         const srcConnectionInfo: ConnectionInfo = {
             url: options.srcChainUrl,
@@ -223,8 +226,7 @@ program
 
 function commonOptions(command: Command): Command {
     if (!defaultOptions) {
-        logger.error(`default config file in variable DEFAULT_CONFIG_FILE_PATH does not exist: ${DEFAULT_CONFIG_FILE_PATH}`);
-        process.exit(-1);
+        defaultOptions = {};
     }
 
     // todo add options and insert default values from config file
@@ -238,11 +240,16 @@ function commonOptions(command: Command): Command {
     command.option('-c, --config-file <path>', 'path to the config file', DEFAULT_CONFIG_FILE_PATH);
     command.option('--connection-timeout <timeout>', 'connection timeout in ms');
     command.option('--src-blocknr <number>', 'block number of src chain to use');
-    command.option('--relay-contract-address <address>', 'Contract address of relay contract');
     return command;
 }
 
-function overrideOptions<T>(filePath: string, options: ConfigTypish): T {
+/**
+ * 
+ * @param filePath path to config file that needs to be extracted
+ * @param options config object that overrides the config file
+ * @returns config object
+ */
+function overrideFileOptions<T>(filePath: string, options: ConfigTypish): T {
     const fileHandler = new FileHandler(filePath);
     let newOptions: T | undefined = fileHandler.getJSON<T>();
     if (!newOptions) {

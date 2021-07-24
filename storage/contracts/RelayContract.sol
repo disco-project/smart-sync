@@ -20,13 +20,13 @@ contract RelayContract {
     uint latestBlockNr;
 
     constructor() public {
-        latestBlockNr = block.number;
     }
 
     /**
      * @dev Called by the proxy to update its state, only after migrationState validation
      */
     function updateProxyInfo(bytes32 _newStorage, uint _blockNumber) public {
+        require(proxyStorageInfos[msg.sender].blockNumber < _blockNumber);
         proxyStorageInfos[msg.sender].storageRoot = _newStorage;
         proxyStorageInfos[msg.sender].migrationState = true;
         proxyStorageInfos[msg.sender].blockNumber = _blockNumber;

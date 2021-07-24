@@ -8,7 +8,7 @@ import { PROXY_INTERFACE } from "../src/config";
 import { ProxyContractBuilder } from "./proxy-contract-builder";
 import { StorageDiff, StorageDiffer } from "../src/get-diff";
 import { logger } from "../src/logger";
-import { getAllKeys, toParityQuantity, EVMOpcodes } from "../src/utils";
+import { getAllKeys, toParityQuantity, EVMOpcodes, toBlockNumber } from "../src/utils";
 import { encodeBlockHeader, GetProof } from "../src/verify-proof";
 import { TransactionResponse } from '@ethersproject/abstract-provider';
 
@@ -80,7 +80,6 @@ export class ChainProxy {
         }
 
         if (this.proxyContractAddress) {
-
             try {
                 // attach to proxy
                 const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract.address ?? this.proxyContractAddress, this.logicContractAddress ?? this.proxyContractAddress, this.srcContractAddress ?? this.proxyContractAddress);
@@ -114,9 +113,12 @@ export class ChainProxy {
         if (!this.initialized) {
             logger.error('ChainProxy is not initialized yet.');
             return false;
-        } else if (!this.relayContract) {
-            logger.error('No address for relayContract given.');
-            return false;
+        } 
+        if (!this.relayContract) {
+            logger.info('No address for relayContract given, deploying new relay contract...');
+            const relayFactory = new RelayContract__factory(this.deployer);
+            this.relayContract = await relayFactory.deploy();
+            logger.info(`Relay contract address: ${this.relayContract.address}`);
         }
         let keys = await getAllKeys(this.srcContractAddress, this.srcProvider);
         srcBlock = toParityQuantity(srcBlock);
@@ -313,6 +315,17 @@ export class ChainProxy {
                 return this.differ.getDiffFromStorage(this.srcContractAddress, this.proxyContractAddress, parameters.srcBlock, parameters.targetBlock);
             // srcTx is default
             default:
+                if (this.relayContract && this.proxyContract) {
+                    const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
+                    if (parameters.srcBlock) {
+                        const givenSrcBlockNr = await toBlockNumber(parameters.srcBlock, this.srcProvider);
+                        if (synchedBlockNr.gte(givenSrcBlockNr)) {
+                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${givenSrcBlockNr}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`)
+                        } 
+                    } else {
+                        parameters.srcBlock = synchedBlockNr.toNumber() + 1;
+                    }
+                }
                 return this.differ.getDiffFromSrcContractTxs(this.srcContractAddress, parameters.targetBlock, parameters.srcBlock);
         }
     }

@@ -199,7 +199,7 @@ export class TransactionHandler {
         if (typeof(latest_block_number) === 'string')
             latest_block_number = await toBlockNumber(latest_block_number);
         
-        // first find deployment block for more efficiently
+        // first find deployment block for more efficiency
         earliest_block_number = earliest_block_number ? earliest_block_number : await findDeploymentBlock(this.contractAddress);
         earliest_block_number = earliest_block_number === 'earliest' ? await findDeploymentBlock(this.contractAddress) : earliest_block_number;
         if (typeof(earliest_block_number) === 'string')

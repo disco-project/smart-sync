@@ -32,7 +32,7 @@ describe("Test CLI", async function () {
 
     before(async () => {
         httpConfig = network.config as HttpNetworkConfig;
-        logger.setSettings({minLevel: 'info', name: 'cli-test.ts'});
+        logger.setSettings({ minLevel: 'info', name: 'cli-test.ts' });
         provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
         differ = new StorageDiffer(provider);
         deployer = await SignerWithAddress.create(provider.getSigner());;
@@ -56,250 +56,329 @@ describe("Test CLI", async function () {
     afterEach(async () => {
     });
 
-    it("should fork", async () => {
-        logger.setSettings({ name: 'should fork'});
+    // it("should fork", async () => {
+    //     logger.setSettings({ name: 'should fork'});
         
-        let forkCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} f ${srcContract.address} --relay-contract-address ${relayContract.address} -c ${TestCLI.default_test_config_file}`;
-        logger.debug(`Executing:\n${forkCommand}`);
+    //     let forkCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} f ${srcContract.address} ${relayContract.address} -c ${TestCLI.default_test_config_file}`;
+    //     logger.debug(`Executing:\n${forkCommand}`);
 
-        let output = execSync(forkCommand);
-        logger.debug(`\n${output}`);
+    //     let output = execSync(forkCommand);
+    //     logger.debug(`\n${output}`);
 
-        const matcher = output.toString().match(/[\w\W]+Logic contract address: (0x[\w\d]{40})[\w\W]+Address of proxyContract: (0x[\w\d]{40})/);
+    //     const matcher = output.toString().match(/[\w\W]+Logic contract address: (0x[\w\d]{40})[\w\W]+Address of proxyContract: (0x[\w\d]{40})/);
 
-        expect(matcher).to.not.be.null;
-        if (matcher === null) return false;
+    //     expect(matcher).to.not.be.null;
+    //     if (matcher === null) return false;
 
-        const logicContractAddress = matcher[1];
-        const proxyContractAddress = matcher[2];
+    //     const logicContractAddress = matcher[1];
+    //     const proxyContractAddress = matcher[2];
 
-        logger.debug(`logicAddress: ${logicContractAddress}, proxyContractAddress: ${proxyContractAddress}`);
+    //     logger.debug(`logicAddress: ${logicContractAddress}, proxyContractAddress: ${proxyContractAddress}`);
 
-        const migrated = await relayContract.getMigrationState(proxyContractAddress);
-        expect(migrated).to.be.true;
+    //     const migrated = await relayContract.getMigrationState(proxyContractAddress);
+    //     expect(migrated).to.be.true;
 
-        const proxyProof = await provider.send("eth_getProof", [proxyContractAddress, []]);
-        const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send("eth_getProof", [srcContract.address, []]);
-        const srcStorageRoot = srcProof.storageHash.toLowerCase();
-        expect(proxyStorageRoot).to.equal(srcStorageRoot);
+    //     const proxyProof = await provider.send("eth_getProof", [proxyContractAddress, []]);
+    //     const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
+    //     const srcProof = await provider.send("eth_getProof", [srcContract.address, []]);
+    //     const srcStorageRoot = srcProof.storageHash.toLowerCase();
+    //     expect(proxyStorageRoot).to.equal(srcStorageRoot);
 
-        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContractAddress, srcContract.address);
-        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
-        const proxyContract = proxyFactory.attach(proxyContractAddress);
+    //     const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContractAddress, srcContract.address);
+    //     const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
+    //     const proxyContract = proxyFactory.attach(proxyContractAddress);
 
-        const newSrcContractAddress = await proxyContract.getSourceAddress();
-        expect(newSrcContractAddress.toLowerCase()).to.equal(srcContract.address.toLowerCase());
+    //     const newSrcContractAddress = await proxyContract.getSourceAddress();
+    //     expect(newSrcContractAddress.toLowerCase()).to.equal(srcContract.address.toLowerCase());
 
-        const newLogicContractAddress = await proxyContract.getLogicAddress();
-        expect(newLogicContractAddress.toLowerCase()).to.equal(logicContractAddress.toLowerCase());
-    });
+    //     const newLogicContractAddress = await proxyContract.getLogicAddress();
+    //     expect(newLogicContractAddress.toLowerCase()).to.equal(logicContractAddress.toLowerCase());
+    // });
 
-    it("should synch (diff mode = srcTx)", async () => {
-        logger.setSettings({ name: 'should synch w/ srcTx'});
-        const map_size = 20;
-        let initialization: InitializationResult;
-
-        try {
-            initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
-            expect(initialization.migrationState).to.be.true;
-        } catch(e) {
-            logger.fatal(e);
-            return false;
-        }
-
-        // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
-
-        // insert some new values
-        const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
-        expect(changedValues).to.be.true;
+    // it("should fork without relayContract", async () => {
+    //     logger.setSettings({ name: 'should fork without relayContract'});
         
-        let synchCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} s ${initialization.proxyContract.address} --src-blocknr ${currBlockNr + 1} --relay-contract-address ${relayContract.address} -c ${TestCLI.default_test_config_file}`;
-        logger.debug(`Executing:\n${synchCommand}`);
+    //     let forkCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} f ${srcContract.address} -c ${TestCLI.default_test_config_file}`;
+    //     logger.debug(`Executing:\n${forkCommand}`);
 
-        let output = execSync(synchCommand);
-        logger.debug(`\n${output}`);
+    //     let output = execSync(forkCommand);
+    //     logger.debug(`\n${output}`);
 
-        const proxyProof = await provider.send("eth_getProof", [initialization.proxyContract.address, []]);
-        const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send("eth_getProof", [srcContract.address, []]);
-        const srcStorageRoot = srcProof.storageHash.toLowerCase();
-        expect(proxyStorageRoot).to.equal(srcStorageRoot);
-    });
+    //     const matcher = output.toString().match(/[\w\W]+Relay contract address: (0x[\w\d]{40})[\w\W]+Logic contract address: (0x[\w\d]{40})[\w\W]+Address of proxyContract: (0x[\w\d]{40})/);
 
-    it("should synch (diff mode = storage)", async () => {
-        logger.setSettings({ name: 'should synch w/ storage'});
-        const map_size = 20;
-        let initialization: InitializationResult;
+    //     expect(matcher).to.not.be.null;
+    //     if (matcher === null) return false;
 
-        try {
-            initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
-            expect(initialization.migrationState).to.be.true;
-        } catch(e) {
-            logger.fatal(e);
-            return false;
-        }
+    //     const relayContractAddress = matcher[1];
+    //     const logicContractAddress = matcher[2];
+    //     const proxyContractAddress = matcher[3];
 
-        // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
+    //     logger.debug(`relayAddress: ${relayContractAddress}, logicAddress: ${logicContractAddress}, proxyContractAddress: ${proxyContractAddress}`);
 
-        // insert some new values
-        const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
-        expect(changedValues).to.be.true;
+    //     const relayFactory = new RelayContract__factory(deployer);
+    //     relayContract = relayFactory.attach(relayContractAddress);
+    //     const migrated = await relayContract.getMigrationState(proxyContractAddress);
+    //     expect(migrated).to.be.true;
+
+    //     const proxyProof = await provider.send("eth_getProof", [proxyContractAddress, []]);
+    //     const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
+    //     const srcProof = await provider.send("eth_getProof", [srcContract.address, []]);
+    //     const srcStorageRoot = srcProof.storageHash.toLowerCase();
+    //     expect(proxyStorageRoot).to.equal(srcStorageRoot);
+
+    //     const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContractAddress, srcContract.address);
+    //     const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
+    //     const proxyContract = proxyFactory.attach(proxyContractAddress);
+
+    //     const newSrcContractAddress = await proxyContract.getSourceAddress();
+    //     expect(newSrcContractAddress.toLowerCase()).to.equal(srcContract.address.toLowerCase());
+
+    //     const newLogicContractAddress = await proxyContract.getLogicAddress();
+    //     expect(newLogicContractAddress.toLowerCase()).to.equal(logicContractAddress.toLowerCase());
+    // });
+
+    // it("should synch (diff mode = srcTx)", async () => {
+    //     logger.setSettings({ name: 'should synch w/ srcTx'});
+    //     const map_size = 20;
+    //     let initialization: InitializationResult;
+
+    //     try {
+    //         initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
+    //         expect(initialization.migrationState).to.be.true;
+    //     } catch(e) {
+    //         logger.fatal(e);
+    //         return false;
+    //     }
+
+    //     // get blocknumber before changing src contract
+    //     const currBlockNr = await provider.getBlockNumber();
+
+    //     // insert some new values
+    //     const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
+    //     expect(changedValues).to.be.true;
         
-        let synchCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} s ${initialization.proxyContract.address} --relay-contract-address ${relayContract.address} --diff-mode storage -c ${TestCLI.default_test_config_file}`;
-        logger.debug(`Executing:\n${synchCommand}`);
+    //     let synchCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} s ${initialization.proxyContract.address} ${relayContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.default_test_config_file}`;
+    //     logger.debug(`Executing:\n${synchCommand}`);
 
-        let output = execSync(synchCommand);
-        logger.debug(`\n${output}`);
+    //     let output = execSync(synchCommand);
+    //     logger.debug(`\n${output}`);
 
-        const proxyProof = await provider.send("eth_getProof", [initialization.proxyContract.address, []]);
-        const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send("eth_getProof", [srcContract.address, []]);
-        const srcStorageRoot = srcProof.storageHash.toLowerCase();
-        expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
-    });
+    //     const proxyProof = await provider.send("eth_getProof", [initialization.proxyContract.address, []]);
+    //     const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
+    //     const srcProof = await provider.send("eth_getProof", [srcContract.address, []]);
+    //     const srcStorageRoot = srcProof.storageHash.toLowerCase();
+    //     expect(proxyStorageRoot).to.equal(srcStorageRoot);
+    // });
 
-    it("should get migration-state", async () => {
-        logger.setSettings({ name: 'should get migration-state'});
+    // it("should synch (diff mode = storage)", async () => {
+    //     logger.setSettings({ name: 'should synch w/ storage'});
+    //     const map_size = 20;
+    //     let initialization: InitializationResult;
 
-        // deploy the proxy with the state of the `srcContract`
-        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
-        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
-        let cleanSlateProxy: Contract;
-        try {
-            cleanSlateProxy = await proxyFactory.deploy();
-        } catch(e) {
-            logger.error(e);
-            return false;
-        }
+    //     try {
+    //         initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
+    //         expect(initialization.migrationState).to.be.true;
+    //     } catch(e) {
+    //         logger.fatal(e);
+    //         return false;
+    //     }
 
-        let stateCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} status ${cleanSlateProxy.address} --relay-contract-address ${relayContract.address} -c ${TestCLI.default_test_config_file}`;
-        logger.debug(`Executing:\n${stateCommand}`);
-        let output = execSync(stateCommand);
+    //     // get blocknumber before changing src contract
+    //     const currBlockNr = await provider.getBlockNumber();
 
-        let result = output.toString().match(/[\w\W]+migration-status: false/);
-        expect(result).to.not.be.null;
-
-        const map_size = 1;
-        let initialization: InitializationResult;
-
-        try {
-            initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
-            expect(initialization.migrationState).to.be.true;
-        } catch(e) {
-            logger.fatal(e);
-            process.exit(-1);
-        }
-
-        stateCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} status ${initialization.proxyContract.address} --relay-contract-address ${relayContract.address} -c ${TestCLI.default_test_config_file}`;
-        logger.debug(`Executing:\n${stateCommand}`);
-        output = execSync(stateCommand);
-
-        result = output.toString().match(/[\w\W]+migration-status: true/);
-        expect(result).to.not.be.null;
-    });
-
-    it("should get-diff (diff mode = srcTx)", async () => {
-        logger.setSettings({ name: 'should get-diff w/ srcTx'});
-        const map_size = 20;
-        let initialization: InitializationResult;
-
-        try {
-            initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
-            expect(initialization.migrationState).to.be.true;
-        } catch(e) {
-            logger.fatal(e);
-            return false;
-        }
-
-        let diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} -c ${TestCLI.default_test_config_file} --relay-contract-address ${relayContract.address}`;
-        logger.debug(`Executing:\n${diffCommand}`);
-        let output = execSync(diffCommand);
-        logger.debug(`\n${output}`);
-        let result = output.toString().match(/[\w\W]+Adds: \n\[\][\w\W]+Changes: \n\[\][\w\W]+Deletions: \n\[\]/);
-        expect(result).to.not.be.null;
-
-        // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
-
-        // insert some new values
-        let changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
-        expect(changedValues).to.be.true;
+    //     // insert some new values
+    //     const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
+    //     expect(changedValues).to.be.true;
         
-         diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.default_test_config_file} --relay-contract-address ${relayContract.address}`;
-        logger.debug(`Executing:\n${diffCommand}`);
+    //     let synchCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} s ${initialization.proxyContract.address} ${relayContract.address} --diff-mode storage -c ${TestCLI.default_test_config_file}`;
+    //     logger.debug(`Executing:\n${synchCommand}`);
 
-        output = execSync(diffCommand);
-        logger.debug(`\n${output}`);
-        result = output.toString().match(/[\w\W]+Changes: \n(\[[\w\W]+\])/);
-        expect(result).to.not.be.null;
+    //     let output = execSync(synchCommand);
+    //     logger.debug(`\n${output}`);
 
-        const realDiffer = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr + 1);
-        realDiffer.changes().forEach((change: Change) => {
-            if (result === null) return false;
-            const regexr = new RegExp(`key[\\w\\W]+:[\\w\\W]+'${change.key}'[\\w\\W]+targetValue[\\w\\W]+:[\\w\\W]+'${change.targetValue}'`);
-            let currResult = regexr.exec(result[1]);
-            expect(currResult).to.not.be.null;
-        });
-    });
+    //     const proxyProof = await provider.send("eth_getProof", [initialization.proxyContract.address, []]);
+    //     const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
+    //     const srcProof = await provider.send("eth_getProof", [srcContract.address, []]);
+    //     const srcStorageRoot = srcProof.storageHash.toLowerCase();
+    //     expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
+    // });
 
-    it("should get-diff (diff mode = storage)", async () => {
-        logger.setSettings({ name: 'should get-diff w/ storage'});
-        const map_size = 20;
-        let initialization: InitializationResult;
+    // it("should get migration-state", async () => {
+    //     logger.setSettings({ name: 'should get migration-state'});
 
-        try {
-            initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
-            expect(initialization.migrationState).to.be.true;
-        } catch(e) {
-            logger.fatal(e);
-            return false;
-        }
+    //     // deploy the proxy with the state of the `srcContract`
+    //     const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
+    //     const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
+    //     let cleanSlateProxy: Contract;
+    //     try {
+    //         cleanSlateProxy = await proxyFactory.deploy();
+    //     } catch(e) {
+    //         logger.error(e);
+    //         return false;
+    //     }
 
-        let diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.default_test_config_file} --diff-mode storage --relay-contract-address ${relayContract.address}`;
-        logger.debug(`Executing:\n${diffCommand}`);
-        let output = execSync(diffCommand);
-        logger.debug(`\n${output}`);
-        let result = output.toString().match(/[\w\W]+Adds: \n\[\][\w\W]+Changes: \n\[\][\w\W]+Deletions: \n\[\]/);
-        expect(result).to.not.be.null;
+    //     let stateCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} status ${cleanSlateProxy.address} ${relayContract.address} -c ${TestCLI.default_test_config_file}`;
+    //     logger.debug(`Executing:\n${stateCommand}`);
+    //     let output = execSync(stateCommand);
 
-        // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
+    //     let result = output.toString().match(/[\w\W]+migration-status: false/);
+    //     expect(result).to.not.be.null;
 
-        // insert some new values
-        let changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
-        expect(changedValues).to.be.true;
+    //     const map_size = 1;
+    //     let initialization: InitializationResult;
+
+    //     try {
+    //         initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
+    //         expect(initialization.migrationState).to.be.true;
+    //     } catch(e) {
+    //         logger.fatal(e);
+    //         process.exit(-1);
+    //     }
+
+    //     stateCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} status ${initialization.proxyContract.address} ${relayContract.address} -c ${TestCLI.default_test_config_file}`;
+    //     logger.debug(`Executing:\n${stateCommand}`);
+    //     output = execSync(stateCommand);
+
+    //     result = output.toString().match(/[\w\W]+migration-status: true/);
+    //     expect(result).to.not.be.null;
+    // });
+
+    // it("should get-diff (diff mode = srcTx)", async () => {
+    //     logger.setSettings({ name: 'should get-diff w/ srcTx'});
+    //     const map_size = 10;
+    //     let initialization: InitializationResult;
+
+    //     try {
+    //         initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
+    //         expect(initialization.migrationState).to.be.true;
+    //     } catch(e) {
+    //         logger.fatal(e);
+    //         return false;
+    //     }
+
+    //     let diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} ${initialization.proxyContract.address} ${relayContract.address} -c ${TestCLI.default_test_config_file}`;
+    //     logger.debug(`Executing:\n${diffCommand}`);
+    //     let output = execSync(diffCommand);
+    //     logger.debug(`\n${output}`);
+    //     let result = output.toString().match(/[\w\W]+Adds: \n\[\][\w\W]+Changes: \n\[\][\w\W]+Deletions: \n\[\]/);
+    //     expect(result).to.not.be.null;
+
+    //     // get blocknumber before changing src contract
+    //     const currBlockNr = await provider.getBlockNumber();
+
+    //     // insert some new values
+    //     let changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
+    //     expect(changedValues).to.be.true;
         
-        diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.default_test_config_file} --diff-mode storage --relay-contract-address ${relayContract.address}`;
-        logger.debug(`Executing:\n${diffCommand}`);
+    //     diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.default_test_config_file}`;
+    //     logger.debug(`Executing:\n${diffCommand}`);
 
-        output = execSync(diffCommand);
-        logger.debug(`\n${output}`);
-        result = output.toString().match(/[\w\W]+Changes: \n(\[[\w\W]+\])/);
-        expect(result).to.not.be.null;
+    //     output = execSync(diffCommand);
+    //     logger.debug(`\n${output}`);
+    //     result = output.toString().match(/[\w\W]+Changes: \n(\[[\w\W]+\])/);
+    //     expect(result).to.not.be.null;
 
-        const realDiffer = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
-        realDiffer.changes().forEach((change: Change) => {
-            if (result === null) return false;
-            const regexr = new RegExp(`key[\\w\\W]+:[\\w\\W]+'${change.key}'[\\w\\W]+targetValue[\\w\\W]+:[\\w\\W]+'${change.targetValue}'`);
-            let currResult = regexr.exec(result[1]);
-            expect(currResult).to.not.be.null;
-        });
-    });
+    //     const realDiffer = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr + 1);
+    //     realDiffer.changes().forEach((change: Change) => {
+    //         if (result === null) return false;
+    //         const regexr = new RegExp(`key[\\w\\W]+:[\\w\\W]+'${change.key}'[\\w\\W]+targetValue[\\w\\W]+:[\\w\\W]+'${change.targetValue}'`);
+    //         let currResult = regexr.exec(result[1]);
+    //         expect(currResult).to.not.be.null;
+    //     });
+    // });
+
+    // it("should get-diff (diff mode = storage)", async () => {
+    //     logger.setSettings({ name: 'should get-diff w/ storage'});
+    //     const map_size = 10;
+    //     let initialization: InitializationResult;
+
+    //     try {
+    //         initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
+    //         expect(initialization.migrationState).to.be.true;
+    //     } catch(e) {
+    //         logger.fatal(e);
+    //         return false;
+    //     }
+
+    //     let diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} ${initialization.proxyContract.address} ${relayContract.address} -c ${TestCLI.default_test_config_file} --diff-mode storage`;
+    //     logger.debug(`Executing:\n${diffCommand}`);
+    //     let output = execSync(diffCommand);
+    //     logger.debug(`\n${output}`);
+    //     let result = output.toString().match(/[\w\W]+Adds: \n\[\][\w\W]+Changes: \n\[\][\w\W]+Deletions: \n\[\]/);
+    //     expect(result).to.not.be.null;
+
+    //     // get blocknumber before changing src contract
+    //     const currBlockNr = await provider.getBlockNumber();
+
+    //     // insert some new values
+    //     let changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
+    //     expect(changedValues).to.be.true;
+        
+    //     diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} ${initialization.proxyContract.address} ${relayContract.address} -c ${TestCLI.default_test_config_file} --diff-mode storage`;
+    //     logger.debug(`Executing:\n${diffCommand}`);
+
+    //     output = execSync(diffCommand);
+    //     logger.debug(`\n${output}`);
+    //     result = output.toString().match(/[\w\W]+Changes: \n(\[[\w\W]+\])/);
+    //     expect(result).to.not.be.null;
+
+    //     const realDiffer = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
+    //     realDiffer.changes().forEach((change: Change) => {
+    //         if (result === null) return false;
+    //         const regexr = new RegExp(`key[\\w\\W]+:[\\w\\W]+'${change.key}'[\\w\\W]+targetValue[\\w\\W]+:[\\w\\W]+'${change.targetValue}'`);
+    //         let currResult = regexr.exec(result[1]);
+    //         expect(currResult).to.not.be.null;
+    //     });
+    // });
 
     it("should get latest blocknr", async () => {
         logger.setSettings({ name: 'should get latest blocknr'});
 
+        const map_size = 10;
+        let initialization: InitializationResult;
         let latestBlock = await provider.send('eth_getBlockByNumber', ['latest', true]);
         logger.debug(`Latest block before exec command: ${latestBlock.number}`);
-        let stateCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} blocknr --relay-contract-address ${relayContract.address} -c ${TestCLI.default_test_config_file}`;
+
+        try {
+            initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
+            expect(initialization.migrationState).to.be.true;
+        } catch(e) {
+            logger.fatal(e);
+            return false;
+        }
+
+        let stateCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} blocknr ${relayContract.address} -c ${TestCLI.default_test_config_file}`;
         logger.debug(`Executing:\n${stateCommand}`);
         let output = execSync(stateCommand);
         logger.debug(output.toString());
 
-        const regexr = new RegExp(`[\\w\\W]+Latest block number from src chain: ${ethers.BigNumber.from(latestBlock.number).toNumber()}`);
+        const regexr = new RegExp(`[\\w\\W]+Latest block number from src chain: ${ethers.BigNumber.from(latestBlock.number).toNumber() + 1}`);
+        let result = regexr.exec(output.toString());
+        expect(result).to.not.be.null;
+    });
+
+    it("should get latest blocknr from one proxy contract", async () => {
+        logger.setSettings({ name: 'should get latest blocknr from one proxy contract'});
+
+        const map_size = 10;
+        let initialization: InitializationResult;
+
+        try {
+            initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
+            expect(initialization.migrationState).to.be.true;
+        } catch(e) {
+            logger.fatal(e);
+            return false;
+        }
+
+        let latestBlock = await relayContract.getCurrentBlockNumber(initialization.proxyContract.address);
+        logger.debug(`Latest block before exec command: ${latestBlock}`);
+        let stateCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} blocknr ${relayContract.address} ${initialization.proxyContract.address} -c ${TestCLI.default_test_config_file}`;
+        logger.debug(`Executing:\n${stateCommand}`);
+        let output = execSync(stateCommand);
+        logger.debug(output.toString());
+
+        const regexr = new RegExp(`[\\w\\W]+Latest block number from src chain: ${ethers.BigNumber.from(latestBlock).toNumber()}`);
         let result = regexr.exec(output.toString());
         expect(result).to.not.be.null;
     });
