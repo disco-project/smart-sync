@@ -32,7 +32,6 @@ export interface MigrationResult {
 }
 
 export class TestChainProxy {
-    // todo currently does not change the value when calling changing values functions
     readonly values: Array<number> = [];
     readonly keys: Array<number> = [];
     private proxyContract: Contract;
@@ -282,6 +281,25 @@ export class TestChainProxy {
         // change previous synced value
         const value = Math.floor(Math.random() * max_value);
         await this.srcContract.insert(valueIndex, value);
+        return true;
+    }
+
+    async addValueAtIndex(valueIndex: number, max_value: number): Promise<Boolean> {
+        if (!this.migrationState) {
+            logger.error('Proxy contract is not initialized yet.');
+            return false;
+        }
+        const value = Math.floor(Math.random() * max_value);
+        await this.srcContract.insert(valueIndex, value);
+        return true;
+    }
+
+    async deleteValueAtIndex(valueIndex: number): Promise<Boolean> {
+        if (!this.migrationState) {
+            logger.error('Proxy contract is not initialized yet.');
+            return false;
+        }
+        await this.srcContract.deleteValue(valueIndex);
         return true;
     }
 

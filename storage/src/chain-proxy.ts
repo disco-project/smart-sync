@@ -82,7 +82,7 @@ export class ChainProxy {
         if (this.proxyContractAddress) {
             try {
                 // attach to proxy
-                const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract.address ?? this.proxyContractAddress, this.logicContractAddress ?? this.proxyContractAddress, this.srcContractAddress ?? this.proxyContractAddress);
+                const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract?.address ?? this.proxyContractAddress, this.logicContractAddress ?? this.proxyContractAddress, this.srcContractAddress ?? this.proxyContractAddress);
                 const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
                 this.proxyContract = proxyFactory.attach(this.proxyContractAddress);
 
@@ -91,7 +91,7 @@ export class ChainProxy {
                 logger.debug(`srcContract: ${this.srcContractAddress}`);
                 this.logicContractAddress = await this.proxyContract.getLogicAddress();
                 
-                this.migrationState = await this.relayContract.getMigrationState(this.proxyContractAddress);
+                this.migrationState = await this.relayContract?.getMigrationState(this.proxyContractAddress) ?? false;
             } catch(e) {
                 logger.error(e);
                 return false;
@@ -320,9 +320,10 @@ export class ChainProxy {
                     if (parameters.srcBlock) {
                         const givenSrcBlockNr = await toBlockNumber(parameters.srcBlock, this.srcProvider);
                         if (synchedBlockNr.gte(givenSrcBlockNr)) {
-                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${givenSrcBlockNr}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`)
+                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${givenSrcBlockNr}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
                         } 
                     } else {
+                        // todo needs testing. What if proxy contract was not yet migrated?
                         parameters.srcBlock = synchedBlockNr.toNumber() + 1;
                     }
                 }

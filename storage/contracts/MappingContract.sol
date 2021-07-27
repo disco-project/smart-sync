@@ -21,4 +21,9 @@ contract MappingContract {
     function getValue(uint _key) public view returns (uint256) {
         return map[_key];
     }
+
+    function deleteValue(uint _key) public returns (bool) {
+        map[_key] = 0x0;
+        return true;
+    }
 }

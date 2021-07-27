@@ -1,4 +1,4 @@
-import {RelayContract__factory, MappingContract, MappingContract__factory, SyncCandidate__factory, CallRelayContract__factory, CallRelayContract, SimpleStorage, SimpleStorage__factory, ProxyContract, RelayContract} from "../src-gen/types";
+import {RelayContract__factory, MappingContract, MappingContract__factory, RelayContract} from "../src-gen/types";
 import {ethers, network} from "hardhat";
 import {expect} from "chai";
 import {StorageDiffer} from "../src/get-diff";
