@@ -343,28 +343,6 @@ export class TestChainProxy {
             if (max_value_mpt_depth < storageProof.proof.length) max_value_mpt_depth = storageProof.proof.length;
         });
 
-        // compute the optimized storage proof
-        const rlpOptimized = changedKeysProof.optimizedStorageProof();
-
-        // ensure that the old contract state equals the last synced storage hash
-        try {
-            const validated = await this.proxyContract.verifyOldContractStateProof(rlpOptimized);
-            if (!validated) {
-                logger.error('Could not verify old contract state proof');
-                return { migrationResult: false };
-            };
-        } catch(e) {
-            logger.error('something went wrong');
-            const regexr = new RegExp(/Reverted 0x(.*)/);
-            const checker = regexr.exec(e.data);
-            if (checker) {
-                logger.error(`'${this.hex_to_ascii(checker[1])}'`);
-                logger.fatal(e);
-            }
-            else logger.fatal(e);
-            return { migrationResult: false };
-        }
-
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
         await this.relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
 

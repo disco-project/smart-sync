@@ -21,7 +21,7 @@ export const SOURCE_CONTRACT_PLACEHOLDER_ADDRESS = "0x0a911618A3dD806a5D14bf856c
 export const PROXY_INTERFACE = [
     "constructor()",
     "function updateStorage(bytes memory proof, uint blockNumber) public",
-    "function verifyOldContractStateProof(bytes memory rlpStorageProof) public view returns (bool)",
+    "function computeRoots(bytes memory rlpProofNode) view returns (bytes32, bytes32)",
     "function insert(uint _key, uint _value) public",
     "function getValue(uint _key) public view returns (uint256)",
     "function addStorage(bytes32[] memory keys, bytes32[] memory values) public",

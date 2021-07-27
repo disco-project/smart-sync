@@ -211,30 +211,28 @@ contract ProxyContract {
     }
 
     /**
-    * @dev If is old contract state proof: Recursively updates a single proof node and returns the adjusted hash after modifying all the proof node's values
-    * @dev Else: Computes state root from adjusted Merkle Tree
+    * @dev Does two things: Recursively updates a single proof node and returns the adjusted hash after modifying all the proof node's values
+    * @dev and computes state root from adjusted Merkle Tree
     * @param rlpProofNode proof of form of:
     *        [list of common branches..last common branch,], values[0..16; LeafNode || proof node]
     */
-    function computeRoot(bytes memory rlpProofNode, bool isOldContractStateProof) internal view returns (bytes32) {
+    function computeRoots(bytes memory rlpProofNode) internal view returns (bytes32, bytes32) {
         // the updated reference hash
         bytes32 newParentHash;
+        bytes32 oldParentHash;
 
         RLPReader.RLPItem[] memory proofNode = rlpProofNode.toRlpItem().toList();
 
         if (!RLPReader.isList(proofNode[1])) {
-            // its only one leaf node
-            if (isOldContractStateProof) {
-                // tree consists of only one entry
-                return keccak256(restoreOldValueState(proofNode));
-            } else {
-                // just return hashed value if its the only one
-                bytes[] memory _list = new bytes[](2);
-                _list[0] = proofNode[1].toRlpBytes();
-                _list[1] = proofNode[2].toRlpBytes();
-                
-                return keccak256(RLPWriter.encodeList(_list));
-            }
+            // its only one leaf node in the tree
+            oldParentHash = keccak256(restoreOldValueState(proofNode));
+
+            bytes[] memory _list = new bytes[](2);
+            _list[0] = proofNode[1].toRlpBytes();
+            _list[1] = proofNode[2].toRlpBytes();
+            newParentHash = keccak256(RLPWriter.encodeList(_list));
+            
+            return (oldParentHash, newParentHash);
         }
 
         // the last proof node consists of a list of common branch nodes
@@ -244,67 +242,54 @@ contract ProxyContract {
         // and a list of values [0..16] for the last branch node
         RLPReader.RLPItem[] memory latestCommonBranchValues = RLPReader.toList(proofNode[1]);
 
-        if(isOldContractStateProof) {
-            if (latestCommonBranchValues.length == 1) {
-                // its an extension
-                bytes32 newReferenceHash = computeRoot(latestCommonBranchValues[0].toRlpBytes(), isOldContractStateProof);
-                lastBranch[1] = RLPWriter.encodeKeccak256Hash(newReferenceHash).toRlpItem();
-            } else {
-                // its a branch
-                // loop through every value
-                for (uint i = 0; i < 17; i++) {
-                    // the value node either holds the [key, value]directly or another proofnode
-                    RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
-                    if (valueNode.length == 3) {
-                        // leaf value, where the is the value of the latest branch node at index i
-                        bytes memory encodedList = restoreOldValueState(valueNode);
-                        
-                        if (encodedList.length > 32) {
-                            bytes32 listHash = keccak256(encodedList);
-                            lastBranch[i] = RLPReader.toRlpItem(RLPWriter.encodeKeccak256Hash(listHash));
-                        } else {
-                            lastBranch[i] = encodedList.toRlpItem();
-                        }
-                    } else if (valueNode.length == 2) {
-                        // branch or extension
-                        bytes32 newReferenceHash = computeRoot(latestCommonBranchValues[i].toRlpBytes(), isOldContractStateProof);
-                        lastBranch[i] = RLPWriter.encodeKeccak256Hash(newReferenceHash).toRlpItem();
-                    }
-                }
-            }            
-        }
-
-        // hash the last branch to get the reference hash
-        if (lastBranch.length == 2) {
+        if (latestCommonBranchValues.length == 1) {
             // its an extension
+            // 1. calculate new parent hash
             bytes[] memory _list = new bytes[](2);
             for (uint j = 0; j < 2; j++) {
                 _list[j] = lastBranch[j].toRlpBytes();
             }
             newParentHash = keccak256(RLPWriter.encodeList(_list));
+
+            // 2. calulate old parent hash
+            (bytes32 oldReferenceHash,) = computeRoots(latestCommonBranchValues[0].toRlpBytes());
+            _list[1] = RLPWriter.encodeKeccak256Hash(oldReferenceHash);
+
+            oldParentHash = keccak256(RLPWriter.encodeList(_list));
         } else {
-            bytes[] memory _list = new bytes[](17);
-            for (uint j = 0; j < 17; j++) {
-                _list[j] = lastBranch[j].toRlpBytes();
+            // its a branch
+            bytes[] memory _newList = new bytes[](17);
+            bytes[] memory _oldList = new bytes[](17);
+            // loop through every value
+            for (uint i = 0; i < 17; i++) {
+                // 1. get new entry for new parent hash calculation
+                _newList[i] = lastBranch[i].toRlpBytes();
+                _oldList[i] = lastBranch[i].toRlpBytes();
+
+                // 2. get old entry for old parent hash calculation
+                // the value node either holds the [key, value]directly or another proofnode
+                RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
+                if (valueNode.length == 3) {
+                    // leaf value, where the is the value of the latest branch node at index i
+                    bytes memory encodedList = restoreOldValueState(valueNode);
+                    
+                    if (encodedList.length > 32) {
+                        bytes32 listHash = keccak256(encodedList);
+                        _oldList[i] = RLPWriter.encodeKeccak256Hash(listHash);
+                    } else {
+                        _oldList[i] = encodedList;
+                    }
+                } else if (valueNode.length == 2) {
+                    // branch or extension
+                    (bytes32 oldReferenceHash,) = computeRoots(latestCommonBranchValues[i].toRlpBytes());
+                    _oldList[i] = RLPWriter.encodeKeccak256Hash(oldReferenceHash);
+                }
             }
-            newParentHash = keccak256(RLPWriter.encodeList(_list));
+            newParentHash = keccak256(RLPWriter.encodeList(_newList));
+            oldParentHash = keccak256(RLPWriter.encodeList(_oldList));
         }
 
-        return newParentHash;
-    }
-
-    /**
-    * @dev Validate the proof.
-    *
-    * @param rlpStorageProof proof of form a of an rlp encoded proof node:
-    *        [list of common branches..last common branch], values[0..16] || proofNode
-    */
-    function verifyOldContractStateProof(bytes memory rlpStorageProof) public view returns (bool) {
-        bytes32 oldRoot = computeRoot(rlpStorageProof, true);
-
-        bytes32 computedStorageRoot = getRelay().getStorageRoot();
-
-        return oldRoot == computedStorageRoot;
+        return (oldParentHash, newParentHash);
     }
 
     /**
@@ -330,11 +315,15 @@ contract ProxyContract {
 
         GetProofLib.Account memory account = GetProofLib.parseAccount(getProof.account);
 
+        bytes32 lastValidParentHash = getRelay().getStorageRoot();
+
+        (bytes32 oldParentHash, bytes32 newParentHash) = computeRoots(getProof.storageProofs);
+
         // Second verify proof would map to current state by replacing values with current values (old contract state proof)
-        require(verifyOldContractStateProof(getProof.storageProofs), "Failed to verify old contract state proof");
+        require(lastValidParentHash == oldParentHash, "Failed to verify old contract state proof");
 
         // Third verify proof is valid according to current block in relay contract
-        require(computeRoot(getProof.storageProofs, false) == account.storageHash, "Failed to verify new contract state proof");
+        require(newParentHash == account.storageHash, "Failed to verify new contract state proof");
 
         // update the storage or revert on error
         setStorageValues(getProof.storageProofs);
