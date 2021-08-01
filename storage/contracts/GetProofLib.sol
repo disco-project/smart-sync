@@ -1,4 +1,4 @@
-pragma solidity >=0.5.0 <0.8.0;
+pragma solidity >=0.6.0 <0.8.0;
 
 import "./MerklePatriciaProof.sol";
 import "solidity-rlp/contracts/RLPReader.sol";

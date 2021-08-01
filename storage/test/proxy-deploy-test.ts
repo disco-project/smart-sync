@@ -1,16 +1,17 @@
 import {RelayContract__factory, SyncCandidate, SyncCandidate__factory, CallRelayContract__factory, CallRelayContract, RelayContract} from "../src-gen/types";
 import {ethers, network} from "hardhat";
-import {expect} from "chai";
+import {expect, should} from "chai";
 import {GetProof, encodeBlockHeader} from "../src/verify-proof";
 import {getAllKeys} from "../src/utils";
 import {StorageDiffer} from "../src/get-diff";
 import {ProxyContractBuilder} from "../src/proxy-contract-builder";
 import {PROXY_INTERFACE} from "../src/config";
-import {Contract} from "ethers";
+import {Contract, ContractReceipt} from "ethers";
 import { logger } from "../src/logger"
 import { HttpNetworkConfig } from "hardhat/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { JsonRpcProvider } from "@ethersproject/providers";
+import assert from "assert";
 
 describe("Deploy proxy and logic contract", async function () {
     let deployer: SignerWithAddress;
@@ -164,7 +165,7 @@ describe("Deploy proxy and logic contract", async function () {
         // update the proxy storage
         let txResponse = await proxyContract.updateStorage(rlpProof, latestBlock.number);
         let receipt = await txResponse.wait();
-        console.log("Gas used for updating 8 and adding 1 value: ", receipt.gasUsed.toNumber());
+        logger.debug("Gas used for updating 8 and adding 1 value: ", receipt.gasUsed.toNumber());
 
         // after update storage layouts are equal, no diffs
         diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
@@ -207,14 +208,13 @@ describe("Deploy proxy and logic contract", async function () {
         } catch (error) {
             // ignore error
         }
-        // TODO: Why do external static calls not work?
-        // expect(await proxyContract.callStatic.getValue(691)).to.equal(9);
-        expect(await callRelayContract.callStatic.getValue(691)).to.equal(ethers.BigNumber.from(9));
+
+        expect(await callRelayContract.getValue(691)).to.equal(ethers.BigNumber.from(9));
     })
 
     it("should be possible to retreive values via fallback through calling contract", async function() {
-        expect(await callRelayContract.callStatic.getValue(691)).to.equal(ethers.BigNumber.from(9));
-        expect(await callRelayContract.callStatic.getValue(333)).to.equal(ethers.BigNumber.from(33));
+        expect(await callRelayContract.getValue(691)).to.equal(ethers.BigNumber.from(9));
+        expect(await callRelayContract.getValue(333)).to.equal(ethers.BigNumber.from(33));
     })
 
     it("should reject state changes via fallback through calling contract", async function() {

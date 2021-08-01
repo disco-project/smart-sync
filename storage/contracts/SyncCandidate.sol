@@ -7,9 +7,6 @@ contract SyncCandidate {
     uint256 valueB;
     mapping(uint => uint) map;
 
-    constructor() {
-    }
-
     /**
     * @dev set a new value to `valueA`
     * @return The old value that was replaced
