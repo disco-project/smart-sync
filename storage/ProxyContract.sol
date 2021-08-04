@@ -60,6 +60,13 @@ contract ProxyContract {
     }
 
     /**
+    * @dev Used to get the relay address
+    */
+    function getRelayAddress() public pure returns (address) {
+        return RELAY_ADDRESS;
+    }
+
+    /**
     * @dev Used to get the source address
     */
     function getSourceAddress() public pure returns (address) {

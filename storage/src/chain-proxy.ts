@@ -38,7 +38,7 @@ export class ChainProxy {
     readonly proxyContractAddress: string | undefined;
     private srcContractAddress: string;
     private logicContractAddress: string | undefined;
-    readonly relayContractAddress: string | undefined;
+    private relayContractAddress: string | undefined;
     readonly srcProvider: JsonRpcProvider;
     readonly srcProviderConnectionInfo: ConnectionInfo;
     readonly targetProviderConnectionInfo: ConnectionInfo;
@@ -82,7 +82,7 @@ export class ChainProxy {
         if (this.proxyContractAddress) {
             try {
                 // attach to proxy
-                const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract.address ?? this.proxyContractAddress, this.logicContractAddress ?? this.proxyContractAddress, this.srcContractAddress ?? this.proxyContractAddress);
+                const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract?.address ?? this.proxyContractAddress, this.logicContractAddress ?? this.proxyContractAddress, this.srcContractAddress ?? this.proxyContractAddress);
                 const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
                 this.proxyContract = proxyFactory.attach(this.proxyContractAddress);
 
@@ -90,6 +90,14 @@ export class ChainProxy {
                 this.srcContractAddress = await this.proxyContract.getSourceAddress();
                 logger.debug(`srcContract: ${this.srcContractAddress}`);
                 this.logicContractAddress = await this.proxyContract.getLogicAddress();
+
+                this.relayContractAddress = await this.proxyContract.getRelayAddress();
+                if (!this.relayContractAddress) {
+                    logger.error('Could not get relay contract address.');
+                    return false;
+                }
+                const relayContractFactory = new RelayContract__factory(this.deployer);
+                this.relayContract = relayContractFactory.attach(this.relayContractAddress);
                 
                 this.migrationState = await this.relayContract.getMigrationState(this.proxyContractAddress);
             } catch(e) {
