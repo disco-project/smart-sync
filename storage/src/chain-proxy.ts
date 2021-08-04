@@ -127,7 +127,7 @@ export class ChainProxy {
         const initialValuesProof = new GetProof(await this.srcProvider.send("eth_getProof", [this.srcContractAddress, keys]));
     
         // update relay
-        await this.relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
     
         // deploy logic contract
         let result = await this.cloneLogic();
@@ -273,7 +273,7 @@ export class ChainProxy {
         }
 
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
-        await this.relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
         let txResponse: ContractTransaction;

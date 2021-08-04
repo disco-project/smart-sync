@@ -30,10 +30,9 @@ contract RelayContract {
         proxyStorageInfos[msg.sender].storageRoot = _newStorage;
         proxyStorageInfos[msg.sender].migrationState = true;
         proxyStorageInfos[msg.sender].blockNumber = _blockNumber;
-        if (_blockNumber > latestBlockNr) latestBlockNr = _blockNumber;
     }
 
-    function updateBlock(bytes32 _stateRoot, uint256 _blockNumber) public {
+    function addBlock(bytes32 _stateRoot, uint256 _blockNumber) public {
         srcContractStateRoots[_blockNumber] = _stateRoot;
         if (_blockNumber > latestBlockNr) latestBlockNr = _blockNumber;
     }

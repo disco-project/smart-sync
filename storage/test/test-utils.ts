@@ -111,7 +111,7 @@ export class TestChainProxy {
             if (this.min_mpt_depth > storageProof.proof.length) this.min_mpt_depth = storageProof.proof.length;
         });
     
-        await this.relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
     
         const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract.address, this.logicContract.address, this.srcContract.address);
     
@@ -348,7 +348,7 @@ export class TestChainProxy {
         }
 
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
-        await this.relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
         let txResponse;
