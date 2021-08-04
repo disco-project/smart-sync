@@ -137,7 +137,7 @@ state_diff = commonOptions(state_diff);
 state_diff
     .alias('diff')
     .arguments('<source_contract_address> [proxy_contract_address] [relay_contract_address]')
-    .description('Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address and relay_contract_address have to be provided.')
+    .description('Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address has to be provided.')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr. If no blocks are given when using srcTx, then only the latest block is examined.')
             .choices(['storage', 'srcTx'])

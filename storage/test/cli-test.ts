@@ -404,6 +404,50 @@ describe("Test CLI", async function () {
         });
     });
 
+    it("should get-diff (diff mode = storage) without relayContract", async () => {
+        logger.setSettings({ name: 'should get-diff w/ storage'});
+        const map_size = 10;
+        let initialization: InitializationResult;
+
+        try {
+            initialization = await chainProxy.initializeProxyContract(map_size, TestCLI.MAX_VALUE);
+            expect(initialization.migrationState).to.be.true;
+        } catch(e) {
+            logger.fatal(e);
+            return false;
+        }
+
+        let diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.default_test_config_file} --diff-mode storage`;
+        logger.debug(`Executing:\n${diffCommand}`);
+        let output = execSync(diffCommand);
+        logger.debug(`\n${output}`);
+        let result = output.toString().match(/[\w\W]+Adds: \n\[\][\w\W]+Changes: \n\[\][\w\W]+Deletions: \n\[\]/);
+        expect(result).to.not.be.null;
+
+        // get blocknumber before changing src contract
+        const currBlockNr = await provider.getBlockNumber();
+
+        // insert some new values
+        let changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
+        expect(changedValues).to.be.true;
+        
+        diffCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.default_test_config_file} --diff-mode storage`;
+        logger.debug(`Executing:\n${diffCommand}`);
+
+        output = execSync(diffCommand);
+        logger.debug(`\n${output}`);
+        result = output.toString().match(/[\w\W]+Changes: \n(\[[\w\W]+\])/);
+        expect(result).to.not.be.null;
+
+        const realDiffer = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
+        realDiffer.changes().forEach((change: Change) => {
+            if (result === null) return false;
+            const regexr = new RegExp(`key[\\w\\W]+:[\\w\\W]+'${change.key}'[\\w\\W]+targetValue[\\w\\W]+:[\\w\\W]+'${change.targetValue}'`);
+            let currResult = regexr.exec(result[1]);
+            expect(currResult).to.not.be.null;
+        });
+    });
+
     it("should get latest blocknr", async () => {
         logger.setSettings({ name: 'should get latest blocknr'});
 

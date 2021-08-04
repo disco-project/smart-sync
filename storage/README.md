@@ -67,7 +67,7 @@ Options:
 
 Example usage:
 ```bash
-$ cross-chain-cli s 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a 0x20a508640B446990c781Cd541B9a2828ACA3a350 --target-blockNr 450
+$ cross-chain-cli s 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a --target-blockNr 450
 ```
 
 ### migration-status
@@ -88,7 +88,7 @@ Options:
 ```
 Example usage:
 ``` bash
-$ cross-chain-cli status 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a 0x20a508640B446990c781Cd541B9a2828ACA3a350
+$ cross-chain-cli status 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a
 ```
 ### get-curr-blocknr
 ```bash
@@ -116,7 +116,7 @@ $ cross-chain-cli blocknr 0x20a508640B446990c781Cd541B9a2828ACA3a350
 $ cross-chain-cli help state-diff
 Usage: cross-chain-cli state-diff|diff [options] <source_contract_address> [proxy_contract_address] [relay_contract_address]
 
-Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address and relay_contract_address have to be provided.
+Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address has to be provided.
 
 Options:
   -l, --log-level <level>           verbose level of logging (choices: "fatal", "error", "warn", "info", "debug", "trace", "silly", default: "debug")
