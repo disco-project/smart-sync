@@ -2,7 +2,7 @@
     "srcChainUrl": "http://localhost:8545",
     "targetChainUrl": "http://localhost:8545",
     "connectionTimeout": "36000",
-    "logLevel": "debug",
+    "logLevel": "info",
     "targetBlocknr": "latest",
     "gasLimit": 1000000000,
     "relayContractAddress": null

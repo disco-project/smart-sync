@@ -113,7 +113,15 @@ export class ChainProxy {
         if (!this.initialized) {
             logger.error('ChainProxy is not initialized yet.');
             return false;
-        } 
+        }
+        if (!ethers.utils.isAddress(this.srcContractAddress)) {
+            logger.error(`Given source contract address not a valid address (${this.srcContractAddress})`);
+            return false;
+        }
+        if ((await this.srcProvider.getCode(this.srcContractAddress)).length < 3) {
+            logger.error(`No contract found under src contract address ${this.srcContractAddress}.`);
+            return false;
+        }
         if (!this.relayContract) {
             logger.info('No address for relayContract given, deploying new relay contract...');
             const relayFactory = new RelayContract__factory(this.deployer);
