@@ -16,7 +16,7 @@ const KEY_VALUE_PAIR_PER_BATCH = 100;
 
 export type ContractAddressMap = {
     srcContract?: string;
-    relayContract: string;
+    relayContract?: string;
     logicContract?: string;
     proxyContract?: string;
 }
@@ -356,6 +356,18 @@ export class ChainProxy {
         }
 
         return await this.relayContract.getLatestBlockNumber();
+    }
+
+    async getCurrentBlockNumber(): Promise<BigNumber> {
+        if (!this.initialized) {
+            logger.error('ChainProxy is not initialized yet.');
+            return BigNumber.from(-1);
+        }  else if (!this.relayContract) {
+            logger.error('No address for relayContract given.');
+            return BigNumber.from(-1);
+        }
+
+        return await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
     }
 
     hex_to_ascii(str1) {
