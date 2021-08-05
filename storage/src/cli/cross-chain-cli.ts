@@ -61,7 +61,12 @@ fork
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, targetConnectionInfo, rpcConfig);
         await chainProxy.init();
         // todo check for return value
-        await chainProxy.migrateSrcContract();
+        const migrated = await chainProxy.migrateSrcContract();
+        if (migrated) {
+            logger.info('Migration successfull.');
+        } else {
+            logger.error('Could not migrate source contract.');
+        }
     });
 
 let migrationStatus = program.command('migration-status') as Command;
@@ -69,8 +74,8 @@ migrationStatus = commonOptions(migrationStatus);
 migrationStatus
     .alias('status')
     .description('Checks if the storage root of the proxy contract equals the current storage root of the source contract in the relay contract on the target chain.')
-    .arguments('<proxy_contract_address> [relay_contract_address]')
-    .action(async (proxyContractAddress: string, relayContractAddress: string | undefined, options) => {
+    .arguments('<proxy_contract_address>')
+    .action(async (proxyContractAddress: string, options) => {
         // override options here if config file was added
         if (options.configFile) {
             options = overrideFileOptions<TxContractInteractionOptions>(options.configFile, options);
@@ -78,8 +83,7 @@ migrationStatus
         logger.setSettings({ minLevel: options.logLevel });
 
         const contractAddressMap: ContractAddressMap = {
-            proxyContract: proxyContractAddress,
-            relayContract: relayContractAddress ? relayContractAddress : options.relayContractAddress
+            proxyContract: proxyContractAddress
         };
         const srcConnectionInfo: ConnectionInfo = {
             url: options.srcChainUrl,
@@ -102,9 +106,9 @@ let get_curr_block_number = program.command('get-curr-blocknr') as Command;
 get_curr_block_number = commonOptions(get_curr_block_number);
 get_curr_block_number
     .alias('blocknr')
-    .description('Get the latest synched block number of src chain from relay contract across all managed proxy contracts or latest synched block nr for a specific proxy contract if its address is provided.')
-    .arguments('<relay_contract_address> [proxy_contract_address]')
-    .action(async (relayContractAddress: string, proxyContractAddress: string | undefined, options) => {
+    .description('Get the synched block number of src chain for the provided proxy contract.')
+    .arguments('<proxy_contract_address>')
+    .action(async (proxyContractAddress: string | undefined, options) => {
         // override options here if config file was added
         if (options.configFile) {
             options = overrideFileOptions<TxContractInteractionOptions>(options.configFile, options);
@@ -112,7 +116,6 @@ get_curr_block_number
         logger.setSettings({ minLevel: options.logLevel });
 
         const contractAddressMap: ContractAddressMap = {
-            relayContract: relayContractAddress,
             proxyContract: proxyContractAddress ? proxyContractAddress : options.proxyContractAddress
         };
         const srcConnectionInfo: ConnectionInfo = {
@@ -128,22 +131,22 @@ get_curr_block_number
         };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, targetConnectionInfo, rpcConfig);
         await chainProxy.init();
-        const latestBlockNumber = await chainProxy.getLatestBlockNumber();
-        logger.info(`Latest block number from src chain: ${latestBlockNumber.toNumber()}`);
+        const latestBlockNumber = await chainProxy.getCurrentBlockNumber();
+        logger.info(`Current synched block number: ${latestBlockNumber.toNumber()}`);
     });
 
 let state_diff = program.command('state-diff') as Command;
 state_diff = commonOptions(state_diff);
 state_diff
     .alias('diff')
-    .arguments('<source_contract_address> [proxy_contract_address] [relay_contract_address]')
-    .description('Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address have to be provided.')
+    .arguments('<source_contract_address> [proxy_contract_address]')
+    .description('Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address has to be provided.')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr. If no blocks are given when using srcTx, then only the latest block is examined.')
             .choices(['storage', 'srcTx'])
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
-    .action(async (srcContractAddress: string, proxyContractAddress: string | undefined, relayContractAddress: string | undefined, options) => {
+    .action(async (srcContractAddress: string, proxyContractAddress: string | undefined, options) => {
         // override options here if config file was added
         if (options.configFile) {
             options = overrideFileOptions<TxContractInteractionOptions>(options.configFile, options);
@@ -152,8 +155,7 @@ state_diff
 
         const contractAddressMap: ContractAddressMap = {
             srcContract: srcContractAddress,
-            proxyContract: proxyContractAddress,
-            relayContract: relayContractAddress ? relayContractAddress : options.relayContractAddress
+            proxyContract: proxyContractAddress
         };
         const srcConnectionInfo: ConnectionInfo = {
             url: options.srcChainUrl,
@@ -182,14 +184,14 @@ synchronize = commonOptions(synchronize);
 synchronize
     .alias('s')
     .description('Synchronizes the storage of a proxy contract with its source contracts storage up to an optionally provided block nr on the source chain.')
-    .arguments('<proxy_contract_address> [relay_contract_address]')
+    .arguments('<proxy_contract_address>')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr.')
             .choices(['storage', 'srcTx'])
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
-    .action(async (proxyContract: string, relayContractAddress: string | undefined, options: TxContractInteractionOptions) => {
+    .action(async (proxyContract: string, options: TxContractInteractionOptions) => {
         // override options here if config file was added
         if (options.configFile) {
             options = overrideFileOptions<TxContractInteractionOptions>(options.configFile, options);
@@ -197,8 +199,7 @@ synchronize
         logger.setSettings({ minLevel: options.logLevel });
 
         const contractAddressMap: ContractAddressMap = {
-            proxyContract,
-            relayContract: relayContractAddress ? relayContractAddress : options.relayContractAddress
+            proxyContract
         };
         const srcConnectionInfo: ConnectionInfo = {
             url: options.srcChainUrl,
@@ -218,7 +219,12 @@ synchronize
             logger.error('Could not get changed keys');
             return;
         }
-        await chainProxy.migrateChangesToProxy(changedKeys.getKeys());
+        const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys());
+        if (synchronized) {
+            logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
+        } else {
+            logger.error('Could not synch changes.');
+        }
     });
 
 program
