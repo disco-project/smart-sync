@@ -1,6 +1,7 @@
-import {ethers, network} from "hardhat";
+import { network } from "hardhat";
+import { ethers } from 'ethers';
 import assert from "assert";
-import {getAllKeys, toBlockNumber, toParityQuantity, TransactionHandler } from "./utils";
+import { getAllKeys, toBlockNumber, toParityQuantity, TransactionHandler } from "./utils";
 import { HttpNetworkConfig } from "hardhat/types";
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { BigNumberish } from "@ethersproject/bignumber";
@@ -82,13 +83,12 @@ export class StorageDiffer {
 
     async getDiffFromSrcContractTxs(srcAddress: string, latestSrcBlock?: string | number, earliestSrcBlock?: string | number): Promise<StorageDiff> {
         const processedParameters: ProcessedParameters = await this.processParameters(srcAddress, latestSrcBlock, srcAddress, earliestSrcBlock);
-        earliestSrcBlock = earliestSrcBlock ? toParityQuantity(earliestSrcBlock) : undefined;
 
         const diffs: StorageKeyDiff[] = [];
         const srcTxHandler = new TransactionHandler(processedParameters.srcAddress, this.srcProvider);
 
         // getting all tx from srcAddress
-        const txs = await srcTxHandler.getTransactions(processedParameters.srcBlock, earliestSrcBlock);
+        const txs = await srcTxHandler.getTransactions(processedParameters.srcBlock, processedParameters.targetBlock);
         const oldKeys = await getAllKeys(srcAddress, this.srcProvider, processedParameters.srcBlock - 1);
 
         const changedStorage: { [ key: string ]: string } = {};
@@ -190,7 +190,6 @@ export class StorageDiff {
     getKeys(): Array<BigNumberish> {
         return this.diffs.map((diff) => diff.key);
     }
-
 }
 
 interface StorageKeyDiff {
@@ -255,7 +254,7 @@ export enum DiffKind {
     Change
 }
 
-interface ProcessedParameters {
+type ProcessedParameters = {
     srcAddress: string;
     srcBlock: number;
     targetAddress: string;

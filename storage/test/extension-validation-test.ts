@@ -4,7 +4,7 @@ import {expect} from "chai";
 import {GetProof} from "../src/verify-proof";
 import {getAllKeys} from "../src/utils";
 import {StorageDiffer} from "../src/get-diff";
-import {DeployProxy} from "../src/deploy-proxy";
+import {ProxyContractBuilder} from "../src/proxy-contract-builder";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
 import { logger } from "../src/logger";
@@ -83,9 +83,9 @@ describe("Extension Validation", async function () {
         // create a proof of the source contract's storage
         let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 
-        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
-        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
+        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
 
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);

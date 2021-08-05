@@ -55,15 +55,29 @@ contract ProxyContract {
     /**
     * @dev Used to access the Relay's abi
     */
-    function getRelay() internal view returns (RelayContract) {
+    function getRelay() internal pure returns (RelayContract) {
         return RelayContract(RELAY_ADDRESS);
+    }
+
+    /**
+    * @dev Used to get the relay address
+    */
+    function getRelayAddress() public pure returns (address) {
+        return RELAY_ADDRESS;
     }
 
     /**
     * @dev Used to get the source address
     */
-    function getSourceAddress() public view returns (address) {
+    function getSourceAddress() public pure returns (address) {
         return SOURCE_ADDRESS;
+    }
+
+    /**
+    * @dev Used to get the logic address
+    */
+    function getLogicAddress() public pure returns (address) {
+        return LOGIC_ADDRESS;
     }
 
     /**
@@ -128,7 +142,7 @@ contract ProxyContract {
     /*
      * The address of the implementation contract
      */
-    function _implementation() internal returns (address) {
+    function _implementation() internal pure returns (address) {
         return LOGIC_ADDRESS;
     }
 
@@ -310,15 +324,16 @@ contract ProxyContract {
     * Secondly verify that the current value is part of the current storage root (old contract state proof)
     * Third step is verifying the provided storage proofs provided in the `proof` (new contract state proof)
     * @param proof The rlp encoded optimized proof
+    * @param blockNumber The block number of the src chain from which to take the stateRoot of the srcContract
     */
-    function updateStorage(bytes memory proof) public {
+    function updateStorage(bytes memory proof, uint blockNumber) public {
         // todo removing values is not considered here
         // First verify stateRoot -> account (account proof)
         RelayContract relay = getRelay();
         require(relay.getMigrationState(address(this)), 'migration not completed');
         
         // get the current state root of the source chain
-        bytes32 root = relay.getStateRoot();
+        bytes32 root = relay.getStateRoot(blockNumber);
         // validate that the proof was obtained for the source contract and the account's storage is part of the current state
         bytes memory path = GetProofLib.encodedAddress(SOURCE_ADDRESS);
 
@@ -337,7 +352,7 @@ contract ProxyContract {
         setStorageValues(getProof.storageProofs);
 
         // update the state in the relay
-        relay.updateProxyInfo(account.storageHash);
+        relay.updateProxyInfo(account.storageHash, blockNumber);
     }
 
     function updateStorageValue(RLPReader.RLPItem[] memory valueNode) internal {

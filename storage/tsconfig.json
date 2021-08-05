@@ -1,14 +1,21 @@
 {
-  "compilerOptions": {
-    "target": "es2018",
-    "module": "commonjs",
-    "strict": true,
-    "esModuleInterop": true,
-    "noImplicitAny": false,
-    "strictPropertyInitialization": false,
-    "outDir": "dist",
-    "sourceMap": true
-  },
-  "include": ["./scripts", "./test", "./src"],
-  "files": ["./hardhat.config.ts"]
+    "extends": "@tsconfig/node14/tsconfig.json",
+    "compilerOptions": {
+        "declaration": true,
+        "noImplicitAny": false,
+        "strictPropertyInitialization": false,
+        "outDir": "dist",
+        "removeComments": true,
+        "sourceMap": true,
+        "resolveJsonModule": true
+    },
+    "ts-node": {
+        // It is faster to skip typechecking.
+        "transpileOnly": true,
+    
+        "files": true
+    },
+    "include": ["src/**/*", "./test"],
+    "files": ["./hardhat.config.ts"],
+    "exclude": ["node_modules"]
 }

@@ -1,7 +1,8 @@
 import {format_proof_nodes, GetProof, hexStringToBuffer, verify_eth_getProof} from "./verify-proof";
 import {BaseTrie as Trie} from "merkle-patricia-tree";
-import {ethers} from "hardhat";
 import * as rlp from "rlp";
+import { ethers } from "ethers";
+import { JsonRpcProvider } from "@ethersproject/providers";
 
 /**
  * Prepares the Merkle proof payload for on chain verification
@@ -19,22 +20,22 @@ export async function buildAccountProof(proof: GetProof, stateRoot): Promise<Mer
     const value = rlp.decode(path.node.value);
 
     return {
-        value: '0x' + rlp.encode(value).toString('hex'),
-        encodedPath: '0x00' + accountKey.toString('hex'),
-        parentNodes: '0x' + rlp.encode(parentNodes).toString('hex'),
+        value: `0x${rlp.encode(value).toString('hex')}`,
+        encodedPath: `0x00${accountKey.toString('hex')}`,
+        parentNodes: `0x${rlp.encode(parentNodes).toString('hex')}`,
         root: stateRoot
     };
 }
 
-interface MerkleProof {
+type MerkleProof = {
     // The value inside the trie
-    value,
+    value: string,
     // The HP encoded path leading to the value
-    encodedPath,
+    encodedPath: string,
     // The rlp encoded stack of nodes
-    parentNodes,
+    parentNodes: string,
     // The root hash of the trie
-    root
+    root: string
 }
 
 export function formatPathStack(path) {
@@ -42,7 +43,7 @@ export function formatPathStack(path) {
 }
 
 export class ProofMerger {
-    private provider;
+    private provider: JsonRpcProvider;
 
     constructor(provider) {
         this.provider = provider;
