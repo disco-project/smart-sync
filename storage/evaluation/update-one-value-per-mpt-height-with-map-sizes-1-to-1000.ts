@@ -5,14 +5,14 @@ import { JsonRpcProvider } from "@ethersproject/providers";
 import { logger } from "../src/logger"
 import { HttpNetworkConfig } from "hardhat/types";
 import { CSVDataTemplatePerMTHeight, CSVManager } from "./eval-utils";
-import { ChainProxy } from "../test/test-utils";
+import { TestChainProxy } from "../test/test-utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { StorageDiff, StorageDiffer } from "../src/get-diff";
 import { BigNumberish } from "@ethersproject/bignumber";
 
 const MAX_VALUE = 1000000;
 
-describe("Test scaling of contract", async function () {
+describe("update-one-value-per-mpt-height-with-map-sizes-1-to-1000", async function () {
     let deployer: SignerWithAddress;
     let srcContract: MappingContract;
     let logicContract: MappingContract;
@@ -21,7 +21,7 @@ describe("Test scaling of contract", async function () {
     let relayContract: RelayContract;
     let httpConfig: HttpNetworkConfig;
     let csvManager: CSVManager<CSVDataTemplatePerMTHeight>;
-    let chainProxy: ChainProxy;
+    let chainProxy: TestChainProxy;
     let differ: StorageDiffer;
     let currBlockNr: number;
 
@@ -45,7 +45,7 @@ describe("Test scaling of contract", async function () {
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        chainProxy = new ChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
+        chainProxy = new TestChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
     });
 
     afterEach(async () => {
