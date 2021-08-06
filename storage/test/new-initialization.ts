@@ -5,7 +5,7 @@ import { JsonRpcProvider } from "@ethersproject/providers";
 import {StorageDiffer} from "../src/get-diff";
 import { logger } from '../src/logger';
 import { HttpNetworkConfig } from "hardhat/types";
-import { ChainProxy, InitializationResult } from "./test-utils";
+import { TestChainProxy, InitializationResult } from "./test-utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 const MAX_VALUE = 1000000;
@@ -18,7 +18,7 @@ describe("New Initialization", async function () {
     let provider: JsonRpcProvider;
     let relayContract: RelayContract;
     let httpConfig: HttpNetworkConfig;
-    let chainProxy: ChainProxy;
+    let chainProxy: TestChainProxy;
 
     before(async () => {
         httpConfig = network.config as HttpNetworkConfig;
@@ -34,7 +34,7 @@ describe("New Initialization", async function () {
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        chainProxy = new ChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
+        chainProxy = new TestChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
     });
 
     it("Contract with map containing 1000 values, update 20 values", async function() {

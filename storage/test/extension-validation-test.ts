@@ -4,14 +4,13 @@ import {expect} from "chai";
 import {GetProof} from "../src/verify-proof";
 import {getAllKeys} from "../src/utils";
 import {StorageDiffer} from "../src/get-diff";
-import {DeployProxy} from "../src/deploy-proxy";
+import {ProxyContractBuilder} from "../src/proxy-contract-builder";
 import {PROXY_INTERFACE} from "../src/config";
 import {Contract} from "ethers";
 import { logger } from "../src/logger";
 import { HttpNetworkConfig } from "hardhat/types";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { getExtensionsAmountLeadingToValue } from '../evaluation/eval-utils';
 
 describe("Extension Validation", async function () {
     let deployer: SignerWithAddress;
@@ -25,7 +24,7 @@ describe("Extension Validation", async function () {
     let httpConfig: HttpNetworkConfig;
 
     before(async () => {
-        deployer = await SignerWithAddress.create(provider.getSigner());
+        [deployer] = await ethers.getSigners();
         httpConfig = network.config as HttpNetworkConfig;
         logger.setSettings({minLevel: 'info', name: 'extension-validation-test.ts'});
         provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
@@ -84,11 +83,9 @@ describe("Extension Validation", async function () {
         // create a proof of the source contract's storage
         let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 
-        const extensionCounter = getExtensionsAmountLeadingToValue(33, proof.storageProof);
+        await relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
-        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
-
-        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
+        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
 
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
@@ -105,7 +102,7 @@ describe("Extension Validation", async function () {
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiffFromTxs(srcContract.address, proxyContract.address);
+        let diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         const rlpOptimized = proof.optimizedStorageProof();

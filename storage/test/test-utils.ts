@@ -5,7 +5,7 @@ import { BigNumberish, ethers } from "ethers";
 import { HttpNetworkConfig } from "hardhat/types";
 import { MappingContract, RelayContract } from "../src-gen/types";
 import { PROXY_INTERFACE } from "../src/config";
-import { DeployProxy } from "../src/deploy-proxy";
+import { ProxyContractBuilder } from "../src/proxy-contract-builder";
 import { StorageDiffer } from "../src/get-diff";
 import { logger } from "../src/logger";
 import { getAllKeys } from "../src/utils";
@@ -36,8 +36,7 @@ export interface ChangeValueAtIndexResult {
     success: Boolean;
     newValue?: BigNumberish;
 }
-
-export class ChainProxy {
+export class TestChainProxy {
     // todo currently does not change the value when calling changing values functions
     readonly values: Array<number> = [];
     readonly keys: Array<number> = [];
@@ -117,9 +116,9 @@ export class ChainProxy {
             if (this.min_mpt_depth > storageProof.proof.length) this.min_mpt_depth = storageProof.proof.length;
         });
     
-        await this.relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
     
-        const compiledProxy = await DeployProxy.compiledAbiAndBytecode(this.relayContract.address, this.logicContract.address, this.srcContract.address);
+        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract.address, this.logicContract.address, this.srcContract.address);
     
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
@@ -153,7 +152,7 @@ export class ChainProxy {
         //  getting encoded block header
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
     
-        await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), { gasLimit: this.httpConfig.gas });
+        await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), ethers.BigNumber.from(latestBlock.number).toNumber(), { gasLimit: this.httpConfig.gas });
     
         //  validating
         const migrationValidated = await this.relayContract.getMigrationState(this.proxyContract.address);
@@ -355,13 +354,13 @@ export class ChainProxy {
         }
 
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
-        await this.relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
         let txResponse;
         let receipt;
         try {
-            txResponse = await this.proxyContract.updateStorage(rlpProof);
+            txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number);
             receipt = await txResponse.wait();
         } catch (e) {
             logger.error('something went wrong');
