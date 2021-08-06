@@ -166,16 +166,16 @@ contract ProxyContract {
         // solhint-disable-next-line no-inline-assembly
         address logic = _implementation();
         assembly {
-        // Copy msg.data. We take full control of memory in this inline assembly
-        // block because it will not return to Solidity code. We overwrite the
-        // Solidity scratch pad at memory position 0.
+            // Copy msg.data. We take full control of memory in this inline assembly
+            // block because it will not return to Solidity code. We overwrite the
+            // Solidity scratch pad at memory position 0.
             calldatacopy(0, 0, calldatasize())
 
-        // Call the implementation.
-        // out and outsize are 0 because we don't know the size yet.
+            // Call the implementation.
+            // out and outsize are 0 because we don't know the size yet.
             let result := delegatecall(gas(), logic, 0, calldatasize(), 0, 0)
 
-        // Copy the returned data.
+            // Copy the returned data.
             returndatacopy(0, 0, returndatasize())
 
             switch result
@@ -249,11 +249,10 @@ contract ProxyContract {
             for (uint j = 0; j < 2; j++) {
                 _list[j] = lastBranch[j].toRlpBytes();
             }
-            newParentHash = keccak256(RLPWriter.encodeList(_list));
+            newParentHash = keccak256(commonBranches[commonBranches.length - 1].toRlpBytes());
 
             // 2. calulate old parent hash
-            (bytes32 oldReferenceHash,) = computeRoots(latestCommonBranchValues[0].toRlpBytes());
-            _list[1] = RLPWriter.encodeKeccak256Hash(oldReferenceHash);
+            _list[1] = RLPWriter.encodeKeccak256Hash(computeOldItem(latestCommonBranchValues[0]));
 
             oldParentHash = keccak256(RLPWriter.encodeList(_list));
         } else {
@@ -264,7 +263,7 @@ contract ProxyContract {
             for (uint i = 0; i < 17; i++) {
                 // 1. get new entry for new parent hash calculation
                 _newList[i] = lastBranch[i].toRlpBytes();
-                _oldList[i] = lastBranch[i].toRlpBytes();
+                _oldList[i] = _newList[i];
 
                 // 2. get old entry for old parent hash calculation
                 // the value node either holds the [key, value]directly or another proofnode
@@ -281,8 +280,7 @@ contract ProxyContract {
                     }
                 } else if (valueNode.length == 2) {
                     // branch or extension
-                    (bytes32 oldReferenceHash,) = computeRoots(latestCommonBranchValues[i].toRlpBytes());
-                    _oldList[i] = RLPWriter.encodeKeccak256Hash(oldReferenceHash);
+                    _oldList[i] = RLPWriter.encodeKeccak256Hash(computeOldItem(latestCommonBranchValues[i]));
                 }
             }
             newParentHash = keccak256(RLPWriter.encodeList(_newList));
@@ -290,6 +288,59 @@ contract ProxyContract {
         }
 
         return (oldParentHash, newParentHash);
+    }
+
+    function computeOldItem(RLPReader.RLPItem memory rlpProofNode) internal view returns (bytes32) {
+        // the updated reference hash
+        bytes32 oldParentHash;
+
+        RLPReader.RLPItem[] memory proofNode = rlpProofNode.toList();
+
+        // the last proof node consists of a list of common branch nodes
+        RLPReader.RLPItem[] memory commonBranches = RLPReader.toList(proofNode[0]);
+        // the last common branch for all underlying values
+        RLPReader.RLPItem[] memory lastBranch = RLPReader.toList(commonBranches[commonBranches.length - 1]);
+        // and a list of values [0..16] for the last branch node
+        RLPReader.RLPItem[] memory latestCommonBranchValues = RLPReader.toList(proofNode[1]);
+
+        if (latestCommonBranchValues.length == 1) {
+            // its an extension
+            bytes[] memory _list = new bytes[](2);
+            _list[0] = lastBranch[0].toRlpBytes();
+
+            // calulate old parent hash
+            _list[1] = RLPWriter.encodeKeccak256Hash(computeOldItem(latestCommonBranchValues[0]));
+
+            oldParentHash = keccak256(RLPWriter.encodeList(_list));
+        } else {
+            // its a branch
+            bytes[] memory _oldList = new bytes[](17);
+            // loop through every value
+            for (uint i = 0; i < 17; i++) {
+                _oldList[i] = lastBranch[i].toRlpBytes();
+
+                // get old entry for old parent hash calculation
+                // the value node either holds the [key, value]directly or another proofnode
+                RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
+                if (valueNode.length == 3) {
+                    // leaf value, where the is the value of the latest branch node at index i
+                    bytes memory encodedList = restoreOldValueState(valueNode);
+                    
+                    if (encodedList.length > 32) {
+                        bytes32 listHash = keccak256(encodedList);
+                        _oldList[i] = RLPWriter.encodeKeccak256Hash(listHash);
+                    } else {
+                        _oldList[i] = encodedList;
+                    }
+                } else if (valueNode.length == 2) {
+                    // branch or extension
+                    _oldList[i] = RLPWriter.encodeKeccak256Hash(computeOldItem(latestCommonBranchValues[i]));
+                }
+            }
+            oldParentHash = keccak256(RLPWriter.encodeList(_oldList));
+        }
+
+        return oldParentHash;
     }
 
     /**
