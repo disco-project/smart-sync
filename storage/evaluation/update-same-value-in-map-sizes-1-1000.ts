@@ -5,7 +5,7 @@ import {StorageDiff, StorageDiffer} from "../src/get-diff";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { logger } from "../src/logger"
 import { HttpNetworkConfig } from "hardhat/types";
-import { ChainProxy, ChangeValueAtIndexResult, MigrationResult } from "../test/test-utils";
+import { TestChainProxy, ChangeValueAtIndexResult, MigrationResult } from "../test/test-utils";
 import { CSVDataTemplateSingleValueMultiple, CSVManager, getExtensionsAmountLeadingToValue } from "./eval-utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumberish } from "@ethersproject/bignumber";
@@ -21,7 +21,7 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
     let provider: JsonRpcProvider;
     let relayContract: RelayContract;
     let httpConfig: HttpNetworkConfig;
-    let chainProxy: ChainProxy;
+    let chainProxy: TestChainProxy;
     let csvManager: CSVManager<CSVDataTemplateSingleValueMultiple>;
     let differ: StorageDiffer;
     let currBlockNr: number;
@@ -46,7 +46,7 @@ describe("update-same-value-in-map-sizes-1-1000", async function () {
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        chainProxy = new ChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
+        chainProxy = new TestChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
     });
 
     afterEach(async () => {

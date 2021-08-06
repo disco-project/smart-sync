@@ -5,7 +5,7 @@ import { JsonRpcProvider } from "@ethersproject/providers";
 import {StorageDiff, StorageDiffer} from "../src/get-diff";
 import { logger } from "../src/logger";
 import { HttpNetworkConfig } from "hardhat/types";
-import { ChainProxy } from "../test/test-utils";
+import { TestChainProxy } from "../test/test-utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { CSVDataTemplateMultipleValues, CSVManager } from "./eval-utils";
 import { BigNumberish } from "@ethersproject/bignumber";
@@ -21,7 +21,7 @@ describe("update-multiple-values-random-with-map-sizes-1-1000", async function (
     let provider: JsonRpcProvider;
     let relayContract: RelayContract;
     let httpConfig: HttpNetworkConfig;
-    let chainProxy: ChainProxy;
+    let chainProxy: TestChainProxy;
     let csvManager: CSVManager<CSVDataTemplateMultipleValues>;
     let differ: StorageDiffer;
     let currBlockNr: number;
@@ -46,7 +46,7 @@ describe("update-multiple-values-random-with-map-sizes-1-1000", async function (
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        chainProxy = new ChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
+        chainProxy = new TestChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
     });
 
     afterEach(async () => {

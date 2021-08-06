@@ -89,40 +89,6 @@ export class StorageDiffer {
      * @param latestSrcBlock replay txs until this block number for the comparison
      * @returns the diff between the storage of the two contracts at their specific blocks as list of `StorageDiff`
      */
-    async getDiffFromTxs(srcAddress: string, targetAddress?: string, latestSrcBlock?: string | number, latestTargetBlock?: string | number): Promise<StorageDiff> {
-        const processedParameters: ProcessedParameters = await this.processParameters(srcAddress, latestSrcBlock, targetAddress, latestTargetBlock);
-
-        const diffs: StorageKeyDiff[] = [];
-        const srcTxHandler = new TransactionHandler(processedParameters.srcAddress, this.srcProvider);
-        const srcStorage: { [key: string]: string } = await srcTxHandler.getContractStorageFromTxs(processedParameters.srcBlock);
-
-        const targetTxHandler = new TransactionHandler(processedParameters.targetAddress, this.targetProvider);
-        const targetStorage: { [key: string]: string } = await targetTxHandler.getContractStorageFromTxs(processedParameters.targetBlock);
-        const targetKeys = Object.keys(targetStorage);
-
-        for (const srcKey in srcStorage) {
-            const srcValue = srcStorage[srcKey];
-            const targetValue = targetStorage[srcKey];
-            if (targetValue) {
-                if (srcValue !== targetValue) {
-                    // value of respective key changed
-                    diffs.push(new Change(srcKey, srcValue, targetValue));
-                }
-                targetKeys.splice(targetKeys.indexOf(srcKey), 1);
-            } else {
-                // key is only present in `targetAddress`
-                diffs.push(new Add(srcKey, targetValue));
-            }
-        }
-
-        // keys that are present in block `srcBlock` but not in `targetBlock`.
-        for (const targetKey of targetKeys) {
-            diffs.push(new Remove(targetKey, srcStorage[targetKey]));
-        }
-
-        return new StorageDiff(diffs);
-    }
-
     async getDiffFromSrcContractTxs(srcAddress: string, latestSrcBlock?: string | number, earliestSrcBlock?: string | number): Promise<StorageDiff> {
         const processedParameters: ProcessedParameters = await this.processParameters(srcAddress, latestSrcBlock, srcAddress, earliestSrcBlock);
 

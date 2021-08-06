@@ -5,7 +5,7 @@ import { JsonRpcProvider } from "@ethersproject/providers";
 import { logger } from "../src/logger"
 import { HttpNetworkConfig } from "hardhat/types";
 import { CSVDataTemplateBasicMTEdge, CSVManager } from "./eval-utils";
-import { ChainProxy } from "../test/test-utils";
+import { TestChainProxy } from "../test/test-utils";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { getAllKeys } from "../src/utils";
 import { GetProof } from "../src/verify-proof";
@@ -21,7 +21,7 @@ describe("get-mt-for-map-sizes-1-1000", async function () {
     let relayContract: RelayContract;
     let httpConfig: HttpNetworkConfig;
     let csvManager: CSVManager<CSVDataTemplateBasicMTEdge>;
-    let chainProxy: ChainProxy;
+    let chainProxy: TestChainProxy;
     let currBlockNr: number;
 
     before(() => {
@@ -41,7 +41,7 @@ describe("get-mt-for-map-sizes-1-1000", async function () {
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        chainProxy = new ChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
+        chainProxy = new TestChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
     });
 
     afterEach(async () => {
