@@ -6,9 +6,10 @@ import {
     TestProxyContract,
     TestProxyContract__factory
 } from "../src-gen/types";
-import {ethers} from "hardhat";
+import {ethers, network} from "hardhat";
 import {expect} from "chai";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { HttpNetworkConfig } from "hardhat/types";
 
 describe("Test static proxy calls", function () {
     let deployer: SignerWithAddress;
@@ -23,6 +24,8 @@ describe("Test static proxy calls", function () {
     ];
 
     it("Should deploy the contracts", async function () {
+        let httpConfig = network.config as HttpNetworkConfig;
+        let provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
         deployer = await SignerWithAddress.create(provider.getSigner());
         const Logic = new TestLogicContract__factory(deployer);
         logic = await Logic.deploy();

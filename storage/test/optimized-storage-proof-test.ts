@@ -14,10 +14,10 @@ describe("Test storage proof optimization", async function () {
 
     before(async function () {
         httpConfig = network.config as HttpNetworkConfig;
+        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
         deployer = await SignerWithAddress.create(provider.getSigner());
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
         logger.setSettings({minLevel: 'info', name: 'optimized-storage-proof-test.ts'});
     });
 
