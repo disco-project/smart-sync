@@ -11,7 +11,6 @@ import { logger } from "../src/logger"
 import { HttpNetworkConfig } from "hardhat/types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { JsonRpcProvider } from "@ethersproject/providers";
-import assert from "assert";
 
 describe("Deploy proxy and logic contract", async function () {
     let deployer: SignerWithAddress;
@@ -224,5 +223,10 @@ describe("Deploy proxy and logic contract", async function () {
             // ignore error
         }
         expect(await callRelayContract.getValue(691)).to.equal(9);
-    })
+    });
+
+    it("should allow to retrieve values via fallback directly from proxy", async () => {
+        const test = factory.attach(proxyContract.address)
+        expect(await test.getValue(691)).to.equal(9);
+    });
 })
