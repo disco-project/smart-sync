@@ -45,14 +45,14 @@ describe("Test scaling of contract", async function () {
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        let diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         // change all the previous synced values
         await chainProxy.changeValues(1, MAX_VALUE);
 
         // get changed keys
-        diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         const changedKeys = diff.getKeys();
 
         // migrate changes to proxy contract
@@ -65,7 +65,7 @@ describe("Test scaling of contract", async function () {
         logger.info("Gas used for updating 1 value in map with 1 value: ", migrationResult.receipt.gasUsed.toNumber());
 
         // after update storage layouts are equal, no diffs
-        diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
     });
 
@@ -76,14 +76,14 @@ describe("Test scaling of contract", async function () {
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        let diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         // change all the previous synced values
         await chainProxy.changeValueAtIndex(0, MAX_VALUE);
 
         // get changed keys
-        diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         const changedKeys = diff.getKeys();
 
         // migrate changes to proxy contract
@@ -96,7 +96,7 @@ describe("Test scaling of contract", async function () {
         logger.info("Gas used for updating first value in map with 10 values: ", migrationResult.receipt.gasUsed.toNumber());
 
         // after update storage layouts are equal, no diffs
-        diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
     });
 
@@ -107,14 +107,14 @@ describe("Test scaling of contract", async function () {
         
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        let diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         // change all the previous synced values
         await chainProxy.changeValues(5, MAX_VALUE);
 
         // get changed keys
-        diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         const changedKeys = diff.getKeys();
 
         // migrate changes to proxy contract
@@ -127,7 +127,7 @@ describe("Test scaling of contract", async function () {
         logger.info("Gas used for updating first 5 values in map with 10 values: ", migrationResult.receipt.gasUsed.toNumber());
 
         // after update storage layouts are equal, no diffs
-        diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
     });
 
@@ -138,14 +138,14 @@ describe("Test scaling of contract", async function () {
         
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        let diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         // change all the previous synced values
         await chainProxy.changeValues(5, MAX_VALUE, 5);
 
         // get changed keys
-        diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         const changedKeys = diff.getKeys();
 
         // migrate changes to proxy contract
@@ -158,7 +158,7 @@ describe("Test scaling of contract", async function () {
         logger.info("Gas used for updating last 5 values in map with 10 values: ", migrationResult.receipt.gasUsed.toNumber());
 
         // after update storage layouts are equal, no diffs
-        diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
     });
 
@@ -169,14 +169,14 @@ describe("Test scaling of contract", async function () {
         
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         let differ = new StorageDiffer(provider);
-        let diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        let diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         // change all the previous synced values
         await chainProxy.changeValues(10, MAX_VALUE);
 
         // get changed keys
-        diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         const changedKeys = diff.getKeys();
 
         // migrate changes to proxy contract
@@ -189,7 +189,7 @@ describe("Test scaling of contract", async function () {
         logger.info("Gas used for updating 10 values in map with 10 values: ", migrationResult.receipt.gasUsed.toNumber());
 
         // after update storage layouts are equal, no diffs
-        diff = await differ.getDiffFromSrcContractTxs(srcContract.address, initialization.proxyContract.address);
+        diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
     });
 })
