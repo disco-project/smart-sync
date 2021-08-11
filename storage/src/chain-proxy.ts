@@ -266,28 +266,6 @@ export class ChainProxy {
         // create a proof of the source contract's storage for all the changed keys
         let changedKeysProof = new GetProof(await this.srcProvider.send("eth_getProof", [this.srcContractAddress, changedKeys]));
 
-        // compute the optimized storage proof
-        const rlpOptimized = changedKeysProof.optimizedStorageProof();
-
-        // ensure that the old contract state equals the last synced storage hash
-        try {
-            const validated = await this.proxyContract.verifyOldContractStateProof(rlpOptimized);
-            if (!validated) {
-                logger.error('Could not verify old contract state proof');
-                return false;
-            };
-        } catch(e) {
-            logger.error('something went wrong');
-            const regexr = new RegExp(/Reverted 0x(.*)/);
-            const checker = regexr.exec(e.data);
-            if (checker) {
-                logger.error(`'${this.hex_to_ascii(checker[1])}'`);
-                logger.fatal(e);
-            }
-            else logger.fatal(e);
-            return false;
-        }
-
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
@@ -295,7 +273,7 @@ export class ChainProxy {
         let txResponse: ContractTransaction;
         let receipt: ContractReceipt;
         try {
-            txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number);
+            txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number, { gasLimit: this.targetRPCConfig.gasLimit });
             receipt = await txResponse.wait();
             logger.debug(receipt);
         } catch (e) {

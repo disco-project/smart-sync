@@ -12,6 +12,7 @@ import { ProxyContractBuilder } from "../src/proxy-contract-builder";
 import { PROXY_INTERFACE } from "../src/config";
 import { Contract } from "@ethersproject/contracts";
 import { getAllKeys } from "../src/utils";
+import { GetProof } from "../src/verify-proof";
 
 namespace TestCLI {
     export const ts_node_exec = './node_modules/ts-node/dist/bin-transpile.js';
@@ -190,10 +191,6 @@ describe("Test CLI", async function () {
         // insert some new values
         const changedValues = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);
         expect(changedValues).to.be.true;
-
-        const keys = await getAllKeys(srcContract.address);
-        const test = await provider.send("eth_getProof", [srcContract.address, keys]);
-        logger.debug(test);
         
         let synchCommand = `${TestCLI.ts_node_exec} ${TestCLI.cli_exec} s ${initialization.proxyContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.default_test_config_file} -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${synchCommand}`);
