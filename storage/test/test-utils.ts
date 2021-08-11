@@ -37,7 +37,6 @@ export interface ChangeValueAtIndexResult {
     newValue?: BigNumberish;
 }
 export class TestChainProxy {
-    // todo currently does not change the value when calling changing values functions
     readonly values: Array<number> = [];
     readonly keys: Array<number> = [];
     private proxyContract: Contract;
@@ -288,6 +287,28 @@ export class TestChainProxy {
         return true;
     }
 
+    async addValueAtIndex(valueIndex: number, max_value: number): Promise<ChangeValueAtIndexResult> {
+        if (!this.migrationState) {
+            logger.error('Proxy contract is not initialized yet.');
+            return { success: false };
+        }
+        const value = Math.floor(Math.random() * max_value);
+        await this.srcContract.insert(valueIndex, value);
+        return {
+            newValue: value,
+            success: true
+        };
+    }
+
+    async deleteValueAtIndex(valueIndex: number): Promise<Boolean> {
+        if (!this.migrationState) {
+            logger.error('Proxy contract is not initialized yet.');
+            return false;
+        }
+        await this.srcContract.deleteValue(valueIndex);
+        return true;
+    }
+
     async changeValueAtIndex(valueIndex: number, max_value: number): Promise<ChangeValueAtIndexResult> {
         if (!this.migrationState) {
             logger.error('Proxy contract is not initialized yet.');
@@ -330,28 +351,6 @@ export class TestChainProxy {
         changedKeysProof.storageProof.forEach((storageProof) => {
             if (max_value_mpt_depth < storageProof.proof.length) max_value_mpt_depth = storageProof.proof.length;
         });
-
-        // compute the optimized storage proof
-        const rlpOptimized = changedKeysProof.optimizedStorageProof();
-
-        // ensure that the old contract state equals the last synced storage hash
-        try {
-            const validated = await this.proxyContract.verifyOldContractStateProof(rlpOptimized);
-            if (!validated) {
-                logger.error('Could not verify old contract state proof');
-                return { migrationResult: false };
-            };
-        } catch(e) {
-            logger.error('something went wrong');
-            const regexr = new RegExp(/Reverted 0x(.*)/);
-            const checker = regexr.exec(e.data);
-            if (checker) {
-                logger.error(`'${this.hex_to_ascii(checker[1])}'`);
-                logger.fatal(e);
-            }
-            else logger.fatal(e);
-            return { migrationResult: false };
-        }
 
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);

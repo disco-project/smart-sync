@@ -158,13 +158,6 @@ describe("Deploy proxy and logic contract", async function () {
         // create a proof of the source contract's storage for all the changed keys
         proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
 
-        // compute the optimized storage proof
-        const rlpOptimized = proof.optimizedStorageProof();
-
-        // ensure that the old contract state equals the last synced storage hash
-        const validated = await proxyContract.verifyOldContractStateProof(rlpOptimized);
-        expect(validated).to.be.true;
-
         const rlpProof = await proof.optimizedProof(latestBlock.stateRoot);
         await relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
@@ -202,31 +195,7 @@ describe("Deploy proxy and logic contract", async function () {
         // after update storage layouts are equal, no diffs
         diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
-    })
-
-    it("It should reject unknown values", async function () {
-        await srcContract.insert(999, 6);
-        await srcContract.insert(1200, 7);
-        await srcContract.insert(1222, 9);
-
-        // get the diff set, the storage keys for the changed values
-        const differ = new StorageDiffer(provider);
-        const diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
-        latestBlock = await provider.send('eth_getBlockByNumber', ["latest", true]);
-        const keys = diff.getKeys();
-
-        const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
-
-        const rlpProof = await proof.optimizedProof(latestBlock.stateRoot);
-
-        // Note that the respective block is not added to the realy contract here
-
-        // compute the optimized storage proof
-        const rlpOptimized = proof.optimizedStorageProof();
-        // ensure that the old contract state equals the last synced storage hash
-        const validated = await proxyContract.verifyOldContractStateProof(rlpOptimized);
-        expect(validated).to.be.false;
-    })
+    });
 
     it("should reject state changes via fallback called externally", async function() {
         // Deploy Calling contract

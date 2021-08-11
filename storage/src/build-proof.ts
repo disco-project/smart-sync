@@ -45,7 +45,7 @@ export function formatPathStack(path) {
 export class ProofMerger {
     private provider: JsonRpcProvider;
 
-    constructor(provider) {
+    constructor(provider: JsonRpcProvider) {
         this.provider = provider;
     }
 

@@ -1,5 +1,5 @@
 import {Proof} from "merkle-patricia-tree/dist.browser/baseTrie";
-import {ethers} from "ethers";
+import {BigNumber, ethers} from "ethers";
 import * as rlp from "rlp";
 import {BaseTrie as Trie} from "merkle-patricia-tree";
 import assert from "assert";
@@ -236,7 +236,7 @@ export class GetProof implements IGetProof {
         this.logger = logger.getChildLogger({ name: 'GetProof' });
     }
 
-    async optimizedProof(stateRoot, includeStorage: Boolean = true) {
+    async optimizedProof(stateRoot: string, includeStorage: Boolean = true) {
         const account = encodeAccount(this.account());
         const accountNodes = await this.encodeParentNodes(stateRoot);
         const storage = includeStorage ? this.optimizedStorageProof() : [];
@@ -261,20 +261,21 @@ export class GetProof implements IGetProof {
                 const node = rlp.decode(hexStringToBuffer(proofNode));
                 
                 if (!pathNodes) {
-                    if (i === storageProof.proof.length - 1) { // node.length === 2
+                    // todo leaf as root could also be deleted...
+                    if (i === storageProof.proof.length - 1 && storageProof.value !== '0x0') { // node.length === 2
                         // only one node in the tree
                         this.logger.debug('Leaf as root');
                         pathNodes = new ProofPathBuilder(node, storageProof.key);
                     } else {
                         // its an extension or branch
-                        pathNodes = new ProofPathBuilder(node,);
+                        pathNodes = new ProofPathBuilder(node);
                     }
                     rootNode = proofNode;
                 }
                 if (rootNode === proofNode) {
-                    // skip root
+                    // skip root if not a proof for deleted value at root branch
                     parentNode = pathNodes;
-                    continue;
+                    if (i !== (storageProof.proof.length - 1)) continue;
                 }
                 if (!pathNodes || !parentNode) {
                     this.logger.debug('not possible.');
@@ -285,10 +286,14 @@ export class GetProof implements IGetProof {
                     if (i === storageProof.proof.length - 1) {
                         // terminating
                         this.logger.debug('terminating branch');
-                        parentNode = pathNodes.addBranch(node, parentNode, storageProof.key);
+                        if (!parentNode.equals(storageProof.proof[i])) parentNode = pathNodes.addBranch(node, parentNode, storageProof.key);
+                        if (storageProof.value === '0x0' && parentNode) {
+                            this.logger.debug('inserting leaf for deleted value');
+                            pathNodes.addDeletedValue(parentNode, storageProof);
+                        }
                     } else {
                         this.logger.debug('branch');
-                        parentNode = pathNodes.addBranch(node, parentNode, null);
+                        parentNode = pathNodes.addBranch(node, parentNode, undefined);
                     }
                 } else if (node.length === 2) {
                     if (i === storageProof.proof.length - 1) {
@@ -307,7 +312,7 @@ export class GetProof implements IGetProof {
         return pathNodes ? pathNodes.encode() : [];
     }
 
-    async encoded(stateRoot): Promise<Buffer> {
+    async encoded(stateRoot: string): Promise<Buffer> {
         const account = encodeAccount(this.account());
         const accountNodes = await this.encodeParentNodes(stateRoot);
         const storage = await this.encodedStorageProofs();
@@ -329,7 +334,7 @@ export class GetProof implements IGetProof {
         return utils.encode(storage)
     }
 
-    private async encodeParentNodes(stateRoot): Promise<Buffer> {
+    private async encodeParentNodes(stateRoot: string): Promise<Buffer> {
         const trie = new Trie(null, hexStringToBuffer(stateRoot));
         const accountProofNodes = format_proof_nodes(this.accountProof);
         const accountTrie = await Trie.fromProof(accountProofNodes, trie);
@@ -355,7 +360,7 @@ class ProofPathBuilder {
     children: EmbeddedNode | EmbeddedNode[] | undefined;
     logger: Logger;
 
-    constructor(root, storageKey?) {
+    constructor(root: Buffer, storageKey?: string) {
         this.logger = logger.getChildLogger({ name: 'ProofPathBuilder' });
         if (root.length === 2 && storageKey) {
             // root is leaf
@@ -372,11 +377,48 @@ class ProofPathBuilder {
         }
     }
 
-    addValue(storageKey, leafNode, parentNode: ParentNode): LeafNode | undefined {
+    /**
+     * returns true if this node equals the rlp-encoded hex string, false otherwise
+     * @param node a hex string with '0x' prefix
+     * @returns boolean
+     */
+    equals(node: string): Boolean {
+        return `0x${rlp.encode(this.root).toString('hex')}` === node;
+    }
+
+    addValue(storageKey: string, leafNode, parentNode: ParentNode): LeafNode | undefined {
         return this.insert(leafNode, parentNode, storageKey, true) as LeafNode;
     }
 
-    addBranch(branchNode, parentNode: ParentNode, storageKey): BranchNode | undefined {
+    // todo this needs testing with other smart contracts than the simple MappingContract
+    addDeletedValue(parentNode: ParentNode, storageProof: StorageProof): LeafNode | undefined {
+        if (parentNode instanceof ExtensionNode) {
+            logger.error('Can not add deleted value to ExtensionNode');
+            return undefined;
+        } else if (!parentNode.children) {
+            logger.error('ParentNode is a leaf node');
+            return undefined;
+        }
+        const path = ethers.utils.keccak256(storageProof.key);
+        let pathPtr = 2;
+        for (let i = 0; i < storageProof.proof.length - 1; i++) {
+            const node = rlp.decode(storageProof.proof[i]) as Buffer[];
+            if (node.length === 17) pathPtr++;
+            else if (node.length === 2) {
+                const extension = BigNumber.from(node[0]).toHexString().length - 2;
+                pathPtr += extension;
+            }
+        }
+        const adjustedPath = Buffer.from(path.substring(2), 'hex');
+        // comment on why change the first slot: the hashed keys in the leafs of a mt on the bc have a leading nibble of 0011.
+        adjustedPath[0] = 48 + (adjustedPath[0] % 16);
+        const artificialNode = [adjustedPath, Buffer.from([0x0])];
+        const pathNibble = parseInt(path[pathPtr], 16);
+        parentNode.children[pathNibble] = new LeafNode(artificialNode, storageProof.key);
+        return parentNode.children[pathNibble] as LeafNode ?? undefined;
+    }
+
+    addBranch(branchNode, parentNode: ParentNode, storageKey: string | undefined): BranchNode | undefined {
         return this.insert(branchNode, parentNode, storageKey, false) as BranchNode;
     }
 
@@ -384,7 +426,7 @@ class ProofPathBuilder {
         return this.insert(extensionNode, parentNode, undefined, false) as ExtensionNode;
     }
 
-    insertChild(childBranch: ParentNode, node, parentNode: ParentNode, storageKey, isLeaf): EmbeddedNode | undefined | null {
+    insertChild(childBranch: ParentNode, node, parentNode: ParentNode, storageKey: string | undefined, isLeaf: Boolean): EmbeddedNode | undefined | null {
         const nodeRef = hexStringToBuffer(ethers.utils.keccak256(rlp.encode(node)));
         if (childBranch instanceof ProofPathBuilder) {
             this.logger.debug('not possible to be proofpathbuilder in insertChild');
@@ -433,7 +475,7 @@ class ProofPathBuilder {
         return undefined;
     }
 
-    insert(node, parentNode: ParentNode, storageKey, isLeaf): EmbeddedNode | undefined | null {
+    insert(node, parentNode: ParentNode, storageKey: string | undefined, isLeaf: Boolean): EmbeddedNode | undefined | null {
         const nodeRef = hexStringToBuffer(ethers.utils.keccak256(rlp.encode(node)));
         // const parentRef = ethers.utils.keccak256(rlp.encode(parentNode));
 
@@ -511,11 +553,20 @@ type ParentNode = BranchNode | ExtensionNode | ProofPathBuilder;
 
 class LeafNode {
     storageKey: Buffer;
-    node: Buffer[];
+    node: Buffer;
 
-    constructor(node: Buffer[], storageKey) {
+    constructor(node, storageKey) {
         this.node = node;
         this.storageKey = storageKey;
+    }
+
+    /**
+     * 
+     * @param node a hex string with '0x' prefix
+     * @returns true if this node equals the rlp-encoded hex string, false otherwise
+     */
+    equals(node: string): Boolean {
+        return `0x${rlp.encode(this.node).toString('hex')}` === node;
     }
 
     encode() {
@@ -532,6 +583,15 @@ class ExtensionNode {
         this.child = child;
     }
 
+    /**
+     * returns true if this node equals the rlp-encoded hex string, false otherwise
+     * @param node a hex string with '0x' prefix
+     * @returns boolean
+     */
+    equals(node: string): Boolean {
+        return `0x${rlp.encode(this.node).toString('hex')}` === node;
+    }
+
     encode() {
         if (!this.child) return undefined
         return [ [this.node], [this.child.encode()] ];
@@ -544,7 +604,6 @@ class BranchNode {
     commonNodes: [];
     children: (EmbeddedNode | null)[];
 
-
     constructor(node: Buffer[], storageKey) {
         this.node = node;
         this.children = new Array(17).fill(null);
@@ -552,6 +611,15 @@ class BranchNode {
         if (storageKey) {
             this.children[16] = new LeafNode(rlp.decode(this.node[16]) as any, storageKey)
         }
+    }
+
+    /**
+     * returns true if this node equals the rlp-encoded hex string, false otherwise
+     * @param node a hex string with '0x' prefix
+     * @returns boolean
+     */
+    equals(node: string): Boolean {
+        return `0x${rlp.encode(this.node).toString('hex')}` === node;
     }
 
     hasLeaf() {
