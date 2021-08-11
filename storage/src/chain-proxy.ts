@@ -16,7 +16,7 @@ const KEY_VALUE_PAIR_PER_BATCH = 100;
 
 export type ContractAddressMap = {
     srcContract?: string;
-    relayContract: string;
+    relayContract?: string;
     logicContract?: string;
     proxyContract?: string;
 }
@@ -38,7 +38,7 @@ export class ChainProxy {
     readonly proxyContractAddress: string | undefined;
     private srcContractAddress: string;
     private logicContractAddress: string | undefined;
-    readonly relayContractAddress: string | undefined;
+    private relayContractAddress: string | undefined;
     readonly srcProvider: JsonRpcProvider;
     readonly srcProviderConnectionInfo: ConnectionInfo;
     readonly targetProviderConnectionInfo: ConnectionInfo;
@@ -90,8 +90,16 @@ export class ChainProxy {
                 this.srcContractAddress = await this.proxyContract.getSourceAddress();
                 logger.debug(`srcContract: ${this.srcContractAddress}`);
                 this.logicContractAddress = await this.proxyContract.getLogicAddress();
+
+                this.relayContractAddress = await this.proxyContract.getRelayAddress();
+                if (!this.relayContractAddress) {
+                    logger.error('Could not get relay contract address.');
+                    return false;
+                }
+                const relayContractFactory = new RelayContract__factory(this.deployer);
+                this.relayContract = relayContractFactory.attach(this.relayContractAddress);
                 
-                this.migrationState = await this.relayContract?.getMigrationState(this.proxyContractAddress) ?? false;
+                this.migrationState = await this.relayContract.getMigrationState(this.proxyContractAddress);
             } catch(e) {
                 logger.error(e);
                 return false;
@@ -113,7 +121,15 @@ export class ChainProxy {
         if (!this.initialized) {
             logger.error('ChainProxy is not initialized yet.');
             return false;
-        } 
+        }
+        if (!ethers.utils.isAddress(this.srcContractAddress)) {
+            logger.error(`Given source contract address not a valid address (${this.srcContractAddress})`);
+            return false;
+        }
+        if ((await this.srcProvider.getCode(this.srcContractAddress)).length < 3) {
+            logger.error(`No contract found under src contract address ${this.srcContractAddress}.`);
+            return false;
+        }
         if (!this.relayContract) {
             logger.info('No address for relayContract given, deploying new relay contract...');
             const relayFactory = new RelayContract__factory(this.deployer);
@@ -127,7 +143,7 @@ export class ChainProxy {
         const initialValuesProof = new GetProof(await this.srcProvider.send("eth_getProof", [this.srcContractAddress, keys]));
     
         // update relay
-        await this.relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
     
         // deploy logic contract
         let result = await this.cloneLogic();
@@ -251,7 +267,7 @@ export class ChainProxy {
         let changedKeysProof = new GetProof(await this.srcProvider.send("eth_getProof", [this.srcContractAddress, changedKeys]));
 
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
-        await this.relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
         let txResponse: ContractTransaction;
@@ -298,10 +314,9 @@ export class ChainProxy {
                     if (parameters.srcBlock) {
                         const givenSrcBlockNr = await toBlockNumber(parameters.srcBlock, this.srcProvider);
                         if (synchedBlockNr.gte(givenSrcBlockNr)) {
-                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${givenSrcBlockNr}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
+                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${givenSrcBlockNr}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`)
                         } 
                     } else {
-                        // todo needs testing. What if proxy contract was not yet migrated?
                         parameters.srcBlock = synchedBlockNr.toNumber() + 1;
                     }
                 }
@@ -319,6 +334,18 @@ export class ChainProxy {
         }
 
         return await this.relayContract.getLatestBlockNumber();
+    }
+
+    async getCurrentBlockNumber(): Promise<BigNumber> {
+        if (!this.initialized) {
+            logger.error('ChainProxy is not initialized yet.');
+            return BigNumber.from(-1);
+        }  else if (!this.relayContract) {
+            logger.error('No address for relayContract given.');
+            return BigNumber.from(-1);
+        }
+
+        return await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
     }
 
     hex_to_ascii(str1) {

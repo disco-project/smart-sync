@@ -83,7 +83,7 @@ describe("Extension Validation", async function () {
         // create a proof of the source contract's storage
         let proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 
-        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
 

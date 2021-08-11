@@ -52,7 +52,7 @@ describe("Deploy proxy and logic contract", async function () {
         // create a proof of the source contract's storage
         proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 
-        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
     })
 
     it("Should compile and deploy the proxy", async function () {
@@ -96,7 +96,7 @@ describe("Deploy proxy and logic contract", async function () {
         // create a proof of the source contract's storage
         proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, keys]));
 
-        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
 
@@ -159,7 +159,7 @@ describe("Deploy proxy and logic contract", async function () {
         proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
 
         const rlpProof = await proof.optimizedProof(latestBlock.stateRoot);
-        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
         let txResponse = await proxyContract.updateStorage(rlpProof, latestBlock.number);
@@ -187,7 +187,7 @@ describe("Deploy proxy and logic contract", async function () {
         // create a proof of the source contract's storage for all the changed keys
         const proof = new GetProof(await provider.send("eth_getProof", [srcContract.address, changedKeys]));
         const rlpProof = await proof.optimizedProof(latestBlock.stateRoot);
-        await relayContract.updateBlock(latestBlock.stateRoot, latestBlock.number);
+        await relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
         await proxyContract.updateStorage(rlpProof, latestBlock.number);

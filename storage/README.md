@@ -47,7 +47,7 @@ $ cross-chain-cli fork 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a
 
 ```bash
 $ cross-chain-cli help synchronize
-Usage: cross-chain-cli synchronize|s [options] <proxy_contract_address> [relay_contract_address]
+Usage: cross-chain-cli synchronize|s [options] <proxy_contract_address>
 
 Synchronizes the storage of a proxy contract with its source contracts storage up to an optionally provided block nr on the source chain.
 
@@ -67,13 +67,13 @@ Options:
 
 Example usage:
 ```bash
-$ cross-chain-cli s 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a 0x20a508640B446990c781Cd541B9a2828ACA3a350 --target-blockNr 450
+$ cross-chain-cli s 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a --target-blockNr 450
 ```
 
 ### migration-status
 ```bash
 $ cross-chain-cli help migration-status
-Usage: cross-chain-cli migration-status|status [options] <proxy_contract_address> [relay_contract_address]
+Usage: cross-chain-cli migration-status|status [options] <proxy_contract_address>
 
 Checks if the storage root of the proxy contract equals the current storage root of the source contract in the relay contract on the target chain.
 
@@ -88,14 +88,14 @@ Options:
 ```
 Example usage:
 ``` bash
-$ cross-chain-cli status 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a 0x20a508640B446990c781Cd541B9a2828ACA3a350
+$ cross-chain-cli status 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a
 ```
 ### get-curr-blocknr
 ```bash
 $ cross-chain-cli help get-curr-blocknr
-Usage: cross-chain-cli get-curr-blocknr|blocknr [options] <relay_contract_address> [proxy_contract_address]
+Usage: cross-chain-cli get-curr-blocknr|blocknr [options] <proxy_contract_address>
 
-Get the latest synched block number of src chain from relay contract across all managed proxy contracts or latest synched block nr for a specific proxy contract if its address is provided.
+Get the synched block number of src chain for the provided proxy contract.
 
 Options:
   -l, --log-level <level>           verbose level of logging (choices: "fatal", "error", "warn", "info", "debug", "trace", "silly", default: "debug")
@@ -114,9 +114,9 @@ $ cross-chain-cli blocknr 0x20a508640B446990c781Cd541B9a2828ACA3a350
 ### state-diff
 ```bash
 $ cross-chain-cli help state-diff
-Usage: cross-chain-cli state-diff|diff [options] <source_contract_address> [proxy_contract_address] [relay_contract_address]
+Usage: cross-chain-cli state-diff|diff [options] <source_contract_address> [proxy_contract_address]
 
-Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address and relay_contract_address have to be provided.
+Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address has to be provided.
 
 Options:
   -l, --log-level <level>           verbose level of logging (choices: "fatal", "error", "warn", "info", "debug", "trace", "silly", default: "debug")
@@ -133,7 +133,7 @@ Options:
 ```
 Example usage:
 ```bash
-$ cross-chain-cli diff 0x20a508640B446990c781Cd541B9a2828ACA3a350 0xf8f22ab160e8a09fbf404a44139d9b5da936e3cb 0x5D73dDbe0d439125401B4ca43dc459d22B86ebf2 --diff-mode storage --src-blocknr 450
+$ cross-chain-cli diff 0x20a508640B446990c781Cd541B9a2828ACA3a350 0xf8f22ab160e8a09fbf404a44139d9b5da936e3cb --diff-mode storage --src-blocknr 450
 ```
 
 # Getting started (Dev)
