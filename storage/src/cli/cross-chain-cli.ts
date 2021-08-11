@@ -235,7 +235,6 @@ function commonOptions(command: Command): Command {
         defaultOptions = {};
     }
 
-    // todo add options and insert default values from config file
     command.addOption(
         new Option('-l, --log-level <level>', 'verbose level of logging')
             .default(defaultOptions.logLevel)

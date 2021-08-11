@@ -224,8 +224,6 @@ contract ProxyContract {
     *        [list of common branches..last common branch,], values[0..16; LeafNode || proof node]
     */
     function computeRoot(bytes memory rlpProofNode, bool isOldContractStateProof) internal view returns (bytes32) {
-        // the hash that references the next node
-        bytes32 parentHash;
         // the updated reference hash
         bytes32 newParentHash;
 
@@ -252,8 +250,6 @@ contract ProxyContract {
         RLPReader.RLPItem[] memory lastBranch = RLPReader.toList(commonBranches[commonBranches.length - 1]);
         // and a list of values [0..16] for the last branch node
         RLPReader.RLPItem[] memory latestCommonBranchValues = RLPReader.toList(proofNode[1]);
-        // store the old reference hash
-        parentHash = keccak256(commonBranches[commonBranches.length - 1].toRlpBytes());
 
         if(isOldContractStateProof) {
             if (latestCommonBranchValues.length == 1) {
@@ -327,7 +323,6 @@ contract ProxyContract {
     * @param blockNumber The block number of the src chain from which to take the stateRoot of the srcContract
     */
     function updateStorage(bytes memory proof, uint blockNumber) public {
-        // todo removing values is not considered here
         // First verify stateRoot -> account (account proof)
         RelayContract relay = getRelay();
         require(relay.getMigrationState(address(this)), 'migration not completed');
@@ -372,11 +367,9 @@ contract ProxyContract {
         } else {
             value = bytes32(byte0);
         }
-        if (value != 0x0) {
-            bytes32 slot = bytes32(valueNode[0].toUint());
-            assembly {
-                sstore(slot, value)
-            }
+        bytes32 slot = bytes32(valueNode[0].toUint());
+        assembly {
+            sstore(slot, value)
         }
     }
 
