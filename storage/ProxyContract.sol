@@ -223,7 +223,7 @@ contract ProxyContract {
     * @param rlpProofNode proof of form of:
     *        [list of common branches..last common branch,], values[0..16; LeafNode || proof node]
     */
-    function computeRoots(bytes memory rlpProofNode) internal view returns (bytes32, bytes32) {
+    function computeRoots(bytes memory rlpProofNode) public view returns (bytes32, bytes32) {
         // the updated reference hash
         bytes32 newParentHash;
         bytes32 oldParentHash;
