@@ -1,9 +1,0 @@
-{
-  "ropsten": {
-    "wss": "wss://ropsten.infura.io/ws/v3/",
-    "http": "https://ropsten.infura.io/v3/",
-    "chainId": 1,
-    "RelayAddress": "",
-    "privateKey": "SIGNER PRIVATE KEY HERE",
-  }
-}

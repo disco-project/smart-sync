@@ -1,0 +1,20 @@
+{
+  "extends": ["airbnb"],
+  "plugins": ["@typescript-eslint"],
+  "parser": "@typescript-eslint/parser",
+  "rules": {
+    "indent": ["error", 4],
+    "semi": ["error", "always"],
+    "import/extensions": 0,
+    "camelcase": "off",
+    "max-len": "off",
+    "no-param-reassign": ["error", { "props": false }]
+  },
+  "settings": {
+    "import/resolver": {
+      "node": {
+        "extensions": [".js", ".jsx", ".ts", ".tsx"]
+      }
+    }
+  }
+}
