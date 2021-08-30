@@ -1,21 +1,26 @@
+/* eslint-disable no-await-in-loop */
+/* eslint-disable import/no-extraneous-dependencies */
+/* eslint-env mocha */
+/* eslint-disable no-unused-expressions */
 import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { HttpNetworkConfig } from 'hardhat/types';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumberish } from '@ethersproject/bignumber';
-import { StorageDiff, DiffHandler } from '../src/get-diff';
-import { logger } from '../src/logger';
-import { ChainProxy } from '../test/test-utils';
+import { logger } from '../src/utils/logger';
+import { TestChainProxy } from '../test/test-utils';
 import { CSVDataTemplateMultipleValues, CSVManager } from './eval-utils';
 import {
     RelayContract__factory, MappingContract, MappingContract__factory, RelayContract,
 } from '../src-gen/types';
+import DiffHandler from '../src/diffHandler/DiffHandler';
+import StorageDiff from '../src/diffHandler/StorageDiff';
 
 const MAX_VALUE = 1000000;
 const MAX_CHANGED_VALUES = 100;
 
-describe('Test scaling of contract', async () => {
+describe('update-multiple-values-with-map-sizes-1-1000', async () => {
     let deployer: SignerWithAddress;
     let srcContract: MappingContract;
     let logicContract: MappingContract;
@@ -23,7 +28,7 @@ describe('Test scaling of contract', async () => {
     let provider: JsonRpcProvider;
     let relayContract: RelayContract;
     let httpConfig: HttpNetworkConfig;
-    let chainProxy: ChainProxy;
+    let chainProxy: TestChainProxy;
     let csvManager: CSVManager<CSVDataTemplateMultipleValues>;
     let differ: DiffHandler;
     let currBlockNr: number;
@@ -48,7 +53,7 @@ describe('Test scaling of contract', async () => {
         // deploy the relay contract
         const Relayer = new RelayContract__factory(deployer);
         relayContract = await Relayer.deploy();
-        chainProxy = new ChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
+        chainProxy = new TestChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
     });
 
     afterEach(async () => {
@@ -60,7 +65,7 @@ describe('Test scaling of contract', async () => {
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 0; i < map_size; i++) {
+        for (let i = 0; i < map_size; i += 1) {
             const value_count = i + 1;
 
             // changing values at srcContract
@@ -98,7 +103,7 @@ describe('Test scaling of contract', async () => {
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 0; i < map_size; i++) {
+        for (let i = 0; i < map_size; i += 1) {
             const value_count = i + 1;
 
             // changing values at srcContract
@@ -136,7 +141,7 @@ describe('Test scaling of contract', async () => {
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 0; i < MAX_CHANGED_VALUES; i++) {
+        for (let i = 0; i < MAX_CHANGED_VALUES; i += 1) {
             const value_count = i + 1;
 
             // changing values at srcContract

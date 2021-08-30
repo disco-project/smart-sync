@@ -151,7 +151,7 @@ describe('Test scaling of contract', async () => {
         expect(diff.isEmpty()).to.be.true;
 
         // change all the previous synced values
-        await chainProxy.changeValues(5, MAX_VALUE, 5);
+        await chainProxy.changeValues(5, MAX_VALUE);
 
         // get changed keys
         diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
