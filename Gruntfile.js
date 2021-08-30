@@ -21,8 +21,10 @@ module.exports = (grunt) => {
         child_process.execSync('npm run test', { stdio: 'inherit' });
     });
 
-    grunt.registerTask('default', 'testing', () => {
+    grunt.registerTask('full', 'testing', () => {
         grunt.task.run('eslint');
         grunt.task.run('test');
     });
+
+    grunt.registerTask('default', ['eslint']);
 };
