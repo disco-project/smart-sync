@@ -1,4 +1,4 @@
-import { ethers } from 'ethers';
+import { BigNumber, ethers } from 'ethers';
 import { Logger } from 'tslog';
 import * as rlp from 'rlp';
 import { logger } from '../utils/logger';
@@ -6,7 +6,7 @@ import { hexStringToBuffer } from '../utils/utils';
 import BranchNode from './BranchNode';
 import ExtensionNode from './ExtensionNode';
 import LeafNode from './LeafNode';
-import { EmbeddedNode, ParentNode } from './Types';
+import { EmbeddedNode, ParentNode, StorageProof } from './Types';
 
 class ProofPathBuilder {
     root: LeafNode | any;
@@ -15,7 +15,7 @@ class ProofPathBuilder {
 
     logger: Logger;
 
-    constructor(root, storageKey?) {
+    constructor(root: Buffer, storageKey?: string) {
         this.logger = logger.getChildLogger({ name: 'ProofPathBuilder' });
         if (root.length === 2 && storageKey) {
             // root is leaf
@@ -32,11 +32,20 @@ class ProofPathBuilder {
         }
     }
 
-    addValue(storageKey, leafNode, parentNode: ParentNode): LeafNode | undefined {
+    /**
+     * returns true if this node equals the rlp-encoded hex string, false otherwise
+     * @param node a hex string with '0x' prefix
+     * @returns boolean
+     */
+    equals(node: string): Boolean {
+        return `0x${rlp.encode(this.root).toString('hex')}` === node;
+    }
+
+    addValue(storageKey: string, leafNode, parentNode: ParentNode): LeafNode | undefined {
         return this.insert(leafNode, parentNode, storageKey, true) as LeafNode;
     }
 
-    addBranch(branchNode, parentNode: ParentNode, storageKey): BranchNode | undefined {
+    addBranch(branchNode, parentNode: ParentNode, storageKey: string | undefined): BranchNode | undefined {
         return this.insert(branchNode, parentNode, storageKey, false) as BranchNode;
     }
 
@@ -44,7 +53,7 @@ class ProofPathBuilder {
         return this.insert(extensionNode, parentNode, undefined, false) as ExtensionNode;
     }
 
-    insertChild(childBranch: ParentNode, node, parentNode: ParentNode, storageKey, isLeaf): EmbeddedNode | undefined | null {
+    insertChild(childBranch: ParentNode, node, parentNode: ParentNode, storageKey: string | undefined, isLeaf: Boolean): EmbeddedNode | undefined | null {
         const nodeRef = hexStringToBuffer(ethers.utils.keccak256(rlp.encode(node)));
         if (childBranch instanceof ProofPathBuilder) {
             this.logger.debug('not possible to be proofpathbuilder in insertChild');
@@ -91,7 +100,7 @@ class ProofPathBuilder {
         return undefined;
     }
 
-    insert(node, parentNode: ParentNode, storageKey, isLeaf): EmbeddedNode | undefined | null {
+    insert(node, parentNode: ParentNode, storageKey: string | undefined, isLeaf: Boolean): EmbeddedNode | undefined | null {
         const nodeRef = hexStringToBuffer(ethers.utils.keccak256(rlp.encode(node)));
         // const parentRef = ethers.utils.keccak256(rlp.encode(parentNode));
 
@@ -140,7 +149,7 @@ class ProofPathBuilder {
         return undefined;
     }
 
-    encode() {
+    encode(): Buffer | null {
         if (this.root instanceof LeafNode) return rlp.encode(this.root.encode());
         if (!this.children) return null;
 
@@ -159,6 +168,34 @@ class ProofPathBuilder {
         // its an extension
         return rlp.encode([[this.root], [this.children.encode()]]);
     }
+}
+
+// todo this needs testing with other smart contracts than the simple MappingContract
+export function addDeletedValue(parentNode: ParentNode, storageProof: StorageProof): LeafNode | undefined {
+    if (parentNode instanceof ExtensionNode) {
+        logger.error('Can not add deleted value to ExtensionNode');
+        return undefined;
+    } if (!parentNode.children) {
+        logger.error('ParentNode is a leaf node');
+        return undefined;
+    }
+    const path = ethers.utils.keccak256(storageProof.key);
+    let pathPtr = 2;
+    for (let i = 0; i < storageProof.proof.length - 1; i += 1) {
+        const node = rlp.decode(storageProof.proof[i]) as Buffer[];
+        if (node.length === 17) pathPtr += 1;
+        else if (node.length === 2) {
+            const extension = BigNumber.from(node[0]).toHexString().length - 2;
+            pathPtr += extension;
+        }
+    }
+    const adjustedPath = Buffer.from(path.substring(2), 'hex');
+    // comment on why change the first slot: the hashed keys in the leafs of a mt on the bc have a leading nibble of 0011.
+    adjustedPath[0] = 48 + (adjustedPath[0] % 16);
+    const artificialNode = [adjustedPath, Buffer.from([0x0])];
+    const pathNibble = parseInt(path[pathPtr], 16);
+    parentNode.children[pathNibble] = new LeafNode(artificialNode, storageProof.key);
+    return parentNode.children[pathNibble] as LeafNode ?? undefined;
 }
 
 export default ProofPathBuilder;

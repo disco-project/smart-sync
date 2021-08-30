@@ -19,6 +19,15 @@ class BranchNode {
         }
     }
 
+    /**
+     * returns true if this node equals the rlp-encoded hex string, false otherwise
+     * @param node a hex string with '0x' prefix
+     * @returns boolean
+     */
+    equals(node: string): Boolean {
+        return `0x${rlp.encode(this.node).toString('hex')}` === node;
+    }
+
     hasLeaf() {
         for (let i = 0; i < this.children.length; i += 1) {
             if (this.children[i] instanceof LeafNode) {

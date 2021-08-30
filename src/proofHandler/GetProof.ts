@@ -8,7 +8,7 @@ import {
 } from './Types';
 import * as utils from '../utils/utils';
 import { logger } from '../utils/logger';
-import ProofPathBuilder from './ProofPathBuilder';
+import ProofPathBuilder, { addDeletedValue } from './ProofPathBuilder';
 
 export function decodeStorageProof(buf: Buffer): StorageProof {
     const it = rlp.decode(buf) as any;
@@ -126,7 +126,7 @@ class GetProof implements IGetProof {
         this.logger = logger.getChildLogger({ name: 'GetProof' });
     }
 
-    async optimizedProof(stateRoot, includeStorage: Boolean = true) {
+    async optimizedProof(stateRoot: string, includeStorage: Boolean = true) {
         const account = encodeAccount(this.account());
         const accountNodes = await this.encodeParentNodes(stateRoot);
         const storage = includeStorage ? this.optimizedStorageProof() : [];
@@ -150,7 +150,8 @@ class GetProof implements IGetProof {
                 const node = rlp.decode(utils.hexStringToBuffer(proofNode));
 
                 if (!pathNodes) {
-                    if (i === storageProof.proof.length - 1) { // node.length === 2
+                    // todo leaf as root could also be deleted...
+                    if (i === storageProof.proof.length - 1 && storageProof.value !== '0x0') { // node.length === 2
                         // only one node in the tree
                         this.logger.debug('Leaf as root');
                         pathNodes = new ProofPathBuilder(node, storageProof.key);
@@ -161,9 +162,9 @@ class GetProof implements IGetProof {
                     rootNode = proofNode;
                 }
                 if (rootNode === proofNode) {
-                    // skip root
+                    // skip root if not a proof for deleted value at root branch
                     parentNode = pathNodes;
-                    return;
+                    if (i !== (storageProof.proof.length - 1)) return;
                 }
                 if (!pathNodes || !parentNode) {
                     this.logger.debug('not possible.');
@@ -174,10 +175,14 @@ class GetProof implements IGetProof {
                     if (i === storageProof.proof.length - 1) {
                         // terminating
                         this.logger.debug('terminating branch');
-                        parentNode = pathNodes.addBranch(node, parentNode, storageProof.key);
+                        if (!parentNode.equals(storageProof.proof[i])) parentNode = pathNodes.addBranch(node, parentNode, storageProof.key);
+                        if (storageProof.value === '0x0' && parentNode) {
+                            this.logger.debug('inserting leaf for deleted value');
+                            addDeletedValue(parentNode, storageProof);
+                        }
                     } else {
                         this.logger.debug('branch');
-                        parentNode = pathNodes.addBranch(node, parentNode, null);
+                        parentNode = pathNodes.addBranch(node, parentNode, undefined);
                     }
                 } else if (node.length === 2) {
                     if (i === storageProof.proof.length - 1) {
@@ -196,7 +201,7 @@ class GetProof implements IGetProof {
         return pathNodes ? pathNodes.encode() : [];
     }
 
-    async encoded(stateRoot): Promise<Buffer> {
+    async encoded(stateRoot: string): Promise<Buffer> {
         const account = encodeAccount(this.account());
         const accountNodes = await this.encodeParentNodes(stateRoot);
         const storage = await this.encodedStorageProofs();
@@ -215,7 +220,7 @@ class GetProof implements IGetProof {
         return utils.encode(storage);
     }
 
-    private async encodeParentNodes(stateRoot): Promise<Buffer> {
+    private async encodeParentNodes(stateRoot: string): Promise<Buffer> {
         const trie = new Trie(null, utils.hexStringToBuffer(stateRoot));
         const accountProofNodes = format_proof_nodes(this.accountProof);
         const accountTrie = await Trie.fromProof(accountProofNodes, trie);

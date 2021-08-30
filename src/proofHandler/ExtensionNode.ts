@@ -1,3 +1,4 @@
+import * as rlp from 'rlp';
 import { EmbeddedNode } from './Types';
 
 class ExtensionNode {
@@ -8,6 +9,15 @@ class ExtensionNode {
     constructor(node: Buffer[], child: EmbeddedNode | undefined) {
         this.node = node;
         this.child = child;
+    }
+
+    /**
+     * returns true if this node equals the rlp-encoded hex string, false otherwise
+     * @param node a hex string with '0x' prefix
+     * @returns boolean
+     */
+    equals(node: string): Boolean {
+        return `0x${rlp.encode(this.node).toString('hex')}` === node;
     }
 
     encode() {
