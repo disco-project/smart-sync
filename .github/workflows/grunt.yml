@@ -12,29 +12,20 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x, 14.x, 16.x]
+        node-version: [14.x, 16.x]
     
     steps:
     - uses: actions/checkout@v2
-
-    - name: Cache
-      uses: actions/cache@v2.1.6
-      with:
-        # A list of files, directories, and wildcard patterns to cache and restore
-        path: [node_modules]
-        # An explicit key for restoring and saving the cache
-        key: 
-        # An ordered list of keys to use for restoring the cache if no cache hit occurred for key
-        restore-keys: # optional
-        # The chunk size used to split up large files during upload, in bytes
-        upload-chunk-size: # optional
 
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v1
       with:
         node-version: ${{ matrix.node-version }}
 
+    - name: Generate types
+      run: npx hardhat compile
+
     - name: Build
       run: |
-        npm install
+        npm install --no-optional
         grunt
