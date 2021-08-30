@@ -23,7 +23,7 @@ jobs:
         node-version: ${{ matrix.node-version }}
 
     - name: Build
-      run: npm install --no-optional
+      run: npm install -f
 
     - name: Generate types
       run: npx hardhat compile

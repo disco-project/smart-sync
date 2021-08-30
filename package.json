@@ -64,8 +64,5 @@
     "nodemon": "^2.0.12",
     "ts-node-dev": "^1.1.8",
     "typescript": "^4.3.3"
-  },
-  "optionalDependencies": {
-    "fsevents": "^2.1.3"
   }
 }
