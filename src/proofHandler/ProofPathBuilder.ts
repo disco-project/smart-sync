@@ -1,3 +1,4 @@
+/* eslint-disable import/no-cycle */
 import { BigNumber, ethers } from 'ethers';
 import { Logger } from 'tslog';
 import * as rlp from 'rlp';

@@ -7,12 +7,12 @@
     "cross-chain-cli": "./src/cli/cross-chain-cli.ts"
   },
   "scripts": {
-    "compile-contracts": "npx hardhat compile",
+    "compile-contracts": "grunt compile-contracts",
     "start": "ts-node-dev --respawn src/cli/cross-chain-cli.ts",
     "refresh": "rm -rf ./node_modules ./package-lock.json && npm install",
-    "compile": "npx hardhat compile",
-    "test": "bash exec_tests.sh",
-    "evaluate": "bash exec_eval.sh"
+    "test": "grunt full-pipeline --force",
+    "lint": "grunt eslint",
+    "evaluate": "grunt full-pipeline-evaluation --force"
   },
   "author": "",
   "license": "ISC",
@@ -50,11 +50,12 @@
     "@types/chai": "^4.2.21",
     "@types/mocha": "^9.0.0",
     "@types/node": "^16.7.6",
-    "@typescript-eslint/eslint-plugin": "^4.29.3",
-    "@typescript-eslint/parser": "^4.29.3",
+    "@typescript-eslint/eslint-plugin": "^4.30.0",
+    "@typescript-eslint/parser": "^4.30.0",
     "chai": "^4.2.0",
     "eslint": "^7.32.0",
-    "eslint-config-airbnb": "^18.2.1",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-config-airbnb-typescript": "^14.0.0",
     "eslint-plugin-import": "^2.24.2",
     "ethereum-waffle": "^3.4.0",
     "grunt": "^1.4.1",

@@ -1,7 +1,6 @@
 /* eslint-disable no-await-in-loop */
 /* eslint-disable import/no-extraneous-dependencies */
 /* eslint-env mocha */
-/* eslint-disable no-unused-expressions */
 import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
 import { JsonRpcProvider } from '@ethersproject/providers';
@@ -60,12 +59,12 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
     });
 
     it('Contract with map containing 10 values, update multiple values per iteration', async () => {
-        const map_size = 10;
-        const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
+        const mapSize = 10;
+        const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 0; i < map_size; i += 1) {
+        for (let i = 0; i < mapSize; i += 1) {
             const value_count = i + 1;
 
             // changing values at srcContract
@@ -89,7 +88,7 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
 
             // add data to csv
             csvManager.pushData({
-                map_size,
+                mapSize,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 changed_value_count: value_count,
                 max_mpt_depth: initialization.max_mpt_depth,
@@ -98,12 +97,12 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
     });
 
     it('Contract with map containing 100 values, update multiple values per iteration', async () => {
-        const map_size = 100;
-        const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
+        const mapSize = 100;
+        const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 0; i < map_size; i += 1) {
+        for (let i = 0; i < mapSize; i += 1) {
             const value_count = i + 1;
 
             // changing values at srcContract
@@ -127,7 +126,7 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
 
             // add data to csv
             csvManager.pushData({
-                map_size,
+                mapSize,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 changed_value_count: value_count,
                 max_mpt_depth: initialization.max_mpt_depth,
@@ -136,8 +135,8 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
     });
 
     it('Contract with map containing 1000 values, update multiple values per iteration', async () => {
-        const map_size = 1000;
-        const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
+        const mapSize = 1000;
+        const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
@@ -165,7 +164,7 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
 
             // add data to csv
             csvManager.pushData({
-                map_size,
+                mapSize,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 changed_value_count: value_count,
                 max_mpt_depth: initialization.max_mpt_depth,

@@ -1,4 +1,5 @@
 import * as rlp from 'rlp';
+// eslint-disable-next-line import/no-cycle
 import { EmbeddedNode } from './Types';
 
 class ExtensionNode {

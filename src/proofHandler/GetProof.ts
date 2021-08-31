@@ -33,7 +33,7 @@ export function decodeAccount(buf: Buffer): Account {
 
 export function encodeAccount(element: Account): Buffer {
     const keys = [
-        // nonce and balance are returned as integer
+    // nonce and balance are returned as integer
         ethers.BigNumber.from(element.nonce).toNumber(),
         ethers.BigNumber.from(element.balance).toNumber(),
         utils.hexStringToBuffer(element.storageHash),
@@ -50,14 +50,14 @@ function formatPathStack(path: any) {
  * Convert an Array of hex strings into a proof
  * @param proof
  */
-export function format_proof_nodes(proof: string[]): Proof {
+export function formatProofNodes(proof: string[]): Proof {
     return proof.map(utils.hexStringToBuffer);
 }
 
 async function encodeStorageProof(storageProof: StorageProof, storageRoot): Promise<Buffer> {
     const log = logger.getChildLogger({ name: 'encodeStorageProof' });
     const trie = new Trie(null, utils.hexStringToBuffer(storageRoot));
-    const storageNodes = format_proof_nodes(storageProof.proof);
+    const storageNodes = formatProofNodes(storageProof.proof);
     const storageTrie = await Trie.fromProof(storageNodes, trie);
     const storageKey = utils.hexStringToBuffer(ethers.utils.keccak256(ethers.utils.hexZeroPad(storageProof.key, 32)));
     const path = await storageTrie.findPath(storageKey) as any;
@@ -222,7 +222,7 @@ class GetProof implements IGetProof {
 
     private async encodeParentNodes(stateRoot: string): Promise<Buffer> {
         const trie = new Trie(null, utils.hexStringToBuffer(stateRoot));
-        const accountProofNodes = format_proof_nodes(this.accountProof);
+        const accountProofNodes = formatProofNodes(this.accountProof);
         const accountTrie = await Trie.fromProof(accountProofNodes, trie);
         const accountKey = utils.hexStringToBuffer(ethers.utils.keccak256(this.address));
         const path = await accountTrie.findPath(accountKey) as any;

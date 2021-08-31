@@ -10,7 +10,7 @@ import { PROXY_INTERFACE } from './config';
 import DiffHandler from './diffHandler/DiffHandler';
 import { logger } from './utils/logger';
 import {
-    getAllKeys, toParityQuantity, toBlockNumber, createDeployingByteCode, hex_to_ascii,
+    getAllKeys, toParityQuantity, toBlockNumber, createDeployingByteCode, hexToAscii,
 } from './utils/utils';
 import GetProof from './proofHandler/GetProof';
 import { BlockHeader } from './proofHandler/Types';
@@ -24,15 +24,15 @@ export type ContractAddressMap = {
     relayContract?: string;
     logicContract?: string;
     proxyContract?: string;
-}
+};
 
 export type DeployingTransation = TransactionResponse & {
     creates?: string;
-}
+};
 
 export type RPCConfig = {
     gasLimit?: BigNumberish;
-}
+};
 
 export type GetDiffMethod = 'srcTx' | 'storage';
 
@@ -55,7 +55,7 @@ export function encodeBlockHeader(blockHeader: BlockHeader): Buffer {
         blockHeader.extraData,
     ];
     if (blockHeader.mixHash && blockHeader.nonce) {
-        // if chain is PoW
+    // if chain is PoW
         cleanBlockHeader.push(blockHeader.mixHash);
         cleanBlockHeader.push(blockHeader.nonce);
     } // else chain is PoA
@@ -331,7 +331,7 @@ export class ChainProxy {
             const regexr = new RegExp(/Reverted 0x(.*)/);
             const checker = regexr.exec(e.data);
             if (checker) {
-                logger.error(`'${hex_to_ascii(checker[1])}'`);
+                logger.error(`'${hexToAscii(checker[1])}'`);
                 logger.fatal(e);
             } else logger.fatal(e);
             return false;
@@ -348,29 +348,29 @@ export class ChainProxy {
 
         let { srcBlock } = parameters;
         switch (method) {
-        case 'storage':
-            if (!this.proxyContractAddress) {
-                logger.error('Proxy address not given.');
-                return undefined;
-            } if (!this.migrationState) {
-                logger.error('Proxy contract is not initialized yet.');
-                return undefined;
-            }
-            return this.differ.getDiffFromStorage(this.srcContractAddress, this.proxyContractAddress, parameters.srcBlock, parameters.targetBlock);
-            // srcTx is default
-        default:
-            if (this.relayContract && this.proxyContract) {
-                const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
-                if (srcBlock) {
-                    const givenSrcBlockNr = await toBlockNumber(parameters.srcBlock, this.srcProvider);
-                    if (synchedBlockNr.gte(givenSrcBlockNr)) {
-                        logger.info(`Note: The given starting block nr (--src-BlockNr == ${givenSrcBlockNr}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
-                    }
-                } else {
-                    srcBlock = synchedBlockNr.toNumber() + 1;
+            case 'storage':
+                if (!this.proxyContractAddress) {
+                    logger.error('Proxy address not given.');
+                    return undefined;
+                } if (!this.migrationState) {
+                    logger.error('Proxy contract is not initialized yet.');
+                    return undefined;
                 }
-            }
-            return this.differ.getDiffFromSrcContractTxs(this.srcContractAddress, parameters.targetBlock, srcBlock);
+                return this.differ.getDiffFromStorage(this.srcContractAddress, this.proxyContractAddress, parameters.srcBlock, parameters.targetBlock);
+            // srcTx is default
+            default:
+                if (this.relayContract && this.proxyContract) {
+                    const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
+                    if (srcBlock) {
+                        const givenSrcBlockNr = await toBlockNumber(parameters.srcBlock, this.srcProvider);
+                        if (synchedBlockNr.gte(givenSrcBlockNr)) {
+                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${givenSrcBlockNr}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
+                        }
+                    } else {
+                        srcBlock = synchedBlockNr.toNumber() + 1;
+                    }
+                }
+                return this.differ.getDiffFromSrcContractTxs(this.srcContractAddress, parameters.targetBlock, srcBlock);
         }
     }
 

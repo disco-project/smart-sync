@@ -5,14 +5,14 @@ export type ProcessedParameters = {
     srcBlock: number;
     targetAddress: string;
     targetBlock: number;
-}
+};
 
 /* eslint-disable no-shadow */
 /* eslint-disable no-unused-vars */
 export enum DiffKind {
     Add,
     Remove,
-    Change
+    Change,
 }
 /* eslint-enable no-shadow */
 /* eslint-enable no-unused-vars */

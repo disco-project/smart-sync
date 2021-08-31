@@ -10,9 +10,9 @@ import ProxyContractBuilder from '../src/utils/proxy-contract-builder';
 import DiffHandler from '../src/diffHandler/DiffHandler';
 import { logger } from '../src/utils/logger';
 import {
-    encode, getAllKeys, hexStringToBuffer, hex_to_ascii,
+    encode, getAllKeys, hexStringToBuffer, hexToAscii,
 } from '../src/utils/utils';
-import GetProof, { encodeAccount, format_proof_nodes } from '../src/proofHandler/GetProof';
+import GetProof, { encodeAccount, formatProofNodes } from '../src/proofHandler/GetProof';
 import { Account, StorageProof } from '../src/proofHandler/Types';
 import { encodeBlockHeader } from '../src/chain-proxy';
 
@@ -33,14 +33,14 @@ export interface MigrationResult {
     receipt?: {
         gasUsed: ethers.BigNumber;
     };
-    max_value_mpt_depth?: number;
+    maxValueMptDepth?: number;
 }
 
 async function verifyStorageProof(storageProof: StorageProof, root) {
     const storageTrieKey = hexStringToBuffer(ethers.utils.keccak256(ethers.utils.hexZeroPad(storageProof.key, 32)));
     const storageTrieRoot = hexStringToBuffer(root);
 
-    const proofValue = await Trie.verifyProof(storageTrieRoot, storageTrieKey, format_proof_nodes(storageProof.proof));
+    const proofValue = await Trie.verifyProof(storageTrieRoot, storageTrieKey, formatProofNodes(storageProof.proof));
 
     if (proofValue === null) {
         throw new Error(`Invalid storage proof: No storage value found for key: ${storageTrieKey.toString('hex')}`);
@@ -78,7 +78,7 @@ export async function verifyEthGetProof(proof: GetProof, root: string | Buffer):
     const rlpAccount = encodeAccount(acc);
     const trieKey = hexStringToBuffer(ethers.utils.keccak256(proof.address));
 
-    const proofAcc = await Trie.verifyProof(root, trieKey, format_proof_nodes(proof.accountProof));
+    const proofAcc = await Trie.verifyProof(root, trieKey, formatProofNodes(proof.accountProof));
 
     if (proofAcc === null) {
         throw new Error(`Invalid account proof: No account value found for key: ${trieKey.toString('hex')}`);
@@ -111,7 +111,7 @@ export class TestChainProxy {
 
     readonly deployer: SignerWithAddress;
 
-    private map_size: number;
+    private mapSize: number;
 
     private max_mpt_depth: number;
 
@@ -134,12 +134,12 @@ export class TestChainProxy {
         this.migrationState = false;
     }
 
-    async initializeProxyContract(map_size: number, max_value: number): Promise<InitializationResult> {
-        this.map_size = map_size;
+    async initializeProxyContract(mapSize: number, max_value: number): Promise<InitializationResult> {
+        this.mapSize = mapSize;
         // insert some random values
         const srcKeys: Array<number> = [];
         const srcValues: Array<number> = [];
-        for (let i = 0; i < map_size; i += 1) {
+        for (let i = 0; i < mapSize; i += 1) {
             const value = Math.floor(Math.random() * max_value);
             srcValues.push(value);
             srcKeys.push(i);
@@ -251,7 +251,7 @@ export class TestChainProxy {
         const srcValues: Array<number> = [];
         while (valueIndices.length < valueCount) {
             // get a new value
-            // eslint-disable-next-line no-loop-func
+            // eslint-disable-next-line @typescript-eslint/no-loop-func
             const proofIndex = this.initialValuesProof.storageProof.findIndex((storageProof, index) => (storageProof.proof.length === currHeight && proofIndices.indexOf(index) === -1));
             if (proofIndex === -1) {
                 // if all values from currHeight already in our array, go one level closer to root
@@ -386,9 +386,9 @@ export class TestChainProxy {
         const changedKeysProof = new GetProof(await this.provider.send('eth_getProof', [this.srcContract.address, changedKeys]));
 
         // get depth of value
-        let max_value_mpt_depth = 0;
+        let maxValueMptDepth = 0;
         changedKeysProof.storageProof.forEach((storageProof) => {
-            if (max_value_mpt_depth < storageProof.proof.length) max_value_mpt_depth = storageProof.proof.length;
+            if (maxValueMptDepth < storageProof.proof.length) maxValueMptDepth = storageProof.proof.length;
         });
 
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
@@ -405,7 +405,7 @@ export class TestChainProxy {
             const regexr = new RegExp(/Reverted 0x(.*)/);
             const checker = regexr.exec(e.data);
             if (checker) {
-                logger.error(`'${hex_to_ascii(checker[1])}'`);
+                logger.error(`'${hexToAscii(checker[1])}'`);
                 logger.fatal(e);
             } else logger.fatal(e);
             return { migrationResult: false };
@@ -413,7 +413,7 @@ export class TestChainProxy {
 
         return {
             receipt,
-            max_value_mpt_depth,
+            maxValueMptDepth,
             migrationResult: true,
 
         };

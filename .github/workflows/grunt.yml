@@ -28,5 +28,5 @@ jobs:
     - name: Generate types
       run: npx hardhat compile
 
-    - name: Grunt
-      run: grunt
+    - name: Eslint
+      run: grunt eslint

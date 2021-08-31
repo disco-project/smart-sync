@@ -39,7 +39,7 @@ describe('Get contract storage diff', () => {
     });
 
     it('Should get a single additional key in diff.getDiffFromStorage after setting a value', async () => {
-        // set value at storage slot 0
+    // set value at storage slot 0
         const tx = await storageSrc.setA(1337);
         const blockNum = tx.blockNumber ?? await provider.getBlockNumber();
         // compare the second latest block against the block
@@ -61,7 +61,7 @@ describe('Get contract storage diff', () => {
     });
 
     it('Should get a single additional key in diff.getDiffFromSrcContractTxs after setting a value', async () => {
-        // set value at storage slot 0
+    // set value at storage slot 0
         let tx = await storageSrc.setA(1337);
         let blockNum = tx.blockNumber ?? await provider.getBlockNumber();
         // check for changes in srcContract tx
@@ -84,7 +84,7 @@ describe('Get contract storage diff', () => {
     });
 
     it('Should get a single changed key in diff.getDiffFromStorage after changing a value in the same contract', async () => {
-        // set value at storage slot 0
+    // set value at storage slot 0
         await storageSrc.setA(1337);
         const tx = await storageSrc.setA(42);
         const blockNum = tx.blockNumber ?? await provider.getBlockNumber();
@@ -103,7 +103,7 @@ describe('Get contract storage diff', () => {
     });
 
     it('Should get a single changed key in diff.getDiffFromSrcContractTxs after changing a value in the same contract', async () => {
-        // set value at storage slot 0
+    // set value at storage slot 0
         await storageSrc.setA(1337);
         const tx = await storageSrc.setA(42);
         const blockNum = tx.blockNumber ?? await provider.getBlockNumber();
@@ -138,7 +138,7 @@ describe('Get contract storage diff', () => {
     });
 
     it('Should get all new changes through getDiffFromSrcBlockTxs', async () => {
-        // insert some values to fill the contract
+    // insert some values to fill the contract
         const inserts: any = [];
         for (let i = 0; i < 10; i += 1) {
             inserts.push(storageSrc.insert(i, 20));

@@ -1,20 +1,42 @@
 {
-  "extends": ["airbnb/base"],
+  "extends": [
+      "airbnb-base",
+      "airbnb-typescript/base"
+    ],
   "plugins": ["@typescript-eslint"],
   "parser": "@typescript-eslint/parser",
   "rules": {
-    "indent": ["error", 4],
+    "@typescript-eslint/indent": ["error", 4],
     "semi": ["error", "always"],
     "import/extensions": 0,
-    "camelcase": "off",
     "max-len": "off",
     "no-param-reassign": ["error", { "props": false }]
   },
+  "overrides": [
+      {
+          "files": [
+              "test/**/*-test.ts",
+              "evaluation/**/*"
+          ],
+          "rules": {
+            "@typescript-eslint/no-unused-expressions": "off"
+          }
+      },
+      {
+        "files": ["*.ts", "*.tsx"], // Your TypeScript files extension
+        "parserOptions": {
+          "project": ["./tsconfig.json"] // Specify it only for TypeScript files
+        }
+      }
+  ],
   "settings": {
     "import/resolver": {
       "node": {
-        "extensions": [".js", ".jsx", ".ts", ".tsx"]
+        "extensions": [".ts", ".tsx"]
       }
     }
+  },
+  "parserOptions": {
+      "project": "./tsconfig.json"
   }
 }

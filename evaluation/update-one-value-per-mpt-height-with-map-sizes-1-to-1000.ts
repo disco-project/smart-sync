@@ -81,7 +81,7 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
         logger.info('Gas used for updating 1 value in map with 1 value: ', migrationResult.receipt.gasUsed.toNumber());
 
         csvManager.pushData({
-            map_size: 1,
+            mapSize: 1,
             used_gas: migrationResult.receipt.gasUsed.toNumber(),
             max_mpt_depth: initialization.max_mpt_depth,
             value_mpt_depth: 1,
@@ -89,8 +89,8 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
     });
 
     it('Contract with map containing 10 values, update 1 value per mpt height', async () => {
-        const map_size = 10;
-        const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
+        const mapSize = 10;
+        const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
@@ -115,7 +115,7 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
 
             // add data to csv
             csvManager.pushData({
-                map_size,
+                mapSize,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
                 value_mpt_depth: i,
@@ -124,8 +124,8 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
     });
 
     it('Contract with map containing 100 values, update 1 value per mpt height', async () => {
-        const map_size = 100;
-        const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
+        const mapSize = 100;
+        const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
@@ -150,7 +150,7 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
 
             // add data to csv
             csvManager.pushData({
-                map_size,
+                mapSize,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
                 value_mpt_depth: i,
@@ -159,8 +159,8 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
     });
 
     it('Contract with map containing 1000 values, update 1 value per mpt height', async () => {
-        const map_size = 1000;
-        const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
+        const mapSize = 1000;
+        const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
         currBlockNr = await provider.getBlockNumber() + 1;
 
@@ -185,7 +185,7 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
 
             // add data to csv
             csvManager.pushData({
-                map_size,
+                mapSize,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
                 value_mpt_depth: i,

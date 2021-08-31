@@ -177,7 +177,7 @@ describe('Deploy proxy and logic contract', async () => {
     });
 
     it('should perform second iteration', async () => {
-        // change some previously synced values
+    // change some previously synced values
         await srcContract.insert(420, 53);
         await srcContract.insert(470, 93);
         await srcContract.insert(710, 83);
@@ -226,7 +226,7 @@ describe('Deploy proxy and logic contract', async () => {
     });
 
     it('should reject state changes via fallback called externally', async () => {
-        // Deploy Calling contract
+    // Deploy Calling contract
         const callRelayFactory = new CallRelayContract__factory(deployer);
         callRelayContract = await callRelayFactory.deploy(proxyContract.address);
 

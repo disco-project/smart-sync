@@ -1,3 +1,4 @@
+/* eslint-disable import/no-cycle */
 import BranchNode from './BranchNode';
 import ExtensionNode from './ExtensionNode';
 import LeafNode from './LeafNode';
@@ -9,7 +10,7 @@ export type StorageProof = {
     key: string;
     value: string;
     proof: string[];
-}
+};
 /**
  * Represents a account object
  */
@@ -18,7 +19,7 @@ export type Account = {
     balance: string;
     storageHash: string;
     codeHash: string;
-}
+};
 export type BlockHeader = {
     difficulty: string;
     extraData: string;
@@ -35,7 +36,7 @@ export type BlockHeader = {
     sha3Uncles: string;
     stateRoot: string;
     timestamp: number;
-}
+};
 /**
  * Represents the result of a [`eth_getProof`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1186.md) RPC request
  */

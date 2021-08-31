@@ -1,5 +1,6 @@
 import * as rlp from 'rlp';
 import LeafNode from './LeafNode';
+// eslint-disable-next-line import/no-cycle
 import { EmbeddedNode } from './Types';
 
 class BranchNode {
@@ -10,7 +11,7 @@ class BranchNode {
 
     children: (EmbeddedNode | null)[];
 
-    constructor(node: Buffer[], storageKey) {
+    constructor(node: Buffer[], storageKey: string) {
         this.node = node;
         this.children = new Array(17).fill(null);
         this.commonNodes = [];

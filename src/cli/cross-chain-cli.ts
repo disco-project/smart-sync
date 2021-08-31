@@ -162,9 +162,9 @@ migrationStatus
         logger.info(`migration-status: ${chainProxy.migrationState}`);
     });
 
-let get_curr_block_number = program.command('get-curr-blocknr') as Command;
-get_curr_block_number = commonOptions(get_curr_block_number);
-get_curr_block_number
+let getCurrBlockNumber = program.command('get-curr-blocknr') as Command;
+getCurrBlockNumber = commonOptions(getCurrBlockNumber);
+getCurrBlockNumber
     .alias('blocknr')
     .description('Get the synched block number of src chain for the provided proxy contract.')
     .arguments('<proxy_contract_address>')
@@ -196,9 +196,9 @@ get_curr_block_number
         logger.info(`Current synched block number: ${latestBlockNumber.toNumber()}`);
     });
 
-let state_diff = program.command('state-diff') as Command;
-state_diff = commonOptions(state_diff);
-state_diff
+let stateDiff = program.command('state-diff') as Command;
+stateDiff = commonOptions(stateDiff);
+stateDiff
     .alias('diff')
     .arguments('<source_contract_address> [proxy_contract_address]')
     .description('Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address has to be provided.')

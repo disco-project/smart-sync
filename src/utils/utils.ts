@@ -59,7 +59,7 @@ export function hexlify(input: string): string {
 }
 
 // binary search for block where contract was deployed
-export async function findDeploymentBlock(contract_address: string, provider: JsonRpcProvider = new ethers.providers.JsonRpcProvider((network.config as HttpNetworkConfig).url)): Promise<number> {
+export async function findDeploymentBlock(contractAddress: string, provider: JsonRpcProvider = new ethers.providers.JsonRpcProvider((network.config as HttpNetworkConfig).url)): Promise<number> {
     let low: number = 0;
     let high: number = await provider.getBlockNumber();
 
@@ -68,11 +68,11 @@ export async function findDeploymentBlock(contract_address: string, provider: Js
     while (low <= high) {
         mid = Math.trunc((low + high) / 2);
 
-        const curr_code = await provider.getCode(contract_address, mid);
+        const currCode = await provider.getCode(contractAddress, mid);
         // return mid if the smart contract was deployed on that block (previousBlock.getCode(smartContract) === none)
-        if (curr_code.length > 3 && (mid === 0 || (await provider.getCode(contract_address, mid - 1)).length < 4)) return mid;
+        if (currCode.length > 3 && (mid === 0 || (await provider.getCode(contractAddress, mid - 1)).length < 4)) return mid;
 
-        if (curr_code.length > 3) high = mid - 1;
+        if (currCode.length > 3) high = mid - 1;
 
         else low = mid + 1;
     }
@@ -108,7 +108,7 @@ export async function getAllKeys(contractAddress: string, provider = new ethers.
     return keys;
 }
 
-export function hex_to_ascii(str1) {
+export function hexToAscii(str1) {
     const hex = str1.toString();
     let str = '';
     for (let n = 0; n < hex.length; n += 2) {
@@ -121,35 +121,35 @@ export async function createDeployingByteCode(srcAddress: string, provider: Json
     let code: string = await provider.getCode(srcAddress);
     code = code.substring(2); // remove 0x
 
-    let deploy_code = EVMOpcodes.contractByteCodeDeploymentPreamble;
+    let deployCode = EVMOpcodes.contractByteCodeDeploymentPreamble;
     const pushOpCodeInt = parseInt(EVMOpcodes.PUSH1, 16);
 
     // Create Contract code deployment code
-    let code_length: string = (code.length / 2).toString(16); // in hex
+    let codeLength: string = (code.length / 2).toString(16); // in hex
 
-    code_length = (code_length.length % 2) ? `0${code_length}` : code_length;
-    const code_length_length: number = code_length.length / 2;
+    codeLength = (codeLength.length % 2) ? `0${codeLength}` : codeLength;
+    const codeLengthLength: number = codeLength.length / 2;
 
-    deploy_code += (pushOpCodeInt + code_length_length - 1).toString(16);
-    deploy_code += code_length;
-    deploy_code += EVMOpcodes.DUP1;
+    deployCode += (pushOpCodeInt + codeLengthLength - 1).toString(16);
+    deployCode += codeLength;
+    deployCode += EVMOpcodes.DUP1;
 
-    let deploy_code_length: string = ((deploy_code.length / 2) + 9).toString(16);
-    deploy_code_length = (deploy_code_length.length % 2) ? `0${deploy_code_length}` : deploy_code_length;
+    let deployCodeLength: string = ((deployCode.length / 2) + 9).toString(16);
+    deployCodeLength = (deployCodeLength.length % 2) ? `0${deployCodeLength}` : deployCodeLength;
     // Check length of code length and add length accordingly
-    deploy_code_length = ((deploy_code_length.length / 2) - 1 + (parseInt(deploy_code_length, 16))).toString(16);
-    deploy_code_length = (deploy_code_length.length % 2) ? `0${deploy_code_length}` : deploy_code_length;
-    deploy_code += (pushOpCodeInt + deploy_code_length.length / 2 - 1).toString(16);
-    deploy_code += deploy_code_length;
-    deploy_code += EVMOpcodes.PUSH1;
-    deploy_code += '00';
-    deploy_code += EVMOpcodes.CODECOPY;
-    deploy_code += EVMOpcodes.PUSH1;
-    deploy_code += '00';
-    deploy_code += EVMOpcodes.RETURN;
-    deploy_code += EVMOpcodes.STOP;
+    deployCodeLength = ((deployCodeLength.length / 2) - 1 + (parseInt(deployCodeLength, 16))).toString(16);
+    deployCodeLength = (deployCodeLength.length % 2) ? `0${deployCodeLength}` : deployCodeLength;
+    deployCode += (pushOpCodeInt + deployCodeLength.length / 2 - 1).toString(16);
+    deployCode += deployCodeLength;
+    deployCode += EVMOpcodes.PUSH1;
+    deployCode += '00';
+    deployCode += EVMOpcodes.CODECOPY;
+    deployCode += EVMOpcodes.PUSH1;
+    deployCode += '00';
+    deployCode += EVMOpcodes.RETURN;
+    deployCode += EVMOpcodes.STOP;
 
-    deploy_code += code;
+    deployCode += code;
 
-    return deploy_code;
+    return deployCode;
 }

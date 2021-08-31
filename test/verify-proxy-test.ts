@@ -31,7 +31,7 @@ describe('Verify State proof', () => {
     });
 
     it('Should read correct storage after transactions', async () => {
-        // assign a value to `a`
+    // assign a value to `a`
         const newValue = 1337;
         expect(await storage.setA(newValue)).to.exist;
         const keys = await provider.send('parity_listStorageKeys', [

@@ -1,5 +1,4 @@
 /* eslint-env mocha */
-/* eslint-disable no-unused-expressions */
 import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
 import { JsonRpcProvider } from '@ethersproject/providers';
@@ -42,10 +41,10 @@ describe('New Initialization', async () => {
     });
 
     it('Contract with map containing 1000 values, update 20 values', async () => {
-        const map_size = 1000;
+        const mapSize = 1000;
         let initialization: InitializationResult;
         try {
-            initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
+            initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
             expect(initialization.migrationState).to.be.true;
         } catch (e) {
             logger.fatal(e);

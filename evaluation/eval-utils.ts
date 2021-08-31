@@ -6,14 +6,14 @@ export interface CSVDataTemplateSingleValue extends CSVDataTemplatePerMTHeight {
 }
 
 export interface CSVDataTemplateMultipleValues {
-    map_size: number;
+    mapSize: number;
     changed_value_count: number;
     max_mpt_depth: number;
     used_gas: number;
 }
 
 export interface CSVDataTemplatePerMTHeight {
-    map_size: number;
+    mapSize: number;
     value_mpt_depth: number | undefined; 
     max_mpt_depth: number;
     used_gas: number;

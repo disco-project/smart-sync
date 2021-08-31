@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import { logger } from './logger';
 
-export class FileHandler {
+class FileHandler {
     private filePath: string;
 
     constructor(filePath: string) {

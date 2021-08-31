@@ -11,17 +11,17 @@ type KeyObject = {
         'to': string
     },
     '+'?: string
-}
+};
 
 export type ParityResponseData = {
     stateDiff: {
-        [ contract_address: string ]: {
+        [ contractAddress: string ]: {
             storage: {
                 [ key: string ] : KeyObject
             }
         };
     }
-}
+};
 
 class TransactionHandler {
     private contractAddress: string;
@@ -83,7 +83,7 @@ class TransactionHandler {
 
     async getTransactions(latest_block_number: number | string, earliest_block_number?: number | string): Promise<Array<string>> {
         logger.debug('Called getTransactions');
-        const contract_address: string = this.contractAddress.toUpperCase();
+        const contractAddress: string = this.contractAddress.toUpperCase();
         const relatedTransactions: Array<string> = [];
         let latest = latest_block_number;
         if (typeof (latest) === 'string') latest = await toBlockNumber(latest);
@@ -115,7 +115,7 @@ class TransactionHandler {
         const receiptPromises: Array<Promise<TransactionReceipt>> = [];
         transactions.forEach((tx) => {
             if (tx.to) {
-                if (tx.to.toUpperCase() === contract_address) {
+                if (tx.to.toUpperCase() === contractAddress) {
                     relatedTransactions.push(tx.hash);
                 }
             } else {
@@ -125,7 +125,7 @@ class TransactionHandler {
 
         const receipts = await Promise.all(receiptPromises);
         receipts.forEach((receipt) => {
-            if (receipt.contractAddress && receipt.contractAddress.toUpperCase() === contract_address) {
+            if (receipt.contractAddress && receipt.contractAddress.toUpperCase() === contractAddress) {
                 relatedTransactions.push(receipt.transactionHash);
                 logger.debug('receipt address: ', receipt.contractAddress);
             }

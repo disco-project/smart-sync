@@ -81,7 +81,7 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
         logger.info('Gas used for updating 1 value in map with 1 value: ', migrationResult.receipt.gasUsed.toNumber());
 
         csvManager.pushData({
-            map_size: 1,
+            mapSize: 1,
             changed_value_index: 0,
             used_gas: migrationResult.receipt.gasUsed.toNumber(),
             max_mpt_depth: initialization.max_mpt_depth,
@@ -90,13 +90,13 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
     });
 
     it('Contract with map containing 10 values, update 1 value per iteration', async () => {
-        const map_size = 10;
-        const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
+        const mapSize = 10;
+        const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
         logger.debug(`correct storage root: ${initialization.initialValuesProof.storageHash}`);
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 0; i < map_size; i += 1) {
+        for (let i = 0; i < mapSize; i += 1) {
             // change previous synced value
             const result = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
             expect(result).to.be.true;
@@ -113,26 +113,26 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
                 process.exit(-1);
             }
 
-            logger.info(`Gas used for updating 1 value in map with ${map_size} values: `, migrationResult.receipt.gasUsed.toNumber());
+            logger.info(`Gas used for updating 1 value in map with ${mapSize} values: `, migrationResult.receipt.gasUsed.toNumber());
 
             csvManager.pushData({
-                map_size,
+                mapSize,
                 changed_value_index: i,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
-                value_mpt_depth: migrationResult.max_value_mpt_depth,
+                value_mpt_depth: migrationResult.maxValueMptDepth,
             });
         }
     });
 
     it('Contract with map containing 100 values, update 1 value per iteration', async () => {
-        const map_size = 100;
-        const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
+        const mapSize = 100;
+        const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
         logger.debug(`correct storage root: ${initialization.initialValuesProof.storageHash}`);
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 0; i < map_size; i += 1) {
+        for (let i = 0; i < mapSize; i += 1) {
             // change previous synced value
             const result = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
             expect(result).to.be.true;
@@ -149,26 +149,26 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
                 process.exit(-1);
             }
 
-            logger.info(`Gas used for updating 1 value in map with ${map_size} values: `, migrationResult.receipt.gasUsed.toNumber());
+            logger.info(`Gas used for updating 1 value in map with ${mapSize} values: `, migrationResult.receipt.gasUsed.toNumber());
 
             csvManager.pushData({
-                map_size,
+                mapSize,
                 changed_value_index: i,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
-                value_mpt_depth: migrationResult.max_value_mpt_depth,
+                value_mpt_depth: migrationResult.maxValueMptDepth,
             });
         }
     });
 
     it('Contract with map containing 1000 values, update 1 value per iteration', async () => {
-        const map_size = 1000;
-        const initialization = await chainProxy.initializeProxyContract(map_size, MAX_VALUE);
+        const mapSize = 1000;
+        const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
         logger.debug(`correct storage root: ${initialization.initialValuesProof.storageHash}`);
         currBlockNr = await provider.getBlockNumber() + 1;
 
-        for (let i = 0; i < map_size; i += 1) {
+        for (let i = 0; i < mapSize; i += 1) {
             // change previous synced value
             const result = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
             expect(result).to.be.true;
@@ -186,14 +186,14 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
                 process.exit(-1);
             }
 
-            logger.info(`Gas used for updating 1 value in map with ${map_size} values: `, migrationResult.receipt.gasUsed.toNumber());
+            logger.info(`Gas used for updating 1 value in map with ${mapSize} values: `, migrationResult.receipt.gasUsed.toNumber());
 
             csvManager.pushData({
-                map_size,
+                mapSize,
                 changed_value_index: i,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
-                value_mpt_depth: migrationResult.max_value_mpt_depth,
+                value_mpt_depth: migrationResult.maxValueMptDepth,
             });
         }
     });

@@ -48,7 +48,7 @@ describe('Test scaling of contract', async () => {
     });
 
     it('Contract with map containing 1 value, update 1 value', async () => {
-        // insert some random values
+    // insert some random values
         const initialization = await chainProxy.initializeProxyContract(1, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
 
@@ -79,7 +79,7 @@ describe('Test scaling of contract', async () => {
     });
 
     it('Contract with map containing 10 values, update 1 value', async () => {
-        // insert some random values
+    // insert some random values
         const initialization = await chainProxy.initializeProxyContract(10, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
 
@@ -110,7 +110,7 @@ describe('Test scaling of contract', async () => {
     });
 
     it('Contract with map containing 10 values, update first 5 values', async () => {
-        // insert some random values
+    // insert some random values
         const initialization = await chainProxy.initializeProxyContract(10, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
 
@@ -141,7 +141,7 @@ describe('Test scaling of contract', async () => {
     });
 
     it('Contract with map containing 10 values, update last 5 values', async () => {
-        // insert some random values
+    // insert some random values
         const initialization = await chainProxy.initializeProxyContract(10, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
 
@@ -172,7 +172,7 @@ describe('Test scaling of contract', async () => {
     });
 
     it('Contract with map containing 10 values, update 10 values', async () => {
-        // insert some random values
+    // insert some random values
         const initialization = await chainProxy.initializeProxyContract(10, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
 
