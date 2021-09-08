@@ -18,7 +18,7 @@ npm i -g
 
 Under `./config` you can find the default configuration for the cli. Adjust the fields according to your needs or pass them as options in the command line
 
-To execute tests, please refer to the [test](##Tests) section.
+To execute tests, please refer to the [test](#tests) section.
 
 ## Usage 
 
