@@ -65,17 +65,17 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
         currBlockNr = await provider.getBlockNumber() + 1;
 
         for (let i = 0; i < mapSize; i += 1) {
-            const value_count = i + 1;
+            const valueCount = i + 1;
 
             // changing values at srcContract
-            const result = await chainProxy.changeDeepestValues(value_count, MAX_VALUE);
+            const result = await chainProxy.changeDeepestValues(valueCount, MAX_VALUE);
             expect(result).to.be.true;
 
             // migrate changes to proxy contract
             // get the diff set, the storage keys for the changed values
             const diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
             const changedKeys: Array<BigNumberish> = diff.getKeys();
-            logger.debug(`valueCount: ${value_count}, changedKeys: ${changedKeys.length}`);
+            logger.debug(`valueCount: ${valueCount}, changedKeys: ${changedKeys.length}`);
             currBlockNr = await provider.getBlockNumber() + 1;
             const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
             expect(migrationResult.migrationResult).to.be.true;
@@ -84,13 +84,13 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
                 process.exit(-1);
             }
 
-            logger.info(`Gas used for updating ${value_count} values in contract with max depth ${initialization.max_mpt_depth}: `, migrationResult.receipt.gasUsed.toNumber());
+            logger.info(`Gas used for updating ${valueCount} values in contract with max depth ${initialization.max_mpt_depth}: `, migrationResult.receipt.gasUsed.toNumber());
 
             // add data to csv
             csvManager.pushData({
                 mapSize,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
-                changed_value_count: value_count,
+                changed_value_count: valueCount,
                 max_mpt_depth: initialization.max_mpt_depth,
             });
         }
@@ -103,17 +103,17 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
         currBlockNr = await provider.getBlockNumber() + 1;
 
         for (let i = 0; i < mapSize; i += 1) {
-            const value_count = i + 1;
+            const valueCount = i + 1;
 
             // changing values at srcContract
-            const result = await chainProxy.changeDeepestValues(value_count, MAX_VALUE);
+            const result = await chainProxy.changeDeepestValues(valueCount, MAX_VALUE);
             expect(result).to.be.true;
 
             // migrate changes to proxy contract
             // get the diff set, the storage keys for the changed values
             const diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
             const changedKeys: Array<BigNumberish> = diff.getKeys();
-            logger.debug(`valueCount: ${value_count}, changedKeys: ${changedKeys.length}`);
+            logger.debug(`valueCount: ${valueCount}, changedKeys: ${changedKeys.length}`);
             currBlockNr = await provider.getBlockNumber() + 1;
             const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
             expect(migrationResult.migrationResult).to.be.true;
@@ -122,13 +122,13 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
                 process.exit(-1);
             }
 
-            logger.info(`Gas used for updating ${value_count} values in contract with max depth ${initialization.max_mpt_depth}: `, migrationResult.receipt.gasUsed.toNumber());
+            logger.info(`Gas used for updating ${valueCount} values in contract with max depth ${initialization.max_mpt_depth}: `, migrationResult.receipt.gasUsed.toNumber());
 
             // add data to csv
             csvManager.pushData({
                 mapSize,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
-                changed_value_count: value_count,
+                changed_value_count: valueCount,
                 max_mpt_depth: initialization.max_mpt_depth,
             });
         }
@@ -141,17 +141,17 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
         currBlockNr = await provider.getBlockNumber() + 1;
 
         for (let i = 0; i < MAX_CHANGED_VALUES; i += 1) {
-            const value_count = i + 1;
+            const valueCount = i + 1;
 
             // changing values at srcContract
-            const result = await chainProxy.changeDeepestValues(value_count, MAX_VALUE);
+            const result = await chainProxy.changeDeepestValues(valueCount, MAX_VALUE);
             expect(result).to.be.true;
 
             // migrate changes to proxy contract
             // get the diff set, the storage keys for the changed values
             const diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
             const changedKeys: Array<BigNumberish> = diff.getKeys();
-            logger.debug(`valueCount: ${value_count}, changedKeys: ${changedKeys.length}`);
+            logger.debug(`valueCount: ${valueCount}, changedKeys: ${changedKeys.length}`);
             currBlockNr = await provider.getBlockNumber() + 1;
             const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
             expect(migrationResult.migrationResult).to.be.true;
@@ -160,13 +160,13 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
                 process.exit(-1);
             }
 
-            logger.info(`Gas used for updating ${value_count} values in contract with max depth ${initialization.max_mpt_depth}: `, migrationResult.receipt.gasUsed.toNumber());
+            logger.info(`Gas used for updating ${valueCount} values in contract with max depth ${initialization.max_mpt_depth}: `, migrationResult.receipt.gasUsed.toNumber());
 
             // add data to csv
             csvManager.pushData({
                 mapSize,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
-                changed_value_count: value_count,
+                changed_value_count: valueCount,
                 max_mpt_depth: initialization.max_mpt_depth,
             });
         }

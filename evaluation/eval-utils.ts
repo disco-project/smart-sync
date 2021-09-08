@@ -14,14 +14,16 @@ export interface CSVDataTemplateMultipleValues {
 
 export interface CSVDataTemplatePerMTHeight {
     mapSize: number;
-    value_mpt_depth: number | undefined; 
+    value_mpt_depth: number | undefined;
     max_mpt_depth: number;
     used_gas: number;
 }
 
 export class CSVManager<T> {
     private dir: string = './evaluation/csv-files';
+
     private fileName: string;
+
     private data: Array<T>;
 
     constructor(fileName: string) {
@@ -34,17 +36,17 @@ export class CSVManager<T> {
     }
 
     async writeTofile() {
-        // turn "Sun May 30 2021 18:19:20 +0200 (Central European Summer Time)" 
+        // turn "Sun May 30 2021 18:19:20 +0200 (Central European Summer Time)"
         // into "Sun_May_30_2021_18:19:20"
-        let timeString = new Date().toString().replace(/ GMT[\w\W]+/g, '').replace(/\s/g, '_');
-        
-        return new Promise(resolve => {
+        const timeString = new Date().toString().replace(/ GMT[\w\W]+/g, '').replace(/\s/g, '_');
+
+        return new Promise((resolve) => {
             const writeStream = fs.createWriteStream(`${this.dir}/${timeString}_${this.fileName}`);
             const csvStringifier = stringify(this.data, { header: true });
 
             writeStream.on('finish', () => {
                 resolve(resolve);
-            })
+            });
             csvStringifier.pipe(writeStream);
         });
     }

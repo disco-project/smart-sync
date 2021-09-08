@@ -8,7 +8,7 @@ module.exports = (grunt) => {
     grunt.initConfig({
         pkg: grunt.file.readJSON('package.json'),
         eslint: {
-            target: ['src/**/*.ts', 'test/**/*.ts'],
+            target: ['src/**/*.ts', 'test/**/*.ts', 'evaluation/**/*.ts'],
             options: {
                 maxWarnings: 5,
                 fix: true,
