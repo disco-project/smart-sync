@@ -1,22 +1,24 @@
 # Getting started
 
-## Prerequirements
-
-Before you can run the CLI, you need `ts-node` installed globally:
-```bash
-npm i ts-node -g
-```
-
 ## Installation
 
-Then, install the cli with the following commands:
+First, install the project and compile all required components:
 ```bash
 npm i
 npx hardhat compile
+```
+
+## CLI
+
+To use the command line interface, `ts-node` and the project must be installed globally:
+```bash
+npm i ts-node -g
 npm i -g
 ```
 
 Under `./config` you can find the default configuration for the cli. Adjust the fields according to your needs or pass them as options in the command line
+
+To execute tests, please refer to the [test](##Tests) section.
 
 ## Usage 
 
@@ -142,13 +144,6 @@ $ cross-chain-cli diff 0x20a508640B446990c781Cd541B9a2828ACA3a350 0xf8f22ab160e8
 
 This project uses [hardhat](https://hardhat.org/getting-started/) and [ethers](https://docs.ethers.io/v5/). 
 
-To start the chain [see](../README.md)
-
-To compile all the contracts and files run.
-
-```bash
-npx hardhat compile
-```
 
 ## Linter
 We use the code style from [airbnb](https://www.npmjs.com/package/eslint-config-airbnb-base).
@@ -159,6 +154,8 @@ $ grunt eslint
 ```
 
 ## Tests
+For test purposes, we provide a preconfigured openethereum test network that can be started using Docker. Please check the [chain](chain/README.md) folder for further details.
+
 To run all the tests run (requires a running ethereum node, see [hardhat.config.ts](./hardhat.config.ts) and [hardhat.org/config](https://hardhat.org/config/)):
 
 ```bash
