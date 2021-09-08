@@ -1,10 +1,19 @@
 # Getting started
 
+## Prerequirements
+
+Before you can run the CLI, you need `ts-node` installed globally:
+```bash
+npm i ts-node -g
+```
+
 ## Installation
 
 Then, install the cli with the following commands:
 ```bash
-npm i && npx grunt install
+npm i
+npx hardhat compile
+npm i -g
 ```
 
 Under `./config` you can find the default configuration for the cli. Adjust the fields according to your needs or pass them as options in the command line
