@@ -260,6 +260,7 @@ export class ChainProxy {
             proxyValues.push(ethers.utils.hexZeroPad(storageProof.value, 32));
         });
 
+        // todo adjust batch according to gas estimations
         const storageAdds: any = [];
         while (proxyKeys.length > 0) {
             storageAdds.push(this.proxyContract.addStorage(proxyKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));

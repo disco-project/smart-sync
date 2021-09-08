@@ -4,6 +4,8 @@ import { BigNumber } from '@ethersproject/bignumber';
 import { ConnectionInfo } from '@ethersproject/web';
 import { Command, Option } from 'commander';
 import { TLogLevelName } from 'tslog';
+import * as CRON from 'node-cron';
+import { SIGTERM } from 'constants';
 import {
     ChainProxy, ContractAddressMap, RPCConfig, GetDiffMethod,
 } from '../chain-proxy';
@@ -81,6 +83,76 @@ function overrideFileOptions<T>(filePath: string, options: ConfigTypish): T {
 program
     .version('0.1.0')
     .description('cross chain contracts CLI');
+
+// continuous state update command
+let continuousSynch: Command = program.command('continuous-synch') as Command;
+continuousSynch = commonOptions(continuousSynch);
+continuousSynch
+    .alias('c')
+    .description('Periodically synch state updates.')
+    .argument('<proxy_contract_address>')
+    .argument('<period>', 'Define the updating period. Be sure to pass the period within " (Example: "*/2 * * * *"). The crontab syntax is based on the GNU crontab syntax. For information visit https://www.npmjs.com/package/node-cron.')
+    .option('--gas-limit <limit>')
+    .addOption(
+        new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr.')
+            .choices(['storage', 'srcTx']),
+    )
+    .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
+    .action(async (proxyContract: string, period: string, options: TxContractInteractionOptions) => {
+        if (!CRON.validate(period)) {
+            logger.error(`No valid period given (${period}). See --help for more information (description of argument period)`);
+            process.exit(-1);
+        }
+        let adjustedOptions = options;
+        // override options here if config file was added
+        if (adjustedOptions.configFile) {
+            adjustedOptions = overrideFileOptions<TxContractInteractionOptions>(adjustedOptions.configFile, adjustedOptions);
+        }
+        logger.setSettings({ minLevel: adjustedOptions.logLevel });
+
+        const contractAddressMap: ContractAddressMap = {
+            proxyContract,
+        };
+        const srcConnectionInfo: ConnectionInfo = {
+            url: adjustedOptions.srcChainUrl,
+            timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
+        };
+        const targetConnectionInfo: ConnectionInfo = {
+            url: adjustedOptions.targetChainUrl,
+            timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
+        };
+        const rpcConfig: RPCConfig = {
+            gasLimit: adjustedOptions.gasLimit,
+        };
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, targetConnectionInfo, rpcConfig);
+        await chainProxy.init();
+
+        // if cli is called as a child process, this will be used to kill it.
+        process.on('message', (m) => {
+            if (m === SIGTERM) {
+                process.exit(0);
+            }
+        });
+
+        // todo adjust batches according to gas estimation and gas-limit
+        CRON.schedule(period, async () => {
+            const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
+            if (!changedKeys) {
+                logger.error('Could not get changed keys');
+                return;
+            }
+            const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys());
+            if (synchronized) {
+                logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
+            } else {
+                logger.error('Could not synch changes.');
+            }
+
+            // update compared blocks
+            adjustedOptions.srcBlocknr = adjustedOptions.diffMode === 'srcTx' ? (await chainProxy.getCurrentBlockNumber()).add(1).toString() : 'latest';
+            adjustedOptions.targetBlocknr = undefined;
+        });
+    });
 
 // fork command
 let fork: Command = program.command('fork') as Command;

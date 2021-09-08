@@ -1,5 +1,3 @@
-/* eslint-env mocha */
-/* eslint-disable no-unused-expressions */
 import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
