@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity >=0.5.0 <0.8.0;
+pragma solidity >=0.6.0 <0.8.0;
 
 import "./contracts/RelayContract.sol";
 import "./contracts/GetProofLib.sol";
@@ -160,7 +160,7 @@ contract ProxyContract {
      * @dev Fallback function that delegates calls to the address returned by `_implementation()`. Will run if no other
      * function in the contract matches the call data.
      */
-    function fallback() external payable {
+    fallback() external payable {
         _fallback();
     }
 

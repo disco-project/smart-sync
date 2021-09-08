@@ -1,8 +1,19 @@
 import stringify from 'csv-stringify';
+import { BigNumberish, ethers } from 'ethers';
 import fs from 'fs';
+import * as rlp from 'rlp';
+import { StorageProof } from '../src/verify-proof';
 
+export interface CSVDataTemplateBasicMTEdge {
+    from: string;
+    to: string;
+}
+export interface CSVDataTemplateSingleValueMultiple extends CSVDataTemplateSingleValue {
+    iteration: number | undefined;
+}
 export interface CSVDataTemplateSingleValue extends CSVDataTemplatePerMTHeight {
     changed_value_index: number | undefined;
+    extensionsCounter: number;
 }
 
 export interface CSVDataTemplateMultipleValues {
@@ -10,6 +21,7 @@ export interface CSVDataTemplateMultipleValues {
     changed_value_count: number;
     max_mpt_depth: number;
     used_gas: number;
+    sequential: Boolean;
 }
 
 export interface CSVDataTemplatePerMTHeight {
@@ -50,4 +62,28 @@ export class CSVManager<T> {
             csvStringifier.pipe(writeStream);
         });
     }
+}
+
+export function getExtensionsAmountLeadingToValue(value: BigNumberish | undefined, storageProofs: StorageProof[] | undefined): number {
+    if (value === undefined || storageProofs === undefined) {
+        return 0;
+    }
+
+    // find proof with value
+    const storageProof = storageProofs.find((proof: StorageProof) => ethers.BigNumber.from(proof.value).eq(ethers.BigNumber.from(value)));
+
+    if (storageProof === undefined) {
+        return 0;
+    }
+
+    // count extensions
+    let extensionsCounter = 0;
+    storageProof.proof.forEach((encodedString: string, index: number) => {
+        const node = rlp.decode(encodedString);
+        if ((node as Buffer[]).length === 2 && index !== storageProof.proof.length - 1) {
+            extensionsCounter += 1;
+        }
+    });
+
+    return extensionsCounter;
 }

@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity >=0.5.0 <0.8.0;
+pragma solidity >=0.6.0 <0.8.0;
 
 import '../ProxyContract.sol';
 import './GetProofLib.sol';
@@ -74,7 +74,7 @@ contract RelayContract {
     /**
     * @dev Used to access the Proxy's abi
     */
-    function getProxy(address proxyAddress) internal pure returns (ProxyContract) {
+    function getProxy(address payable proxyAddress) internal pure returns (ProxyContract) {
         return ProxyContract(proxyAddress);
     }
 
@@ -87,7 +87,7 @@ contract RelayContract {
     * @param proxyChainBlockNumber block number from the proxy chain block header, this is needed because the blockNumber in the header is a hex string
     * @param srcChainBlockNumber block number from the src chain from which we take the stateRoot from the srcContract
     */
-    function verifyMigrateContract(bytes memory sourceAccountProof, bytes memory proxyAccountProof, bytes memory proxyChainBlockHeader, address proxyAddress, uint proxyChainBlockNumber, uint srcChainBlockNumber) public {
+    function verifyMigrateContract(bytes memory sourceAccountProof, bytes memory proxyAccountProof, bytes memory proxyChainBlockHeader, address payable proxyAddress, uint proxyChainBlockNumber, uint srcChainBlockNumber) public {
         GetProofLib.BlockHeader memory blockHeader = GetProofLib.parseBlockHeader(proxyChainBlockHeader);
 
         // compare block header hashes

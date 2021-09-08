@@ -1,20 +1,17 @@
-/* eslint-disable no-await-in-loop */
-/* eslint-disable import/no-extraneous-dependencies */
-/* eslint-env mocha */
-/* eslint-disable no-unused-expressions */
-import { ethers, network } from 'hardhat';
+import { ethers } from 'ethers';
+import { network } from 'hardhat';
 import { expect } from 'chai';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { HttpNetworkConfig } from 'hardhat/types';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumberish } from '@ethersproject/bignumber';
-import { logger } from '../src/utils/logger';
-import { TestChainProxy } from '../test/test-utils';
-import { CSVDataTemplateSingleValue, CSVManager } from './eval-utils';
+import { ChangeValueAtIndexResult, MigrationResult, TestChainProxy } from '../test/test-utils';
+import { CSVDataTemplateSingleValue, CSVManager, getExtensionsAmountLeadingToValue } from './eval-utils';
 import {
     RelayContract__factory, MappingContract, MappingContract__factory, RelayContract,
 } from '../src-gen/types';
 import DiffHandler from '../src/diffHandler/DiffHandler';
+import { logger } from '../src/utils/logger';
 import StorageDiff from '../src/diffHandler/StorageDiff';
 
 const MAX_VALUE = 1000000;
@@ -45,7 +42,7 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
     });
 
     beforeEach(async () => {
-        [deployer] = await ethers.getSigners();
+        deployer = await SignerWithAddress.create(provider.getSigner());
         factory = new MappingContract__factory(deployer);
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
@@ -64,7 +61,7 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
         currBlockNr = await provider.getBlockNumber() + 1;
 
         // change all the previous synced values
-        await chainProxy.changeValueAtIndex(0, MAX_VALUE);
+        const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(0, MAX_VALUE);
 
         // migrate changes to proxy contract
         // get the diff set, the storage keys for the changed values
@@ -78,9 +75,12 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
             process.exit(-1);
         }
 
-        logger.info('Gas used for updating 1 value in map with 1 value: ', migrationResult.receipt.gasUsed.toNumber());
+        const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs?.storageProof);
+
+        logger.info(`Update value at ${1}, mapSize: ${1}, value_depth: ${migrationResult.maxValueMptDept}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
 
         csvManager.pushData({
+            extensionsCounter,
             mapSize: 1,
             changed_value_index: 0,
             used_gas: migrationResult.receipt.gasUsed.toNumber(),
@@ -98,8 +98,8 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
 
         for (let i = 0; i < mapSize; i += 1) {
             // change previous synced value
-            const result = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
-            expect(result).to.be.true;
+            const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
+            expect(result.success).to.be.true;
 
             // migrate changes to proxy contract
             // get the diff set, the storage keys for the changed values
@@ -107,20 +107,23 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
             const changedKeys: Array<BigNumberish> = diff.getKeys();
             logger.debug(changedKeys);
             currBlockNr = await provider.getBlockNumber() + 1;
-            const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
+            const migrationResult: MigrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
             if (!migrationResult.receipt) {
                 logger.fatal('No receipt provided');
                 process.exit(-1);
             }
 
-            logger.info(`Gas used for updating 1 value in map with ${mapSize} values: `, migrationResult.receipt.gasUsed.toNumber());
+            const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs?.storageProof);
+
+            logger.info(`Update value at ${i}, mapSize: ${mapSize}, value_depth: ${migrationResult.maxValueMptDept}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
 
             csvManager.pushData({
+                extensionsCounter,
                 mapSize,
                 changed_value_index: i,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
-                value_mpt_depth: migrationResult.maxValueMptDepth,
+                value_mpt_depth: migrationResult.maxValueMptDept,
             });
         }
     });
@@ -134,8 +137,8 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
 
         for (let i = 0; i < mapSize; i += 1) {
             // change previous synced value
-            const result = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
-            expect(result).to.be.true;
+            const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
+            expect(result.success).to.be.true;
 
             // migrate changes to proxy contract
             // get the diff set, the storage keys for the changed values
@@ -149,14 +152,17 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
                 process.exit(-1);
             }
 
-            logger.info(`Gas used for updating 1 value in map with ${mapSize} values: `, migrationResult.receipt.gasUsed.toNumber());
+            const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs?.storageProof);
+
+            logger.info(`Update value at ${i}, mapSize: ${mapSize}, value_depth: ${migrationResult.maxValueMptDept}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
 
             csvManager.pushData({
+                extensionsCounter,
                 mapSize,
                 changed_value_index: i,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
-                value_mpt_depth: migrationResult.maxValueMptDepth,
+                value_mpt_depth: migrationResult.maxValueMptDept,
             });
         }
     });
@@ -170,8 +176,8 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
 
         for (let i = 0; i < mapSize; i += 1) {
             // change previous synced value
-            const result = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
-            expect(result).to.be.true;
+            const result: ChangeValueAtIndexResult = await chainProxy.changeValueAtIndex(i, MAX_VALUE);
+            expect(result.success).to.be.true;
 
             // migrate changes to proxy contract
             // get the diff set, the storage keys for the changed values
@@ -186,14 +192,17 @@ describe('update-one-value-with-map-sizes-1-1000', async () => {
                 process.exit(-1);
             }
 
-            logger.info(`Gas used for updating 1 value in map with ${mapSize} values: `, migrationResult.receipt.gasUsed.toNumber());
+            const extensionsCounter = getExtensionsAmountLeadingToValue(result.newValue, migrationResult.proofs?.storageProof);
+
+            logger.info(`Update value at ${i}, mapSize: ${mapSize}, value_depth: ${migrationResult.maxValueMptDept}, extensionsCounter: ${extensionsCounter}, gas_cost:`, migrationResult.receipt.gasUsed.toNumber());
 
             csvManager.pushData({
+                extensionsCounter,
                 mapSize,
                 changed_value_index: i,
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
-                value_mpt_depth: migrationResult.maxValueMptDepth,
+                value_mpt_depth: migrationResult.maxValueMptDept,
             });
         }
     });

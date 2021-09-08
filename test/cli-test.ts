@@ -195,7 +195,7 @@ describe('Test CLI', async () => {
 
         // insert some new values
         const changedValues = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);
-        expect(changedValues).to.be.true;
+        expect(changedValues.success).to.be.true;
 
         const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${synchCommand}`);
@@ -288,7 +288,7 @@ describe('Test CLI', async () => {
 
         // insert some new values
         const changedValues = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);
-        expect(changedValues).to.be.true;
+        expect(changedValues.success).to.be.true;
 
         const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} --diff-mode storage -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${synchCommand}`);
@@ -443,7 +443,7 @@ describe('Test CLI', async () => {
 
         // insert some new values
         const addedValue = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);
-        expect(addedValue).to.be.true;
+        expect(addedValue.success).to.be.true;
 
         diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${diffCommand}`);
@@ -575,7 +575,7 @@ describe('Test CLI', async () => {
 
         // insert some new values
         const addedValue = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);
-        expect(addedValue).to.be.true;
+        expect(addedValue.success).to.be.true;
 
         diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} --diff-mode storage -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${diffCommand}`);
