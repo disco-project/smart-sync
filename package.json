@@ -39,7 +39,9 @@
     "ts-node": "^10.2.1",
     "tslog": "^3.2.1",
     "typechain": "^4.0.3",
-    "web3": "^1.5.2"
+    "web3": "^1.5.2",
+    "grunt": "^1.4.1",
+    "grunt-cli": "^1.4.3"
   },
   "devDependencies": {
     "@ethersproject/abi": "^5.0.8",
