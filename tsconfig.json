@@ -1,0 +1,20 @@
+{
+    "extends": "@tsconfig/node14/tsconfig.json",
+    "compilerOptions": {
+        "declaration": true,
+        "noImplicitAny": false,
+        "strictPropertyInitialization": false,
+        "outDir": "dist",
+        "removeComments": true,
+        "sourceMap": true,
+        "resolveJsonModule": true
+    },
+    "ts-node": {
+        // It is faster to skip typechecking.
+        "transpileOnly": true,
+    
+        "files": true
+    },
+    "include": ["src/**/*", "./test", "./evaluation/**/*"],
+    "exclude": ["node_modules", "chain", "config", "hardhat_scripts", "src-gen", "**/*.js"]
+}
