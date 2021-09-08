@@ -7,12 +7,12 @@
     "cross-chain-cli": "./src/cli/cross-chain-cli.ts"
   },
   "scripts": {
-    "compile-contracts": "grunt compile-contracts",
+    "compile-contracts": "npx grunt compile-contracts",
     "start": "ts-node-dev --respawn src/cli/cross-chain-cli.ts",
     "refresh": "rm -rf ./node_modules ./package-lock.json && npm install",
-    "test": "grunt full-pipeline --force",
-    "lint": "grunt eslint",
-    "evaluate": "grunt full-pipeline-evaluation --force"
+    "test": "npx grunt full-pipeline --force",
+    "lint": "npx grunt eslint",
+    "evaluate": "npx grunt full-pipeline-evaluation --force"
   },
   "author": "",
   "license": "ISC",

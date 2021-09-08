@@ -76,4 +76,11 @@ module.exports = (grunt) => {
     });
 
     grunt.registerTask('default', ['eslint']);
+
+    grunt.registerTask('install', 'Install cross-chain-cli', () => {
+        child_process.execSync(`npm i`, { stdio: 'inherit' });
+        child_process.execSync(`npx hardhat compile`, { stdio: 'inherit' });
+        child_process.execSync(`npm i -g`, { stdio: 'inherit' });
+        grunt.verbose.ok();
+    });
 };

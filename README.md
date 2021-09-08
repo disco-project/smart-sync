@@ -9,8 +9,10 @@ npm i ts-node -g
 
 ## Installation
 
-Then, install the cli with the following command:
+Then, install the cli with the following commands:
 ```bash
+npm i
+npx hardhat compile
 npm i -g
 ```
 
