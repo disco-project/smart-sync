@@ -33,7 +33,13 @@ export interface MigrationResult {
     receipt?: {
         gasUsed: ethers.BigNumber;
     };
-    maxValueMptDepth?: number;
+    maxValueMptDept?: number;
+    proofs?: GetProof;
+}
+
+export interface ChangeValueAtIndexResult {
+    success: Boolean;
+    newValue?: BigNumberish;
 }
 
 async function verifyStorageProof(storageProof: StorageProof, root) {
@@ -111,8 +117,6 @@ export class TestChainProxy {
 
     readonly deployer: SignerWithAddress;
 
-    private mapSize: number;
-
     private max_mpt_depth: number;
 
     private min_mpt_depth: number;
@@ -134,30 +138,19 @@ export class TestChainProxy {
         this.migrationState = false;
     }
 
-    async initializeProxyContract(mapSize: number, max_value: number): Promise<InitializationResult> {
-        this.mapSize = mapSize;
+    async initializeProxyContract(map_size: number, max_value: number): Promise<InitializationResult> {
+        this.map_size = map_size;
         // insert some random values
         const srcKeys: Array<number> = [];
         const srcValues: Array<number> = [];
-        for (let i = 0; i < mapSize; i += 1) {
+        for (let i = 0; i < map_size; i += 1) {
             const value = Math.floor(Math.random() * max_value);
             srcValues.push(value);
             srcKeys.push(i);
             this.keys.push(i);
             this.values.push(value);
         }
-
-        let storageAdds: any = [];
-        while (srcKeys.length > 0) {
-            storageAdds.push(this.srcContract.insertMultiple(srcKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), srcValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
-        }
-        try {
-            await Promise.all(storageAdds);
-        } catch (e) {
-            logger.error('Could not insert multiple values in srcContract');
-            logger.error(e);
-            process.exit(-1);
-        }
+        await this.insertValues(srcKeys, srcValues);
 
         const keys = await getAllKeys(this.srcContract.address, this.provider);
         const latestBlock = await this.provider.send('eth_getBlockByNumber', ['latest', true]);
@@ -192,8 +185,7 @@ export class TestChainProxy {
             proxykeys.push(ethers.utils.hexZeroPad(storageProof.key, 32));
             proxyValues.push(ethers.utils.hexZeroPad(storageProof.value, 32));
         });
-
-        storageAdds = [];
+        const storageAdds = [];
         while (proxykeys.length > 0) {
             storageAdds.push(this.proxyContract.addStorage(proxykeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
         }
@@ -252,7 +244,7 @@ export class TestChainProxy {
         while (valueIndices.length < valueCount) {
             // get a new value
             // eslint-disable-next-line @typescript-eslint/no-loop-func
-            const proofIndex = this.initialValuesProof.storageProof.findIndex((storageProof, index) => (storageProof.proof.length === currHeight && proofIndices.indexOf(index) === -1));
+            const proofIndex = this.initialValuesProof.storageProof.findIndex((storageProof, index) => storageProof.proof.length === currHeight && proofIndices.indexOf(index) === -1);
             if (proofIndex === -1) {
                 // if all values from currHeight already in our array, go one level closer to root
                 currHeight -= 1;
@@ -267,20 +259,34 @@ export class TestChainProxy {
             srcValues.push(value);
         }
 
-        // change previous synced value in batches
-        const storageAdds: any = [];
-        while (srcKeys.length > 0) {
-            storageAdds.push(this.srcContract.insertMultiple(srcKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), srcValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
-        }
-        try {
-            await Promise.all(storageAdds);
-        } catch (e) {
-            logger.error('Could not insert multiple values in srcContract');
-            logger.error(e);
+        return this.insertValues(srcKeys, srcValues);
+    }
+
+    async changeRandomValues(valueCount: number, max_value: number): Promise<Boolean> {
+        if (valueCount > this.values.length) {
+            logger.error('Requested more value changes than values in contract');
+            return false;
+        } if (!this.migrationState) {
+            logger.error('contract is not migrated yet.');
             return false;
         }
 
-        return true;
+        const usedKeys: Array<number> = [];
+        const srcKeys: Array<number> = [];
+        const srcValues: Array<number> = [];
+        for (let i = 0; i < valueCount; i += 1) {
+            const value = Math.floor(Math.random() * max_value);
+            srcValues.push(value);
+
+            let newKey = Math.floor(Math.random() * this.keys.length);
+            // eslint-disable-next-line @typescript-eslint/no-loop-func
+            while (usedKeys.findIndex((key) => key === this.keys[newKey]) > -1) {
+                newKey = Math.floor(Math.random() * this.keys.length);
+            }
+            srcKeys.push(this.keys[newKey]);
+            usedKeys.push(this.keys[newKey]);
+        }
+        return this.insertValues(srcKeys, srcValues);
     }
 
     async changeValues(valueCount: number, max_value: number): Promise<Boolean> {
@@ -299,12 +305,17 @@ export class TestChainProxy {
             srcValues.push(value);
             srcKeys.push(this.keys[i]);
         }
-        const storageAdds: any = [];
+        return this.insertValues(srcKeys, srcValues);
+    }
+
+    private async insertValues(srcKeys: Array<number>, srcValues: Array<number>): Promise<Boolean> {
+        const promises = [];
         while (srcKeys.length > 0) {
-            storageAdds.push(this.srcContract.insertMultiple(srcKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), srcValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
+            promises.push(this.srcContract.insertMultiple(srcKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), srcValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
         }
+
         try {
-            await Promise.all(storageAdds);
+            await Promise.all(promises);
         } catch (e) {
             logger.error('Could not insert multiple values in srcContract');
             logger.error(e);
@@ -332,14 +343,17 @@ export class TestChainProxy {
         return true;
     }
 
-    async addValueAtIndex(valueIndex: number, max_value: number): Promise<Boolean> {
+    async addValueAtIndex(valueIndex: number, max_value: number): Promise<ChangeValueAtIndexResult> {
         if (!this.migrationState) {
             logger.error('Proxy contract is not initialized yet.');
-            return false;
+            return { success: false };
         }
         const value = Math.floor(Math.random() * max_value);
         await this.srcContract.insert(valueIndex, value);
-        return true;
+        return {
+            newValue: value,
+            success: true,
+        };
     }
 
     async deleteValueAtIndex(valueIndex: number): Promise<Boolean> {
@@ -351,18 +365,21 @@ export class TestChainProxy {
         return true;
     }
 
-    async changeValueAtIndex(valueIndex: number, max_value: number): Promise<Boolean> {
+    async changeValueAtIndex(valueIndex: number, max_value: number): Promise<ChangeValueAtIndexResult> {
         if (!this.migrationState) {
             logger.error('Proxy contract is not initialized yet.');
-            return false;
+            return { success: false };
         }
         if (this.keys.findIndex((key) => key === valueIndex) < 0) {
             logger.error(`Index ${valueIndex} does not exist on srcContract`);
-            return false;
+            return { success: false };
         }
         const value = Math.floor(Math.random() * max_value);
         await this.srcContract.insert(valueIndex, value);
-        return true;
+        return {
+            newValue: value,
+            success: true,
+        };
     }
 
     async migrateChangesToProxy(changedKeys: Array<BigNumberish>): Promise<MigrationResult> {
@@ -386,9 +403,9 @@ export class TestChainProxy {
         const changedKeysProof = new GetProof(await this.provider.send('eth_getProof', [this.srcContract.address, changedKeys]));
 
         // get depth of value
-        let maxValueMptDepth = 0;
+        let maxValueMptDept = 0;
         changedKeysProof.storageProof.forEach((storageProof) => {
-            if (maxValueMptDepth < storageProof.proof.length) maxValueMptDepth = storageProof.proof.length;
+            if (maxValueMptDept < storageProof.proof.length) maxValueMptDept = storageProof.proof.length;
         });
 
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
@@ -413,9 +430,9 @@ export class TestChainProxy {
 
         return {
             receipt,
-            maxValueMptDepth,
+            maxValueMptDept,
             migrationResult: true,
-
+            proofs: changedKeysProof,
         };
     }
 }
