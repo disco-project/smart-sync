@@ -18,3 +18,4 @@ data/
 .idea/
 target/
 node_modules
+.vscode/
