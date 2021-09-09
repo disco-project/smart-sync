@@ -74,6 +74,36 @@ Example usage:
 $ cross-chain-cli s 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a --target-blockNr 450
 ```
 
+### continuous-synch
+```bash
+$ cross-chain-cli continuous-synch --help
+Usage: cross-chain-cli continuous-synch|c [options] <proxy_contract_address> <period>
+
+Periodically synch state updates.
+
+Arguments:
+  proxy_contract_address
+  period                            Define the updating period. Be sure to pass the period within " (Example: "*/2 * * * *"). The crontab syntax is based on the GNU crontab syntax. For information visit https://www.npmjs.com/package/node-cron.
+
+Options:
+  -l, --log-level <level>           verbose level of logging (choices: "fatal", "error", "warn", "info", "debug", "trace", "silly", default: "info")
+  -s, --src-chain-rpc-host <url>    url of src chain rpc
+  -t, --target-chain-rpc-url <url>  url of target chain rpc
+  -c, --config-file <path>          path to the config file (default: "./config/cli-config.json")
+  --connection-timeout <timeout>    connection timeout in ms
+  --src-blocknr <number>            block number of src chain to use
+  --gas-limit <limit>
+  --diff-mode <mode>                Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr. (choices: "storage",
+                                    "srcTx")
+  --target-blocknr <number>         see --diff-mode for further explanation
+  -h, --help                        display help for command
+```
+
+Example usage:
+```bash
+$ cross-chain-cli c 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a "*/2 * * * *"
+```
+
 ### migration-status
 ```bash
 $ cross-chain-cli help migration-status
@@ -144,6 +174,20 @@ $ cross-chain-cli diff 0x20a508640B446990c781Cd541B9a2828ACA3a350 0xf8f22ab160e8
 
 This project uses [hardhat](https://hardhat.org/getting-started/) and [ethers](https://docs.ethers.io/v5/). 
 
+To start the chain [see](../README.md)
+
+To compile all the contracts and files run.
+
+```bash
+npx hardhat compile
+```
+
+## Chain
+Generally, you don't need to start the chain individually since its already started if you execute the command:
+``` bash
+$ npm run test
+```
+See [readme](chain/README.md) on how to start the test chain.
 
 ## Linter
 We use the code style from [airbnb](https://www.npmjs.com/package/eslint-config-airbnb-base).
@@ -154,15 +198,13 @@ $ grunt eslint
 ```
 
 ## Tests
-For test purposes, we provide a preconfigured openethereum test network that can be started using Docker. Please check the [chain](chain/README.md) folder for further details.
-
 To run all the tests run (requires a running ethereum node, see [hardhat.config.ts](./hardhat.config.ts) and [hardhat.org/config](https://hardhat.org/config/)):
 
 ```bash
 $ npm run test
 ```
 
-Or a single test:
+Or a single test (chain needs to be started manually):
 
 ```bash
 $ npx hardhat test tests/list-storage-test.ts
@@ -175,7 +217,7 @@ To run the evaluation run:
 $ npm run evaluate
 ```
 
-Or a specific evaluation:
+Or a specific evaluation (chain needs to be started manually):
 
 ```bash
 $ npx hardhat test evaluation/update-multiple-values-with-map-sizes-1-1000.ts

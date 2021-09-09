@@ -98,7 +98,7 @@ createdPlot +
 
 # 3. Update one value for multiple times
 multipleValues <- list.files(pattern = "+update-same-value-in-map-sizes-1-1000+")
-data <- read.csv(multipleValues[1], header=TRUE)
+data <- read.csv(multipleValues[0], header=TRUE)
 map_size_1 <- data[data[,1] == 1,]
 map_size_1_calc <- do.call(rbind, lapply(split(map_size_1, map_size_1$changed_value_index), function(d) { data.frame(md=median(d$used_gas), sd=sd(d$used_gas), index=d$changed_value_index, value_depth=d$value_mpt_depth, mapSize=d$mapSize)}))
 map_size_10 <- data[data[,1] == 10,]

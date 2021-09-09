@@ -1,12 +1,13 @@
-/* eslint-env mocha */
-/* eslint-disable no-unused-expressions */
 import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { HttpNetworkConfig } from 'hardhat/types';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { execSync } from 'child_process';
+import {
+    execSync, spawn,
+} from 'child_process';
 import { Contract } from '@ethersproject/contracts';
+import { SIGTERM } from 'constants';
 import { logger } from '../src/utils/logger';
 import { PROXY_INTERFACE } from '../src/config';
 import { InitializationResult, TestChainProxy } from './test-utils';
@@ -177,6 +178,136 @@ describe('Test CLI', async () => {
         return expect(proxyStorageRoot).to.equal(srcStorageRoot);
     });
 
+    it('should synch continuously (simple, diff mode = srcTx, changed values)', async () => {
+        logger.setSettings({ name: 'should synch continuously w/ srcTx, changed values' });
+        const mapSize = 10;
+        let initialization: InitializationResult;
+
+        try {
+            initialization = await chainProxy.initializeProxyContract(mapSize, TestCLI.MAX_VALUE);
+            expect(initialization.migrationState).to.be.true;
+        } catch (e) {
+            logger.fatal(e);
+            return false;
+        }
+
+        // get blocknumber before changing src contract
+        const currBlockNr = await provider.getBlockNumber();
+
+        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        logger.debug(`Executing:\n${synchContinuousCommand}`);
+        const cronJob = spawn(synchContinuousCommand, {
+            shell: true,
+            stdio: ['ipc', 'pipe', 'pipe'],
+        });
+        cronJob.on('error', () => {
+            logger.debug('Could not spawn the continuous command.');
+            cronJob.kill('SIGINT');
+            return false;
+        });
+        cronJob.stdout?.on('data', (data) => {
+            if (logger.settings.minLevel === 'debug') {
+                process.stdout.write(`simple childProcess: ${data}\n`);
+            }
+        });
+        cronJob.stderr?.on('data', (data) => {
+            if (logger.settings.minLevel === 'debug') {
+                process.stdout.write(`simple childProcess: ${data}\n`);
+            }
+        });
+
+        // insert some new values
+        const changedValues = await chainProxy.changeValues(5, TestCLI.MAX_VALUE);
+        expect(changedValues).to.be.true;
+
+        // shouldn't be synched right away
+        const diff = await differ.getDiffFromStorage(chainProxy.srcContract.address, initialization.proxyContract.address);
+        expect(diff.getKeys().length).to.equal(5, 'There is no diff.');
+
+        await new Promise((resolve) => {
+            setTimeout(() => resolve(resolve), 8000);
+        });
+
+        const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+        const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
+        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcStorageRoot = srcProof.storageHash.toLowerCase();
+
+        // kill child process executing the cron job
+        cronJob.send(SIGTERM);
+        return expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
+    });
+
+    it('should synch continuously (multiple times, diff mode = srcTx, changed values)', async () => {
+        logger.setSettings({ name: 'should synch continuously w/ srcTx, changed values' });
+        const mapSize = 10;
+        let initialization: InitializationResult;
+
+        try {
+            initialization = await chainProxy.initializeProxyContract(mapSize, TestCLI.MAX_VALUE);
+            expect(initialization.migrationState).to.be.true;
+        } catch (e) {
+            logger.fatal(e);
+            return false;
+        }
+
+        // get blocknumber before changing src contract
+        const currBlockNr = await provider.getBlockNumber();
+
+        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        logger.debug(`Executing:\n${synchContinuousCommand}`);
+        const cronJob = spawn(synchContinuousCommand, {
+            shell: true,
+            stdio: ['ipc', 'pipe', 'pipe'],
+        });
+        cronJob.on('error', () => {
+            logger.debug('Could not spawn the continuous command.');
+            cronJob.kill('SIGINT');
+            return false;
+        });
+        cronJob.stdout?.on('data', (data) => {
+            if (logger.settings.minLevel === 'debug') {
+                process.stdout.write(`multiple childProcess: ${data}\n`);
+            }
+        });
+        cronJob.stderr?.on('data', (data) => {
+            if (logger.settings.minLevel === 'debug') {
+                process.stdout.write(`multiple childProcess: ${data}\n`);
+            }
+        });
+
+        // wait for the crobJob to start
+        logger.debug('Waiting for the cronJob to start...');
+        await new Promise((resolve) => {
+            setTimeout(() => resolve(resolve), 5000);
+        });
+        logger.debug('done.');
+
+        for (let i = 0; i < 3; i += 1) {
+            // insert some new values
+            const changedValues = await chainProxy.changeValues(5, TestCLI.MAX_VALUE);
+            expect(changedValues).to.be.true;
+
+            // shouldn't be synched right away
+            const diff = await differ.getDiffFromStorage(chainProxy.srcContract.address, initialization.proxyContract.address);
+            expect(diff.getKeys().length).to.equal(5, 'There is no diff.');
+
+            await new Promise((resolve) => {
+                setTimeout(() => resolve(resolve), 3000);
+            });
+
+            const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+            const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
+            const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+            const srcStorageRoot = srcProof.storageHash.toLowerCase();
+
+            expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
+        }
+
+        // kill child process executing the cron job
+        return cronJob.send(SIGTERM);
+    });
+
     it('should synch (diff mode = srcTx, added values but not changing merkle tree structure)', async () => {
         logger.setSettings({ name: 'should synch w/ srcTx, added values' });
         const mapSize = 3;
@@ -271,6 +402,130 @@ describe('Test CLI', async () => {
         const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
         return expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
+    });
+
+    it('should continuously synch (simple, diff mode = storage, changed values)', async () => {
+        logger.setSettings({ name: 'should synch continuously simple w/ storage, changed values' });
+        const mapSize = 10;
+        let initialization: InitializationResult;
+
+        try {
+            initialization = await chainProxy.initializeProxyContract(mapSize, TestCLI.MAX_VALUE);
+            expect(initialization.migrationState).to.be.true;
+        } catch (e) {
+            logger.fatal(e);
+            return false;
+        }
+
+        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/3 * * * * *" --diff-mode storage -c ${TestCLI.defaultTestConfigFile}`;
+        logger.debug(`Executing:\n${synchContinuousCommand}`);
+        const cronJob = spawn(synchContinuousCommand, {
+            shell: true,
+            stdio: ['ipc', 'pipe', 'pipe'],
+        });
+        cronJob.on('error', () => {
+            logger.debug('Could not spawn the continuous command.');
+            cronJob.kill('SIGINT');
+            return false;
+        });
+        cronJob.stdout?.on('data', (data) => {
+            if (logger.settings.minLevel === 'debug') {
+                process.stdout.write(`childProcess: ${data}\n`);
+            }
+        });
+        cronJob.stderr?.on('data', (data) => {
+            if (logger.settings.minLevel === 'debug') {
+                process.stdout.write(`childProcess: ${data}\n`);
+            }
+        });
+
+        // insert some new values
+        const changedValues = await chainProxy.changeValues(5, TestCLI.MAX_VALUE);
+        expect(changedValues).to.be.true;
+
+        // shouldn't be synched right away
+        const diff = await differ.getDiffFromStorage(chainProxy.srcContract.address, initialization.proxyContract.address);
+        expect(diff.getKeys().length).to.equal(5, 'There is no diff.');
+
+        await new Promise((resolve) => {
+            setTimeout(() => resolve(resolve), 8000);
+        });
+
+        const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+        const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
+        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcStorageRoot = srcProof.storageHash.toLowerCase();
+
+        // kill child process executing the cron job
+        cronJob.send(SIGTERM);
+        return expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
+    });
+
+    it('should continuously synch (multiple times, diff mode = storage, changed values)', async () => {
+        logger.setSettings({ name: 'should synch continuously w/ storage, changed values' });
+        const mapSize = 10;
+        let initialization: InitializationResult;
+
+        try {
+            initialization = await chainProxy.initializeProxyContract(mapSize, TestCLI.MAX_VALUE);
+            expect(initialization.migrationState).to.be.true;
+        } catch (e) {
+            logger.fatal(e);
+            return false;
+        }
+
+        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --diff-mode storage -c ${TestCLI.defaultTestConfigFile}`;
+        logger.debug(`Executing:\n${synchContinuousCommand}`);
+        const cronJob = spawn(synchContinuousCommand, {
+            shell: true,
+            stdio: ['ipc', 'pipe', 'pipe'],
+        });
+        cronJob.on('error', () => {
+            logger.debug('Could not spawn the continuous command.');
+            cronJob.kill('SIGINT');
+            return false;
+        });
+        cronJob.stdout?.on('data', (data) => {
+            if (logger.settings.minLevel === 'debug') {
+                process.stdout.write(`childProcess: ${data}\n`);
+            }
+        });
+        cronJob.stderr?.on('data', (data) => {
+            if (logger.settings.minLevel === 'debug') {
+                process.stdout.write(`childProcess: ${data}\n`);
+            }
+        });
+
+        // wait for the crobJob to start
+        logger.debug('Waiting for the cronJob to start...');
+        await new Promise((resolve) => {
+            setTimeout(() => resolve(resolve), 5000);
+        });
+        logger.debug('done.');
+
+        for (let i = 0; i < 3; i += 1) {
+            // insert some new values
+            const changedValues = await chainProxy.changeValues(5, TestCLI.MAX_VALUE);
+            expect(changedValues).to.be.true;
+
+            // shouldn't be synched right away
+            const diff = await differ.getDiffFromStorage(chainProxy.srcContract.address, initialization.proxyContract.address);
+            expect(diff.getKeys().length).to.equal(5, 'There is no diff.');
+
+            await new Promise((resolve) => {
+                setTimeout(() => resolve(resolve), 3000);
+            });
+
+            const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+            const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
+            const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+            const srcStorageRoot = srcProof.storageHash.toLowerCase();
+
+            expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
+        }
+
+        // kill child process executing the cron job
+        return cronJob.send(SIGTERM);
     });
 
     it('should synch (diff mode = storage, added values but not changing merkle tree structure)', async () => {

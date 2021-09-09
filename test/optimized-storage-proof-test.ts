@@ -1,5 +1,3 @@
-/* eslint-env mocha */
-/* eslint-disable no-unused-expressions */
 import { ethers, network } from 'hardhat';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { JsonRpcProvider } from '@ethersproject/providers';
