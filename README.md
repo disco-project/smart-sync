@@ -1,20 +1,24 @@
 # Getting started
 
-## Prerequirements
-
-Before you can run the CLI, you need `ts-node` installed globally:
-```bash
-npm i ts-node -g
-```
-
 ## Installation
 
-Then, install the cli with the following command:
+First, install the project and compile all required components:
 ```bash
+npm i
+npx hardhat compile
+```
+
+## CLI
+
+To use the command line interface, `ts-node` and the project must be installed globally:
+```bash
+npm i ts-node -g
 npm i -g
 ```
 
 Under `./config` you can find the default configuration for the cli. Adjust the fields according to your needs or pass them as options in the command line
+
+To execute tests, please refer to the [test](#tests) section.
 
 ## Usage 
 

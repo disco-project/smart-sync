@@ -10,7 +10,7 @@ import { PROXY_INTERFACE } from './config';
 import DiffHandler from './diffHandler/DiffHandler';
 import { logger } from './utils/logger';
 import {
-    getAllKeys, toParityQuantity, toBlockNumber, createDeployingByteCode, hexToAscii,
+    getAllKeys, toParityQuantity, toBlockNumber, createDeployingByteCode,
 } from './utils/utils';
 import GetProof from './proofHandler/GetProof';
 import { BlockHeader } from './proofHandler/Types';
@@ -329,12 +329,7 @@ export class ChainProxy {
             logger.debug(receipt);
         } catch (e) {
             logger.error('something went wrong');
-            const regexr = new RegExp(/Reverted 0x(.*)/);
-            const checker = regexr.exec(e.data);
-            if (checker) {
-                logger.error(`'${hexToAscii(checker[1])}'`);
-                logger.fatal(e);
-            } else logger.fatal(e);
+            logger.fatal(e);
             return false;
         }
 
