@@ -1,9 +1,9 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity >=0.6.0 <0.8.0;
 
-import "./contracts/RelayContract.sol";
-import "./contracts/GetProofLib.sol";
-import "./contracts/RLPWriter.sol";
+import "./RelayContract.sol";
+import "./GetProofLib.sol";
+import "./RLPWriter.sol";
 import "solidity-rlp/contracts/RLPReader.sol";
 
 contract ProxyContract {

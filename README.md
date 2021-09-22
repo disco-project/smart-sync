@@ -1,19 +1,11 @@
 # Getting started
 
-## Installation
+## Installation CLI
 
-First, install the project and compile all required components:
+To use the command line interface
 ```bash
 npm i
-npx hardhat compile
-```
-
-## CLI
-
-To use the command line interface, `ts-node` and the project must be installed globally:
-```bash
-npm i ts-node -g
-npm i -g
+npx grunt install
 ```
 
 Under `./config` you can find the default configuration for the cli. Adjust the fields according to your needs or pass them as options in the command line

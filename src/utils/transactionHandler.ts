@@ -1,8 +1,5 @@
 import { Block, TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider';
 import { JsonRpcProvider } from '@ethersproject/providers';
-import { ethers } from 'ethers';
-import { network } from 'hardhat';
-import { HttpNetworkConfig } from 'hardhat/types';
 import { logger } from './logger';
 import { findDeploymentBlock, toBlockNumber } from './utils';
 
@@ -28,7 +25,7 @@ class TransactionHandler {
 
     private provider: JsonRpcProvider;
 
-    constructor(contractAddress: string, provider = new ethers.providers.JsonRpcProvider((network.config as HttpNetworkConfig).url)) {
+    constructor(contractAddress: string, provider: JsonRpcProvider) {
         this.contractAddress = contractAddress;
         this.provider = provider;
     }
@@ -86,14 +83,14 @@ class TransactionHandler {
         const contractAddress: string = this.contractAddress.toUpperCase();
         const relatedTransactions: Array<string> = [];
         let latest = latest_block_number;
-        if (typeof (latest) === 'string') latest = await toBlockNumber(latest);
+        if (typeof (latest) === 'string') latest = await toBlockNumber(latest, this.provider);
 
         // first find deployment block for more efficiency
-        let earliest = (earliest_block_number && earliest_block_number !== 'earliest') ? earliest_block_number : await findDeploymentBlock(this.contractAddress);
-        if (typeof (earliest) === 'string') earliest = await toBlockNumber(earliest);
+        let earliest = (earliest_block_number && earliest_block_number !== 'earliest') ? earliest_block_number : await findDeploymentBlock(this.contractAddress, this.provider);
+        if (typeof (earliest) === 'string') earliest = await toBlockNumber(earliest, this.provider);
 
         if (latest < earliest) {
-            logger.debug('Given latest block number older than earliest block number.');
+            logger.debug(`Given latest block number ${latest} older than earliest block number ${earliest}.`);
             return [];
         }
 
@@ -103,7 +100,8 @@ class TransactionHandler {
             blockPromises.push(this.provider.getBlock(i));
         }
 
-        const blocks = await Promise.all(blockPromises);
+        let blocks = await Promise.all(blockPromises);
+        blocks = blocks.filter((value) => (!!value));
         const transactionPromises: Array<Promise<TransactionResponse>> = [];
         blocks.forEach(({ transactions }) => {
             transactions.forEach((txHash) => {

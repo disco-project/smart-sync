@@ -1,4 +1,4 @@
-#!/usr/bin/env ts-node-transpile-only
+#!/usr/bin/env node
 
 import { BigNumber } from '@ethersproject/bignumber';
 import { ConnectionInfo } from '@ethersproject/web';
@@ -29,12 +29,12 @@ interface ViewContractInteractionOptions extends GeneralOptions {
     relayContractAddress: string;
 }
 
-interface TxContractInteractionOptions extends ViewContractInteractionOptions {
+export interface TxContractInteractionOptions extends ViewContractInteractionOptions {
     diffMode?: string;
     gasLimit?: string;
 }
 
-type ConfigTypish = GeneralOptions | TxContractInteractionOptions | ViewContractInteractionOptions;
+export type ConfigTypish = GeneralOptions | TxContractInteractionOptions | ViewContractInteractionOptions;
 
 // get options from config to insert them as default
 const fileHandler = new FileHandler(DEFAULT_CONFIG_FILE_PATH);
@@ -95,7 +95,8 @@ continuousSynch
     .option('--gas-limit <limit>')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr.')
-            .choices(['storage', 'srcTx']),
+            .choices(['storage', 'srcTx'])
+            .default('srcTx'),
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .action(async (proxyContract: string, period: string, options: TxContractInteractionOptions) => {
@@ -276,7 +277,8 @@ stateDiff
     .description('Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address has to be provided.')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr. If no blocks are given when using srcTx, then only the latest block is examined.')
-            .choices(['storage', 'srcTx']),
+            .choices(['storage', 'srcTx'])
+            .default('srcTx'),
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .action(async (srcContractAddress: string, proxyContractAddress: string | undefined, options) => {
@@ -321,7 +323,8 @@ synchronize
     .arguments('<proxy_contract_address>')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr.')
-            .choices(['storage', 'srcTx']),
+            .choices(['storage', 'srcTx'])
+            .default('srcTx'),
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')

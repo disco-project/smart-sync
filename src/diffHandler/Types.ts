@@ -4,7 +4,7 @@ export type ProcessedParameters = {
     srcAddress: string;
     srcBlock: number;
     targetAddress: string;
-    targetBlock: number;
+    targetBlock: number | string;
 };
 
 /* eslint-disable no-shadow */

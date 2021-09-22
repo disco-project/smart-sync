@@ -1,0 +1,36 @@
+[parity]
+# Custom chain spec with docker mnt path
+chain = "/home/openethereum/.local/share/openethereum/disco-spec.json"
+# Use the following lines instead for running `openethereum --config config.toml` and change the password path in `account`
+#chain = "disco-spec.json"
+#base_path = "./chain-data"
+#keys_path = "./keys"
+
+[account]
+unlock = ["0x00ce0c25d2a45e2f22d4416606d928b8c088f8db", "0x009a77b77c1bd10f6bd6ce0c76b6a06c1df5e8ae", "0x00ea67ecec38e3688662110471e6804380418fc7"]
+password = ["/home/openethereum/.local/share/openethereum/devs.pwd"]
+#password = ["./devs.pwd"]
+
+[rpc]
+interface = "all"
+apis = ["all"]
+hosts = ["all"]
+cors = ["all"]
+# necessary for EIP1186 eth_getProof
+experimental_rpcs = true
+port = 8547
+
+[websockets]
+interface = "all"
+apis = ["all"]
+hosts = ["all"]
+origins = ["all"]
+port = 8548
+
+[mining]
+reseal_min_period = 0
+min_gas_price = 0
+
+[footprint]
+# Enables Fat DB
+fat_db = "on"

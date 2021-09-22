@@ -1,6 +1,4 @@
 import { BigNumberish, ethers } from 'ethers';
-import { network } from 'hardhat';
-import { HttpNetworkConfig } from 'hardhat/types';
 import * as rlp from 'rlp';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { Input } from 'rlp';
@@ -34,7 +32,7 @@ export function toParityQuantity(val: BigNumberish): string {
     return ethers.BigNumber.from(val).toHexString();
 }
 
-export async function toBlockNumber(val: BigNumberish, provider: JsonRpcProvider = new ethers.providers.JsonRpcProvider((network.config as HttpNetworkConfig).url)): Promise<number> {
+export async function toBlockNumber(val: BigNumberish, provider: JsonRpcProvider): Promise<number> {
     if (typeof (val) === 'string' && BLOCKNUMBER_TAGS.indexOf(val) > -1) {
         return (await provider.getBlock(val)).number;
     }
@@ -59,7 +57,7 @@ export function hexlify(input: string): string {
 }
 
 // binary search for block where contract was deployed
-export async function findDeploymentBlock(contractAddress: string, provider: JsonRpcProvider = new ethers.providers.JsonRpcProvider((network.config as HttpNetworkConfig).url)): Promise<number> {
+export async function findDeploymentBlock(contractAddress: string, provider: JsonRpcProvider): Promise<number> {
     let low: number = 0;
     let high: number = await provider.getBlockNumber();
 
@@ -89,7 +87,7 @@ export async function findDeploymentBlock(contractAddress: string, provider: Jso
  * @param batchSize how many keys to retrieve per request [parity_liststoragekeys](https://openethereum.github.io/JSONRPC-parity-module#parity_liststoragekeys)
  * @returns all the storage keys of the contract with `address` at block `blockNum`
  */
-export async function getAllKeys(contractAddress: string, provider = new ethers.providers.JsonRpcProvider((network.config as HttpNetworkConfig).url), blockNum: number | string = 'latest', batchSize: number = 50): Promise<BigNumberish[]> {
+export async function getAllKeys(contractAddress: string, provider: JsonRpcProvider, blockNum: number | string = 'latest', batchSize: number = 50): Promise<BigNumberish[]> {
     const keys: Array<BigNumberish> = [];
     let batch: Array<BigNumberish> = [];
     let batchCounter = 1;

@@ -1,48 +1,62 @@
-import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
 import { JsonRpcProvider } from '@ethersproject/providers';
-import { HttpNetworkConfig } from 'hardhat/types';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { BigNumber, ethers } from 'ethers';
 import DiffHandler from '../src/diffHandler/DiffHandler';
 import { logger } from '../src/utils/logger';
-import { TestChainProxy } from './test-utils';
+import { TestChainProxy, TestCLI } from './test-utils';
 import {
     RelayContract__factory,
     MappingContract,
     MappingContract__factory,
     RelayContract,
 } from '../src-gen/types';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import FileHandler from '../src/utils/fileHandler';
 
 const MAX_VALUE = 1000000;
 
 describe('Test scaling of contract', async () => {
-    let deployer: SignerWithAddress;
+    let srcDeployer: SignerWithAddress;
+    let targetDeployer: SignerWithAddress;
     let srcContract: MappingContract;
     let logicContract: MappingContract;
     let factory: MappingContract__factory;
-    let provider: JsonRpcProvider;
+    let srcProvider: JsonRpcProvider;
+    let targetProvider: JsonRpcProvider;
     let relayContract: RelayContract;
-    let httpConfig: HttpNetworkConfig;
+    let chainConfigs: TxContractInteractionOptions | undefined;
     let chainProxy: TestChainProxy;
 
     before(async () => {
-        httpConfig = network.config as HttpNetworkConfig;
+        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fh.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.targetChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        srcDeployer = await SignerWithAddress.create(srcProvider.getSigner());
+        targetDeployer = await SignerWithAddress.create(targetProvider.getSigner());
         logger.setSettings({ minLevel: 'info', name: 'scale_test.ts' });
-        [deployer] = await ethers.getSigners();
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
     });
 
     beforeEach(async () => {
-        factory = new MappingContract__factory(deployer);
+        factory = new MappingContract__factory(srcDeployer);
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
         // deploy the relay contract
-        const Relayer = new RelayContract__factory(deployer);
+        const Relayer = new RelayContract__factory(targetDeployer);
         relayContract = await Relayer.deploy();
-        logger.debug(`srcContractAddress: ${srcContract.address}, relayContract: ${relayContract.address}`);
-        chainProxy = new TestChainProxy(srcContract, logicContract, httpConfig, deployer,
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        chainProxy = new TestChainProxy(srcContract, logicContract, chainConfigs, srcDeployer, targetDeployer,
             relayContract,
-            provider);
+            srcProvider, targetProvider);
+        logger.debug(`srcContractAddress: ${srcContract.address}, relayContract: ${relayContract.address}`);
     });
 
     it('Contract with map containing 1 value, update 1 value', async () => {
@@ -51,7 +65,7 @@ describe('Test scaling of contract', async () => {
         expect(initialization.migrationState).to.be.true;
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
-        const differ = new DiffHandler(provider);
+        const differ = new DiffHandler(srcProvider, targetProvider);
         let diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
@@ -82,7 +96,7 @@ describe('Test scaling of contract', async () => {
         expect(initialization.migrationState).to.be.true;
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
-        const differ = new DiffHandler(provider);
+        const differ = new DiffHandler(srcProvider, targetProvider);
         let diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
@@ -113,7 +127,7 @@ describe('Test scaling of contract', async () => {
         expect(initialization.migrationState).to.be.true;
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
-        const differ = new DiffHandler(provider);
+        const differ = new DiffHandler(srcProvider, targetProvider);
         let diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
@@ -144,7 +158,7 @@ describe('Test scaling of contract', async () => {
         expect(initialization.migrationState).to.be.true;
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
-        const differ = new DiffHandler(provider);
+        const differ = new DiffHandler(srcProvider, targetProvider);
         let diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
@@ -175,7 +189,7 @@ describe('Test scaling of contract', async () => {
         expect(initialization.migrationState).to.be.true;
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
-        const differ = new DiffHandler(provider);
+        const differ = new DiffHandler(srcProvider, targetProvider);
         let diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 

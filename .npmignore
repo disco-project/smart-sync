@@ -1,0 +1,30 @@
+# Created by .ignore support plugin (hsz.mobi)
+logs
+*.log
+build
+src-gen
+node_modules/
+*.tsbuildinfo
+.env
+node_modules
+src
+test
+imgs
+hardhat_scripts
+evaluation
+contracts
+config
+chain
+chain2
+hardhat.config.ts
+optimized-storage-proof.md
+
+#Hardhat files
+cache
+artifacts
+
+data/
+.idea/
+target/
+node_modules
+.vscode/

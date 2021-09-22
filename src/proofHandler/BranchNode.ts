@@ -11,7 +11,7 @@ class BranchNode {
 
     children: (EmbeddedNode | null)[];
 
-    constructor(node: Buffer[], storageKey: string) {
+    constructor(node: Buffer[], storageKey: string | undefined) {
         this.node = node;
         this.children = new Array(17).fill(null);
         this.commonNodes = [];

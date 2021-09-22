@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity >=0.6.0 <0.8.0;
 
-import '../ProxyContract.sol';
+import './ProxyContract.sol';
 import './GetProofLib.sol';
 
 contract RelayContract {

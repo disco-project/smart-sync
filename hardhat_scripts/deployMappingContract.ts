@@ -9,12 +9,13 @@ async function main() {
     const provider = await new ethers.providers.JsonRpcProvider('http://localhost:8545');
 
     await mapper.deployed();
+    logger.info(mapper.address);
 
     for (let i = 0; i < 10; i += 1) {
         await mapper.insert(i, i + 1);
         const keys = await getAllKeys(mapper.address, provider);
         const proof = await provider.send('eth_getProof', [mapper.address, keys]);
-        logger.info(proof.storageProof);
+        logger.debug(proof.storageProof);
     }
 }
 

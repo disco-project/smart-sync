@@ -1,11 +1,13 @@
-import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { JsonRpcProvider } from '@ethersproject/providers';
-import { HttpNetworkConfig } from 'hardhat/types';
+import { BigNumber, ethers } from 'ethers';
 import DiffHandler from '../src/diffHandler/DiffHandler';
 import { SimpleStorage, SimpleStorage__factory } from '../src-gen/types';
 import { logger } from '../src/utils/logger';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import FileHandler from '../src/utils/fileHandler';
+import { TestCLI } from './test-utils';
 
 describe('Get contract storage diff', () => {
     let deployer: SignerWithAddress;
@@ -13,17 +15,22 @@ describe('Get contract storage diff', () => {
     let storageTarget: SimpleStorage;
     let differ: DiffHandler;
     let provider: JsonRpcProvider;
-    let httpConfig: HttpNetworkConfig;
+    let chainConfigs: TxContractInteractionOptions | undefined;
 
     before(async () => {
-        [deployer] = await ethers.getSigners();
-        httpConfig = network.config as HttpNetworkConfig;
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
+        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fh.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        deployer = await SignerWithAddress.create(provider.getSigner());
         logger.setSettings({ minLevel: 'info', name: 'get-diff-test.ts' });
     });
 
     beforeEach(async () => {
-        differ = new DiffHandler();
+        differ = new DiffHandler(provider);
         const Storage = new SimpleStorage__factory(deployer);
         storageSrc = await Storage.deploy();
         storageTarget = await Storage.deploy();

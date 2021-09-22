@@ -1,23 +1,31 @@
-import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { HttpNetworkConfig } from 'hardhat/types';
 import { JsonRpcProvider } from '@ethersproject/providers';
+import { BigNumber, ethers } from 'ethers';
 import { SimpleStorage, SimpleStorage__factory } from '../src-gen/types';
 import * as utils from '../src/utils/utils';
 import GetProof from '../src/proofHandler/GetProof';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import FileHandler from '../src/utils/fileHandler';
+import { TestCLI } from './test-utils';
+import { logger } from '../src/utils/logger';
 
 describe('Validate old contract state', () => {
     let deployer: SignerWithAddress;
     let storage: SimpleStorage;
-    let httpConfig: HttpNetworkConfig;
+    let chainConfigs: TxContractInteractionOptions | undefined;
     let provider: JsonRpcProvider;
 
     before(async () => {
-        httpConfig = network.config as HttpNetworkConfig;
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
-        [deployer] = await ethers.getSigners();
+        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fh.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        deployer = await SignerWithAddress.create(provider.getSigner());
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
     });

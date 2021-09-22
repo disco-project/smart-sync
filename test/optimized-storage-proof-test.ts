@@ -1,23 +1,30 @@
-import { ethers, network } from 'hardhat';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { JsonRpcProvider } from '@ethersproject/providers';
-import { HttpNetworkConfig } from 'hardhat/types';
+import { BigNumber, ethers } from 'ethers';
 import { logger } from '../src/utils/logger';
 import { SimpleStorage, SimpleStorage__factory } from '../src-gen/types';
 import GetProof from '../src/proofHandler/GetProof';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import FileHandler from '../src/utils/fileHandler';
+import { TestCLI } from './test-utils';
 
 describe('Test storage proof optimization', async () => {
     let deployer: SignerWithAddress;
     let storage: SimpleStorage;
     let provider: JsonRpcProvider;
-    let httpConfig: HttpNetworkConfig;
+    let chainConfigs: TxContractInteractionOptions | undefined;
 
     before(async () => {
-        httpConfig = network.config as HttpNetworkConfig;
-        [deployer] = await ethers.getSigners();
+        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fh.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        deployer = await SignerWithAddress.create(provider.getSigner());
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
         logger.setSettings({ minLevel: 'info', name: 'optimized-storage-proof-test.ts' });
     });
 

@@ -1,6 +1,7 @@
-import { ethers } from 'hardhat';
 import { expect } from 'chai';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { BigNumber, ethers } from 'ethers';
+import { JsonRpcProvider } from '@ethersproject/providers';
 import {
     CallingContract,
     CallingContract__factory,
@@ -9,12 +10,18 @@ import {
     TestProxyContract,
     TestProxyContract__factory,
 } from '../src-gen/types';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import FileHandler from '../src/utils/fileHandler';
+import { TestCLI } from './test-utils';
+import { logger } from '../src/utils/logger';
 
 describe('Test static proxy calls', () => {
     let deployer: SignerWithAddress;
     let logic: TestLogicContract;
     let proxy: TestProxyContract;
     let caller: CallingContract;
+    let chainConfigs: TxContractInteractionOptions | undefined;
+    let provider: JsonRpcProvider;
 
     const abi = [
         'function getValue() view returns (uint256)',
@@ -22,8 +29,18 @@ describe('Test static proxy calls', () => {
         'function valuePure() public pure returns (uint256)',
     ];
 
+    before(async () => {
+        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fh.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        deployer = await SignerWithAddress.create(provider.getSigner());
+    });
+
     it('Should deploy the contracts', async () => {
-        [deployer] = await ethers.getSigners();
         const Logic = new TestLogicContract__factory(deployer);
         logic = await Logic.deploy();
         const Proxy = new TestProxyContract__factory(deployer);
