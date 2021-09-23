@@ -104,7 +104,7 @@ module.exports = (grunt) => {
         child_process.execSync(`npm i -g`, { stdio: 'inherit' });
     });
 
-    grunt.registerTask('full-pipeline-test', 'testing', () => {
+    grunt.registerTask('full-pipeline-test', 'Testing precompiled *.ts project', () => {
         grunt.task.run('compile-contracts');
         grunt.task.run('eslint');
         grunt.task.run('stop-chains');
@@ -113,7 +113,16 @@ module.exports = (grunt) => {
         grunt.task.run('stop-chains');
     });
 
-    grunt.registerTask('full-pipeline-evaluation', 'evaluating', () => {
+    grunt.registerTask('full-pipeline-dist-test', 'Testing compiled *.js project inside dist folder', () => {
+        grunt.task.run('compile-contracts');
+        grunt.task.run('eslint');
+        grunt.task.run('stop-chains');
+        grunt.task.run('start-chains');
+        grunt.task.run('mochaTest');
+        grunt.task.run('stop-chains');
+    });
+
+    grunt.registerTask('full-pipeline-evaluation', 'Evaluating project', () => {
         grunt.task.run('compile-contracts');
         grunt.task.run('eslint');
         grunt.task.run('stop-chains');

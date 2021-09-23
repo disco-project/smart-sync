@@ -1,7 +1,10 @@
 {
-  "name": "cross-chain-cli",
+  "name": "@disco-project/cross-chain-cli",
   "version": "1.0.0",
   "description": "",
+  "repository": {
+      "url": "git://github.com/my-org/test.git"
+    },
   "main": "./dist/src/cli/cross-chain-cli.js",
   "types": "./dist/src/**/*.d.ts",
   "bin": {
