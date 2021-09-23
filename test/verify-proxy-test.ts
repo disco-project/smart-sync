@@ -30,9 +30,9 @@ describe('Verify State proof', () => {
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
 
-        expect(await storage.getA()).to.equal(0);
-        expect(await storage.getB()).to.equal(42);
-        expect(await storage.getValue(deployer.address)).to.equal(0);
+        expect((await storage.getA()).eq(0)).to.be.true;
+        expect((await storage.getB()).eq(42)).to.be.true;
+        expect((await storage.getValue(deployer.address)).eq(0)).to.be.true;
     });
 
     it('Should read correct storage after transactions', async () => {
@@ -47,7 +47,7 @@ describe('Verify State proof', () => {
 
         // `a` is the first field of the contract and its value is stored at slot 0
         const aValue = await provider.getStorageAt(storage.address, 0);
-        expect(aValue).to.equal(ethers.BigNumber.from(newValue));
+        expect(ethers.BigNumber.from(newValue).eq(aValue)).to.be.true;
     });
 
     it('Should read correct mapping storage', async () => {

@@ -58,7 +58,7 @@ describe('Test static proxy calls', () => {
             // ignore error
         }
         // validate that the setValue did not succeed and the contract variable still has its old value
-        expect(await contract.getValue()).to.equal(37);
+        expect((await contract.getValue()).eq(37)).to.be.true;
     });
 
     it('Should not delegate set call through calling contract', async () => {
@@ -68,11 +68,11 @@ describe('Test static proxy calls', () => {
         } catch (error) {
             // ignore error
         }
-        expect(await contract.getValue()).to.equal(37);
+        expect((await contract.getValue()).eq(37)).to.be.true;
     });
 
     it('Should allow delegation of pure functions through the proxy', async () => {
         const contract = new ethers.Contract(proxy.address, abi, deployer);
-        expect(await contract.valuePure()).to.equal(42);
+        expect((await contract.valuePure()).eq(42)).to.be.true;
     });
 });

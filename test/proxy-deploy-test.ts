@@ -50,7 +50,7 @@ describe('Deploy proxy and logic contract', async () => {
         relayContract = await Relayer.deploy();
         await srcContract.setValueA(42);
         await srcContract.setValueB(100);
-        expect(await srcContract.getValueA()).to.be.equal(ethers.BigNumber.from(42));
+        expect((await srcContract.getValueA()).eq(ethers.BigNumber.from(42))).to.be.true;
     });
 
     it('Should copy the source contract', async () => {
@@ -243,12 +243,12 @@ describe('Deploy proxy and logic contract', async () => {
         }
         // TODO: Why do external static calls not work?
         // expect(await proxyContract.callStatic.getValue(691)).to.equal(9);
-        expect(await callRelayContract.callStatic.getValue(691)).to.equal(ethers.BigNumber.from(9));
+        expect((await callRelayContract.callStatic.getValue(691)).eq(ethers.BigNumber.from(9))).to.be.true;
     });
 
     it('should be possible to retreive values via fallback through calling contract', async () => {
-        expect(await callRelayContract.callStatic.getValue(691)).to.equal(ethers.BigNumber.from(9));
-        expect(await callRelayContract.callStatic.getValue(333)).to.equal(ethers.BigNumber.from(33));
+        expect((await callRelayContract.callStatic.getValue(691)).eq(ethers.BigNumber.from(9))).to.be.true;
+        expect((await callRelayContract.callStatic.getValue(333)).eq(ethers.BigNumber.from(33))).to.be.true;
     });
 
     it('should reject state changes via fallback through calling contract', async () => {
@@ -257,6 +257,6 @@ describe('Deploy proxy and logic contract', async () => {
         } catch (error) {
             // ignore error
         }
-        expect(await callRelayContract.getValue(691)).to.equal(9);
+        expect((await callRelayContract.getValue(691)).eq(9)).to.be.true;
     });
 });
