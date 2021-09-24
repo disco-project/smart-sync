@@ -97,7 +97,7 @@ module.exports = (grunt) => {
         grunt.file.copy('./artifacts/contracts/ProxyContract.sol/ProxyContract.json', './dist/artifacts/contracts/ProxyContract.sol/ProxyContract.json');
     });
 
-    grunt.registerTask('install', 'Install cross-chain-cli locally', () => {
+    grunt.registerTask('install', 'Install cross-chain-cli', () => {
         child_process.execSync(`npm i --development`, { stdio: 'inherit' });
         grunt.task.run('compile-project');
         grunt.task.run('install-global');
