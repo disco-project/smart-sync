@@ -13,7 +13,6 @@ imgs
 hardhat_scripts
 evaluation
 contracts
-config
 chain
 chain2
 dist/test
@@ -30,5 +29,3 @@ data/
 target/
 node_modules
 .vscode/
-
-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

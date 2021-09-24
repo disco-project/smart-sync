@@ -89,20 +89,33 @@ module.exports = (grunt) => {
     });
 
     grunt.registerTask('tsc', 'Compile ts files', () => {
+        if (!grunt.file.exists('./artifacts/contracts/ProxyContract.sol/ProxyContract.json')) {
+            grunt.log.writeln('Contracts were not compiled yet.');
+            grunt.task.run('compile-contracts');
+        }
         child_process.execSync('tsc', { stdio: 'inherit' });
-        child_process.execSync('npx copyfiles ./artifacts/contracts/ProxyContract.sol/ProxyContract.json dist', { stdio: 'inherit' });
+        grunt.file.copy('./artifacts/contracts/ProxyContract.sol/ProxyContract.json', './dist/artifacts/contracts/ProxyContract.sol/ProxyContract.json');
     });
 
-    grunt.registerTask('install', 'Install cross-chain-cli', () => {
-        // child_process.execSync(`npm i --development`, { stdio: 'inherit' });
+    grunt.registerTask('install', 'Install cross-chain-cli locally', () => {
+        child_process.execSync(`npm i --development`, { stdio: 'inherit' });
         grunt.task.run('compile-project');
         grunt.task.run('install-global');
         grunt.verbose.ok();
     });
 
-    grunt.registerTask('install-global', 'Install globally', () => {
+    grunt.registerTask('install-global', 'Install cross-chain-cli globally', () => {
         child_process.execSync(`npm i -g`, { stdio: 'inherit' });
     });
+
+    grunt.registerTask('pack', 'npm pack cross-chain-cli', () => {
+        grunt.task.run('install'); 
+        grunt.task.run('npm-pack');
+    });
+
+    grunt.registerTask('npm-pack', 'npm packaging command', () => {
+        child_process.execSync(`npm pack`, { stdio: 'inherit' });
+    })
 
     grunt.registerTask('full-pipeline-test', 'Testing precompiled *.ts project', () => {
         grunt.task.run('compile-contracts');
@@ -114,7 +127,10 @@ module.exports = (grunt) => {
     });
 
     grunt.registerTask('full-pipeline-dist-test', 'Testing compiled *.js project inside dist folder', () => {
-        grunt.task.run('compile-contracts');
+        if (!grunt.file.exists('dist')) {
+            grunt.log.writeln('Dir dist does not exist. Will compile the project now.');
+            grunt.task.run('compile-project');
+        }
         grunt.task.run('eslint');
         grunt.task.run('stop-chains');
         grunt.task.run('start-chains');
