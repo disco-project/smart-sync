@@ -1,10 +1,9 @@
 const child_process = require('child_process');
 const CHAIN_DOCKER_NAME = 'crossChainContracts_test_chain';
-const CONFIG_CHAIN_DIR = './chain/';
-const CHAIN_DIR = './chain/';
+const CONFIG_CHAIN_DIR = 'chain';
+const CHAIN_DIR = './chains';
 const CHAIN_DOCKER_NAME_2 = 'crossChainContracts_test_chain_2';
-const CONFIG_CHAIN_DIR_2 = './chain2/';
-const CHAIN_DIR_2 = './chain2/';
+const CONFIG_CHAIN_DIR_2 = 'chain2';
 
 module.exports = (grunt) => {
     grunt.initConfig({
@@ -45,7 +44,6 @@ module.exports = (grunt) => {
     grunt.registerTask('start-chains', 'Startup chain', () => {
         grunt.verbose.write('Starting test chains...');
         child_process.execSync('docker-compose up -d', { cwd: CHAIN_DIR });
-        child_process.execSync('docker-compose up -d', { cwd: CHAIN_DIR_2 });
     });
 
     grunt.registerTask('stop-chains', 'Stopping chain', () => {
@@ -59,21 +57,15 @@ module.exports = (grunt) => {
         } catch(e) {
             grunt.fail.fatal(e);
         }
-        if (container) {
-            grunt.verbose.write(`Stopping container ${CHAIN_DOCKER_NAME}...`);
-            child_process.execSync(`docker stop ${CHAIN_DOCKER_NAME}`);
-            child_process.execSync(`docker rm -f ${CHAIN_DOCKER_NAME}`);
-            grunt.verbose.ok();
-        }
-        if (container2) {
-            grunt.verbose.write(`Stopping container ${CHAIN_DOCKER_NAME_2}...`);
-            child_process.execSync(`docker stop ${CHAIN_DOCKER_NAME_2}`);
-            child_process.execSync(`docker rm -f ${CHAIN_DOCKER_NAME_2}`);
+        if (container || container2) {
+            grunt.verbose.write(`Stopping containers...`);
+            child_process.execSync(`docker-compose stop`, { cwd: CHAIN_DIR });
+            child_process.execSync(`docker-compose rm -f`, { cwd: CHAIN_DIR });
             grunt.verbose.ok();
         }
         grunt.verbose.write('Removing chain data from test chains...');
-        child_process.execSync(`rm -rf ${CONFIG_CHAIN_DIR}chain-data`);
-        child_process.execSync(`rm -rf ${CONFIG_CHAIN_DIR_2}chain-data`);
+        child_process.execSync(`rm -rf ${CHAIN_DIR}/${CONFIG_CHAIN_DIR}/chain-data`);
+        child_process.execSync(`rm -rf ${CHAIN_DIR}/${CONFIG_CHAIN_DIR_2}/chain-data`);
         grunt.verbose.ok();
     });
     
