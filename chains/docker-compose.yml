@@ -4,8 +4,11 @@ services:
     container_name: crossChainContracts_test_chain
     image: openethereum/openethereum
     volumes:
-      - ./chain/:/home/openethereum/.local/share/openethereum
-    command: --config /home/openethereum/.local/share/openethereum/config.toml --base-path /home/openethereum/.local/share/openethereum/chain-data --keys-path /home/openethereum/.local/share/openethereum/keys
+      - ./:/home/openethereum/.local/share/openethereum
+    command: >
+      --config /home/openethereum/.local/share/openethereum/config.toml 
+      --base-path /home/openethereum/.local/share/openethereum/chain1-data 
+      --keys-path /home/openethereum/.local/share/openethereum/keys
     ports:
       - 8545:8545
       - 8546:8546
@@ -15,8 +18,12 @@ services:
     container_name: crossChainContracts_test_chain_2
     image: openethereum/openethereum
     volumes:
-      - ./chain2:/home/openethereum/.local/share/openethereum
-    command: --config /home/openethereum/.local/share/openethereum/config.toml --base-path /home/openethereum/.local/share/openethereum/chain-data --keys-path /home/openethereum/.local/share/openethereum/keys
+      - ./:/home/openethereum/.local/share/openethereum
+    command: >
+      --config /home/openethereum/.local/share/openethereum/config.toml 
+      --base-path /home/openethereum/.local/share/openethereum/chain2-data 
+      --keys-path /home/openethereum/.local/share/openethereum/keys
+      --ports-shift 2
     ports:
       - 8547:8547
       - 8548:8548

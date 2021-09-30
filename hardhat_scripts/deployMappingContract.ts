@@ -11,11 +11,11 @@ async function main() {
     await mapper.deployed();
     logger.info(mapper.address);
 
-    for (let i = 0; i < 10; i += 1) {
+    for (let i = 0; i < 20; i += 1) {
         await mapper.insert(i, i + 1);
         const keys = await getAllKeys(mapper.address, provider);
         const proof = await provider.send('eth_getProof', [mapper.address, keys]);
-        logger.debug(proof.storageProof);
+        logger.info(proof.storageProof);
     }
 }
 

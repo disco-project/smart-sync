@@ -1,9 +1,9 @@
 const child_process = require('child_process');
 const CHAIN_DOCKER_NAME = 'crossChainContracts_test_chain';
-const CONFIG_CHAIN_DIR = 'chain';
+const CONFIG_CHAIN_DIR = 'chain1-data';
 const CHAIN_DIR = './chains';
 const CHAIN_DOCKER_NAME_2 = 'crossChainContracts_test_chain_2';
-const CONFIG_CHAIN_DIR_2 = 'chain2';
+const CONFIG_CHAIN_DIR_2 = 'chain2-data';
 
 module.exports = (grunt) => {
     grunt.initConfig({
@@ -64,8 +64,8 @@ module.exports = (grunt) => {
             grunt.verbose.ok();
         }
         grunt.verbose.write('Removing chain data from test chains...');
-        child_process.execSync(`rm -rf ${CHAIN_DIR}/${CONFIG_CHAIN_DIR}/chain-data`);
-        child_process.execSync(`rm -rf ${CHAIN_DIR}/${CONFIG_CHAIN_DIR_2}/chain-data`);
+        child_process.execSync(`rm -rf ${CHAIN_DIR}/${CONFIG_CHAIN_DIR}`);
+        child_process.execSync(`rm -rf ${CHAIN_DIR}/${CONFIG_CHAIN_DIR_2}`);
         grunt.verbose.ok();
     });
     
