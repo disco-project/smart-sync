@@ -1,6 +1,6 @@
 {
     "srcChainUrl": "http://localhost:8545",
-    "targetChainUrl": "http://localhost:8548",
+    "targetChainUrl": "http://localhost:8547",
     "connectionTimeout": "36000",
     "logLevel": "info",
     "targetBlocknr": "latest",
