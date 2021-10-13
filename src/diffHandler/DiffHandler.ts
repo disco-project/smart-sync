@@ -1,9 +1,9 @@
 import { ethers } from 'ethers';
 import assert from 'assert';
 import { JsonRpcProvider } from '@ethersproject/providers';
-import { BigNumberish } from '@ethersproject/bignumber';
+import { BigNumberish, BigNumber } from '@ethersproject/bignumber';
 import {
-    getAllKeys, toBlockNumber,
+    getAllKeys, toBlockNumber, toParityQuantity,
 } from '../utils/utils';
 import { logger } from '../utils/logger';
 import TransactionHandler from '../utils/transactionHandler';
@@ -12,6 +12,7 @@ import Remove from './Remove';
 import Change from './Change';
 import Add from './Add';
 import { ProcessedParameters, StorageKeyDiff } from './Types';
+import GetProof from '../proofHandler/GetProof';
 
 async function processParameters(srcAddress: string, srcProvider: JsonRpcProvider, srcBlock?: string | number, targetAddress?: string, targetProvider?: JsonRpcProvider, targetBlock?: string | number): Promise<ProcessedParameters> {
     assert(ethers.utils.isAddress(srcAddress), 'contract address is not a valid address');
@@ -123,6 +124,18 @@ class DiffHandler {
         return new StorageDiff(diffs);
     }
 
+    /**
+     * Create a diff of the `srcAddress` storage between block `srcBlock` and `targetBlock`.
+     * The Diff is from the point of view of `srcAddress` between blocks `srcBlock` targetBlock.
+     * If `srcAddress` contains an additional storage key and value, this is represented as `Add`.
+     * If `srcAddress` nullifies a storage key and value, this is represented as `Remove`.
+     * If key already exists at `srcAddress` and its value differs in `srcAddress`, then
+     * this is represented as a `Change` where the `Change` `srcValue` is set to the value of the `srcAddress`'s storage.
+     * @param srcAddress the address of the contract to get the diff for
+     * @param latestSrcBlock the block number of the targeted block of this comparison
+     * @param earliestSrcBlock the number of the block that is the base for this comparison
+     * @returns the diff between the storage of the two contracts at their specific blocks as list of `StorageDiff`
+     */
     async getDiffFromSrcContractTxs(srcAddress: string, latestSrcBlock?: string | number, earliestSrcBlock?: string | number): Promise<StorageDiff> {
         let processedParameters: ProcessedParameters;
         try {
@@ -142,7 +155,7 @@ class DiffHandler {
         const changedStorage: { [ key: string ]: string } = {};
 
         // replay storage changes
-        const txStorages = await Promise.all(txs.map((tx, index) => srcTxHandler.replayTransaction(tx, index)));
+        const txStorages = await Promise.all(txs.map((tx) => srcTxHandler.replayTransaction(tx)));
         txStorages.forEach((storage) => {
             if (storage) {
                 logger.debug('srcTx txStorage: ', storage);
@@ -169,6 +182,65 @@ class DiffHandler {
             }
         });
 
+        return new StorageDiff(diffs);
+    }
+
+    // todo doesn't work yet
+    async getDiffFromProof(srcAddress: string, latestSrcBlock: string | number, earliestSrcBlock: string | number): Promise<StorageDiff> {
+        let processedParameters: ProcessedParameters;
+        try {
+            processedParameters = await processParameters(srcAddress, this.srcProvider, earliestSrcBlock, srcAddress, this.srcProvider, latestSrcBlock);
+        } catch (e) {
+            logger.error(e);
+            return new StorageDiff([]);
+        }
+
+        const diffs: StorageKeyDiff[] = [];
+
+        const oldKeys = await getAllKeys(srcAddress, this.srcProvider, processedParameters.srcBlock);
+        const newKeys = await getAllKeys(srcAddress, this.srcProvider, processedParameters.targetBlock);
+
+        const paritySrcBlock = toParityQuantity(processedParameters.srcBlock);
+        const parityTargetBlock = toParityQuantity(processedParameters.targetBlock);
+        const oldProof = new GetProof(await this.srcProvider.send('eth_getProof', [srcAddress, oldKeys, paritySrcBlock]));
+        const newProof = new GetProof(await this.srcProvider.send('eth_getProof', [srcAddress, newKeys, parityTargetBlock]));
+
+        /* eslint-disable no-await-in-loop */
+        for (let i = 0; i < newKeys.length; i += 1) {
+            const key: BigNumberish = newKeys[i];
+            const index: number = oldProof.storageProof.findIndex((storageProof) => {
+                return BigNumber.from(key).eq(storageProof.key);
+            });
+            const newStorageProof = newProof.storageProof.find((storageProof) => {
+                return BigNumber.from(key).eq(storageProof.key);
+            });
+            if (!newStorageProof) {
+                logger.error(`Could not find storage proof for key ${key}`);
+                continue;
+            }
+            if (index !== -1) {
+                oldKeys.splice(index, 1);
+                // check if there are any differences in the values
+                if (oldProof.storageProof[index].value !== newStorageProof.value) {
+                    diffs.push(new Change(key, oldProof.storageProof[index].value, newStorageProof.value));
+                }
+            } else {
+                // key is only present in newProof
+                diffs.push(new Add(key, newStorageProof.value));
+            }
+        }
+        // keys that are present in block `srcBlock` but not in `targetBlock`.
+        /* eslint-disable no-restricted-syntax */
+        for (const key of oldKeys) {
+            const currStorageProof = oldProof.storageProof.find((storageProof) => {
+                return BigNumber.from(key).eq(storageProof.key);
+            });
+            if (!currStorageProof) {
+                logger.error(`Could not find storage proof for key ${key}`);
+                continue;
+            }
+            diffs.push(new Remove(key, currStorageProof.value));
+        }
         return new StorageDiff(diffs);
     }
 }

@@ -25,7 +25,6 @@ class ProxyContractBuilder {
         proxyContractJson.bytecode = proxyContractJson.bytecode.split(LOGIC_CONTRACT_PLACEHOLDER_ADDRESS.substr(2).toLowerCase()).join(logicAddress.substr(2).toLowerCase());
         proxyContractJson.bytecode = proxyContractJson.bytecode.split(SOURCE_CONTRACT_PLACEHOLDER_ADDRESS.substr(2).toLowerCase()).join(sourceAddress.substr(2).toLowerCase());
         proxyContractJson.error = false;
-        logger.debug(proxyContractJson.bytecode);
         return proxyContractJson;
     }
 }

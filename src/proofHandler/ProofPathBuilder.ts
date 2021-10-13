@@ -176,11 +176,12 @@ export function addDeletedValue(parentNode: ParentNode, storageProof: StoragePro
     if (parentNode instanceof ExtensionNode) {
         logger.error('Can not add deleted value to ExtensionNode');
         return undefined;
-    } if (!parentNode.children) {
+    } 
+    if (!parentNode.children) {
         logger.error('ParentNode is a leaf node');
         return undefined;
     }
-    const path = ethers.utils.keccak256(storageProof.key);
+    const path = ethers.utils.keccak256(ethers.utils.hexZeroPad(storageProof.key, 32));
     let pathPtr = 2;
     for (let i = 0; i < storageProof.proof.length - 1; i += 1) {
         const node = rlp.decode(storageProof.proof[i]) as Buffer[];

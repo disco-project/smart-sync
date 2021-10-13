@@ -32,9 +32,10 @@ export type DeployingTransation = TransactionResponse & {
 
 export type RPCConfig = {
     gasLimit?: BigNumberish;
+    blockNr?: string | number;
 };
 
-export type GetDiffMethod = 'srcTx' | 'storage';
+export type GetDiffMethod = 'srcTx' | 'storage' | 'getProof';
 
 export function encodeBlockHeader(blockHeader: BlockHeader): Buffer {
     // needed parameters for block header hash
@@ -97,10 +98,17 @@ export class ChainProxy {
 
     private initialized: Boolean;
 
-    constructor(contractAddresses: ContractAddressMap, srcProviderConnectionInfo: ConnectionInfo, targetProviderConnectionInfo: ConnectionInfo, targetRPCConfig: RPCConfig) {
+    private batchSize: number;
+
+    private srcBlock: string | number;
+
+    private targetBlock: string | number;
+
+    constructor(contractAddresses: ContractAddressMap, srcProviderConnectionInfo: ConnectionInfo, srcRPCConfig: RPCConfig, targetProviderConnectionInfo: ConnectionInfo, targetRPCConfig: RPCConfig, batch: number = 50) {
         if (contractAddresses.srcContract) {
             this.srcContractAddress = contractAddresses.srcContract;
         }
+        this.batchSize = batch;
         this.logicContractAddress = contractAddresses.logicContract;
         this.relayContractAddress = contractAddresses.relayContract;
         this.proxyContractAddress = contractAddresses.proxyContract;
@@ -111,6 +119,8 @@ export class ChainProxy {
         this.targetRPCConfig = targetRPCConfig;
         this.initialized = false;
         this.migrationState = false;
+        this.srcBlock = srcRPCConfig.blockNr ?? 'latest';
+        this.targetBlock = targetRPCConfig.blockNr ?? 'latest';
     }
 
     async init(): Promise<Boolean> {
@@ -190,11 +200,11 @@ export class ChainProxy {
             this.relayContract = await relayFactory.deploy();
             logger.info(`Relay contract address: ${this.relayContract.address}`);
         }
-        const keys = await getAllKeys(this.srcContractAddress, this.srcProvider);
         const srcBlockParity = toParityQuantity(srcBlock);
+        const keys = await getAllKeys(this.srcContractAddress, this.srcProvider, srcBlockParity, this.batchSize);
         const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', [srcBlockParity, true]);
         // create a proof of the source contract's storage
-        const initialValuesProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, keys]));
+        const initialValuesProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, keys, srcBlockParity]));
 
         // update relay
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
@@ -310,7 +320,7 @@ export class ChainProxy {
         }
     }
 
-    async migrateChangesToProxy(changedKeys: Array<BigNumberish>): Promise<Boolean> {
+    async migrateChangesToProxy(changedKeys: Array<BigNumberish>, srcBlock: string | number = this.srcBlock): Promise<Boolean> {
         if (!this.initialized) {
             logger.error('ChainProxy is not initialized yet.');
             return false;
@@ -325,10 +335,11 @@ export class ChainProxy {
             return false;
         }
 
-        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', ['latest', true]);
+        const paritySrcBlock = toParityQuantity(srcBlock);
+        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', [paritySrcBlock, true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        const changedKeysProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, changedKeys]));
+        const changedKeysProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, changedKeys, paritySrcBlock]));
 
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
@@ -366,7 +377,20 @@ export class ChainProxy {
                     return undefined;
                 }
                 return this.differ.getDiffFromStorage(this.srcContractAddress, this.proxyContractAddress, parameters.srcBlock, parameters.targetBlock);
-            // srcTx is default
+            case 'getProof':
+                if (this.relayContract && this.proxyContract) {
+                    const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
+                    if (srcBlock) {
+                        const givenSrcBlockNr = await toBlockNumber(parameters.srcBlock, this.srcProvider);
+                        if (synchedBlockNr.gte(givenSrcBlockNr)) {
+                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${givenSrcBlockNr}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
+                        }
+                    } else {
+                        srcBlock = synchedBlockNr.toNumber() + 1;
+                    }
+                }
+                return this.differ.getDiffFromProof(this.srcContractAddress, parameters.targetBlock, srcBlock)
+                // srcTx is default
             default:
                 if (this.relayContract && this.proxyContract) {
                     const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);

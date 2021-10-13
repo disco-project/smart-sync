@@ -32,6 +32,7 @@ interface ViewContractInteractionOptions extends GeneralOptions {
 export interface TxContractInteractionOptions extends ViewContractInteractionOptions {
     diffMode?: string;
     gasLimit?: string;
+    batchSize?: string | undefined;
 }
 
 export type ConfigTypish = GeneralOptions | TxContractInteractionOptions | ViewContractInteractionOptions;
@@ -95,7 +96,7 @@ continuousSynch
     .option('--gas-limit <limit>')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr.')
-            .choices(['storage', 'srcTx'])
+            .choices(['storage', 'srcTx', 'getProof'])
             .default('srcTx'),
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
@@ -125,7 +126,14 @@ continuousSynch
         const rpcConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
         };
-        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, targetConnectionInfo, rpcConfig);
+        const targetRPCConfig: RPCConfig = {
+            gasLimit: adjustedOptions.gasLimit,
+            blockNr: adjustedOptions.targetBlocknr
+        };
+        const srcRPCConfig: RPCConfig = {
+            blockNr: adjustedOptions.srcBlocknr
+        }
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
 
         // if cli is called as a child process, this will be used to kill it.
@@ -164,7 +172,8 @@ fork
     .arguments('<src_contract_address> [relay_contract_address]')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use')
-            .choices(['storage', 'srcTx']),
+            .choices(['storage', 'srcTx', 'getProof'])
+            .default('srcTx'),
     )
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
     .action(async (srcContract: string, relayContractAddress: string | undefined, options: TxContractInteractionOptions) => {
@@ -190,10 +199,17 @@ fork
         const rpcConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
         };
-        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, targetConnectionInfo, rpcConfig);
+        const targetRPCConfig: RPCConfig = {
+            gasLimit: adjustedOptions.gasLimit,
+            blockNr: adjustedOptions.targetBlocknr
+        };
+        const srcRPCConfig: RPCConfig = {
+            blockNr: adjustedOptions.srcBlocknr
+        }
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
         // todo check for return value
-        const migrated = await chainProxy.migrateSrcContract();
+        const migrated = await chainProxy.migrateSrcContract(adjustedOptions.srcBlocknr);
         if (migrated) {
             logger.info('Migration successfull.');
         } else {
@@ -229,7 +245,14 @@ migrationStatus
         const rpcConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
         };
-        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, targetConnectionInfo, rpcConfig);
+        const targetRPCConfig: RPCConfig = {
+            gasLimit: adjustedOptions.gasLimit,
+            blockNr: adjustedOptions.targetBlocknr
+        };
+        const srcRPCConfig: RPCConfig = {
+            blockNr: adjustedOptions.srcBlocknr
+        }
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
 
         logger.info(`migration-status: ${chainProxy.migrationState}`);
@@ -260,10 +283,14 @@ getCurrBlockNumber
             url: adjustedOptions.targetChainUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
-        const rpcConfig: RPCConfig = {
+        const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
+            blockNr: adjustedOptions.targetBlocknr
         };
-        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, targetConnectionInfo, rpcConfig);
+        const srcRPCConfig: RPCConfig = {
+            blockNr: adjustedOptions.srcBlocknr
+        }
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
         const latestBlockNumber = await chainProxy.getCurrentBlockNumber();
         logger.info(`Current synched block number: ${latestBlockNumber.toNumber()}`);
@@ -277,7 +304,7 @@ stateDiff
     .description('Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address has to be provided.')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr. If no blocks are given when using srcTx, then only the latest block is examined.')
-            .choices(['storage', 'srcTx'])
+            .choices(['storage', 'srcTx', 'getProof'])
             .default('srcTx'),
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
@@ -301,13 +328,17 @@ stateDiff
             url: adjustedOptions.targetChainUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
-        const rpcConfig: RPCConfig = {
+        const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
+            blockNr: adjustedOptions.targetBlocknr
         };
-        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, targetConnectionInfo, rpcConfig);
+        const srcRPCConfig: RPCConfig = {
+            blockNr: adjustedOptions.srcBlocknr
+        }
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
 
-        const diff = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: options.srcBlocknr, targetBlock: options.targetBlocknr });
+        const diff = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
 
         if (diff === undefined) return;
         logger.info('Adds:', diff.adds().map((add) => ({ key: add.key, value: add.value })));
@@ -323,11 +354,12 @@ synchronize
     .arguments('<proxy_contract_address>')
     .addOption(
         new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr.')
-            .choices(['storage', 'srcTx'])
+            .choices(['storage', 'srcTx', 'getProof'])
             .default('srcTx'),
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
+    .option('-b, --batch-size', 'Define how many blocks should be synchronized at once', undefined)
     .action(async (proxyContract: string, options: TxContractInteractionOptions) => {
         let adjustedOptions = options;
         // override options here if config file was added
@@ -335,6 +367,10 @@ synchronize
             adjustedOptions = overrideFileOptions<TxContractInteractionOptions>(adjustedOptions.configFile, adjustedOptions);
         }
         logger.setSettings({ minLevel: adjustedOptions.logLevel });
+        let batchSize = -1;
+        if (adjustedOptions.batchSize) {
+            batchSize = BigNumber.from(adjustedOptions.batchSize).toNumber();
+        }
 
         const contractAddressMap: ContractAddressMap = {
             proxyContract,
@@ -347,12 +383,17 @@ synchronize
             url: adjustedOptions.targetChainUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
-        const rpcConfig: RPCConfig = {
+        const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
+            blockNr: adjustedOptions.targetBlocknr
         };
-        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, targetConnectionInfo, rpcConfig);
+        const srcRPCConfig: RPCConfig = {
+            blockNr: adjustedOptions.srcBlocknr
+        }
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
-        const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: options.targetBlocknr });
+        // todo hier eine schleife einfügen
+        const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
         if (!changedKeys) {
             logger.error('Could not get changed keys');
             return;
@@ -362,6 +403,7 @@ synchronize
             logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
         } else {
             logger.error('Could not synch changes.');
+            return;
         }
     });
 

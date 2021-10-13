@@ -151,3 +151,17 @@ export async function createDeployingByteCode(srcAddress: string, provider: Json
 
     return deployCode;
 }
+
+export async function processPromiseBatches<T>(promises: Array<Promise<T>>, batch: number = 20): Promise<Array<T>> {
+    let array: Array<T> = []
+    while (promises.length > 0) {
+        try {
+            const currBatch = await Promise.all(promises.splice(0, batch));
+            array = array.concat(currBatch);
+        } catch (e) {
+            logger.error(e);
+            process.exit(-1);
+        }
+    }
+    return array;
+}
