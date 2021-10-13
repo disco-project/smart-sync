@@ -176,7 +176,7 @@ export function addDeletedValue(parentNode: ParentNode, storageProof: StoragePro
     if (parentNode instanceof ExtensionNode) {
         logger.error('Can not add deleted value to ExtensionNode');
         return undefined;
-    } 
+    }
     if (!parentNode.children) {
         logger.error('ParentNode is a leaf node');
         return undefined;

@@ -6,7 +6,6 @@ import {
     PROXY_CONTRACT_FILE_PATH,
 } from '../config';
 import FileHandler from './fileHandler';
-import { logger } from './logger';
 
 class ProxyContractBuilder {
     /**
