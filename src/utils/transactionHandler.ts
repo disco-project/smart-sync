@@ -1,8 +1,8 @@
 import { Block, TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider';
 import { JsonRpcProvider } from '@ethersproject/providers';
-import { logger } from './logger';
-import { findDeploymentBlock, processPromiseBatches, toBlockNumber } from './utils';
 import * as CliProgress from 'cli-progress';
+import { logger } from './logger';
+import { findDeploymentBlock, toBlockNumber } from './utils';
 
 type KeyObject = {
     '*'?: {
@@ -43,7 +43,7 @@ class TransactionHandler {
         let txStorages: Array<{ [ key: string ]: string } | undefined> = [];
 
         logger.debug(`Replaying ${txs.length} transactions...`);
-        let replayBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        const replayBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
         replayBar.start(txs.length, 0);
         while (txs.length > 0) {
             const currTx = txs.pop();
@@ -126,7 +126,7 @@ class TransactionHandler {
                     blockPromise.catch((error) => {
                         logger.error(error);
                         process.exit(-1);
-                    })
+                    });
                 });
                 blocks = blocks.concat(await Promise.all(blockPromises));
                 blockPromises = [];
@@ -138,16 +138,16 @@ class TransactionHandler {
         logger.debug('Done.');
         blocks = blocks.filter((value) => (!!value));
 
-        let transactionBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        const transactionBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
         let transactionPromises: Array<Promise<TransactionResponse>> = [];
-        let transactionHashes: Array<string> = []; 
+        let transactionHashes: Array<string> = [];
         let transactions: Array<TransactionResponse> = [];
         blocks.forEach(({ transactions }) => {
             transactionHashes = transactionHashes.concat(transactions);
         });
         logger.debug(`Getting ${transactionHashes.length} transactions...`);
         transactionBar.start(transactionHashes.length, 0);
-        while(transactionHashes.length > 0) {
+        while (transactionHashes.length > 0) {
             const currTx = transactionHashes.pop();
             if (!currTx) continue;
             transactionPromises.push(this.provider.getTransaction(currTx));
@@ -156,7 +156,7 @@ class TransactionHandler {
                     transactionPromise.catch((error) => {
                         logger.error(error);
                         process.exit(-1);
-                    })
+                    });
                 });
                 transactions = transactions.concat(await Promise.all(transactionPromises));
                 transactionPromises = [];
@@ -164,10 +164,10 @@ class TransactionHandler {
             }
         }
         transactionBar.stop();
-        logger.debug('Done.')
+        logger.debug('Done.');
 
         logger.debug('Getting receipts and related txs...');
-        let receiptBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        const receiptBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
         let receiptPromises: Array<Promise<TransactionReceipt>> = [];
         const receiptHashes: Array<string> = [];
         let receipts: Array<TransactionReceipt> = [];
@@ -191,7 +191,7 @@ class TransactionHandler {
                     receiptPromise.catch((error) => {
                         logger.error(error);
                         process.exit(-1);
-                    })
+                    });
                 });
                 receipts = receipts.concat(await Promise.all(receiptPromises));
                 receiptPromises = [];

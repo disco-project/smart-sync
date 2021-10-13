@@ -123,16 +123,13 @@ continuousSynch
             url: adjustedOptions.targetChainUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
-        const rpcConfig: RPCConfig = {
-            gasLimit: adjustedOptions.gasLimit,
-        };
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
-            blockNr: adjustedOptions.targetBlocknr
+            blockNr: adjustedOptions.targetBlocknr,
         };
         const srcRPCConfig: RPCConfig = {
-            blockNr: adjustedOptions.srcBlocknr
-        }
+            blockNr: adjustedOptions.srcBlocknr,
+        };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
 
@@ -196,16 +193,13 @@ fork
             url: adjustedOptions.targetChainUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
-        const rpcConfig: RPCConfig = {
-            gasLimit: adjustedOptions.gasLimit,
-        };
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
-            blockNr: adjustedOptions.targetBlocknr
+            blockNr: adjustedOptions.targetBlocknr,
         };
         const srcRPCConfig: RPCConfig = {
-            blockNr: adjustedOptions.srcBlocknr
-        }
+            blockNr: adjustedOptions.srcBlocknr,
+        };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
         // todo check for return value
@@ -242,16 +236,13 @@ migrationStatus
             url: adjustedOptions.targetChainUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
-        const rpcConfig: RPCConfig = {
-            gasLimit: adjustedOptions.gasLimit,
-        };
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
-            blockNr: adjustedOptions.targetBlocknr
+            blockNr: adjustedOptions.targetBlocknr,
         };
         const srcRPCConfig: RPCConfig = {
-            blockNr: adjustedOptions.srcBlocknr
-        }
+            blockNr: adjustedOptions.srcBlocknr,
+        };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
 
@@ -285,11 +276,11 @@ getCurrBlockNumber
         };
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
-            blockNr: adjustedOptions.targetBlocknr
+            blockNr: adjustedOptions.targetBlocknr,
         };
         const srcRPCConfig: RPCConfig = {
-            blockNr: adjustedOptions.srcBlocknr
-        }
+            blockNr: adjustedOptions.srcBlocknr,
+        };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
         const latestBlockNumber = await chainProxy.getCurrentBlockNumber();
@@ -330,11 +321,11 @@ stateDiff
         };
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
-            blockNr: adjustedOptions.targetBlocknr
+            blockNr: adjustedOptions.targetBlocknr,
         };
         const srcRPCConfig: RPCConfig = {
-            blockNr: adjustedOptions.srcBlocknr
-        }
+            blockNr: adjustedOptions.srcBlocknr,
+        };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
 
@@ -371,6 +362,7 @@ synchronize
         if (adjustedOptions.batchSize) {
             batchSize = BigNumber.from(adjustedOptions.batchSize).toNumber();
         }
+        // todo adjust block nrs
 
         const contractAddressMap: ContractAddressMap = {
             proxyContract,
@@ -385,11 +377,11 @@ synchronize
         };
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
-            blockNr: adjustedOptions.targetBlocknr
+            blockNr: adjustedOptions.targetBlocknr,
         };
         const srcRPCConfig: RPCConfig = {
-            blockNr: adjustedOptions.srcBlocknr
-        }
+            blockNr: adjustedOptions.srcBlocknr,
+        };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
         // todo hier eine schleife einfügen
@@ -403,7 +395,6 @@ synchronize
             logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
         } else {
             logger.error('Could not synch changes.');
-            return;
         }
     });
 

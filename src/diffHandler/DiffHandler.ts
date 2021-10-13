@@ -208,14 +208,11 @@ class DiffHandler {
         /* eslint-disable no-await-in-loop */
         for (let i = 0; i < newKeys.length; i += 1) {
             const key: BigNumberish = newKeys[i];
-            const index: number = oldProof.storageProof.findIndex((storageProof) => {
-                return BigNumber.from(key).eq(storageProof.key);
-            });
-            const newStorageProof = newProof.storageProof.find((storageProof) => {
-                return BigNumber.from(key).eq(storageProof.key);
-            });
+            const index: number = oldProof.storageProof.findIndex((storageProof) => BigNumber.from(key).eq(storageProof.key));
+            const newStorageProof = newProof.storageProof.find((storageProof) => BigNumber.from(key).eq(storageProof.key));
             if (!newStorageProof) {
                 logger.error(`Could not find storage proof for key ${key}`);
+                // eslint-disable-next-line no-continue
                 continue;
             }
             if (index !== -1) {
@@ -232,11 +229,10 @@ class DiffHandler {
         // keys that are present in block `srcBlock` but not in `targetBlock`.
         /* eslint-disable no-restricted-syntax */
         for (const key of oldKeys) {
-            const currStorageProof = oldProof.storageProof.find((storageProof) => {
-                return BigNumber.from(key).eq(storageProof.key);
-            });
+            const currStorageProof = oldProof.storageProof.find((storageProof) => BigNumber.from(key).eq(storageProof.key));
             if (!currStorageProof) {
                 logger.error(`Could not find storage proof for key ${key}`);
+                // eslint-disable-next-line no-continue
                 continue;
             }
             diffs.push(new Remove(key, currStorageProof.value));

@@ -389,7 +389,7 @@ export class ChainProxy {
                         srcBlock = synchedBlockNr.toNumber() + 1;
                     }
                 }
-                return this.differ.getDiffFromProof(this.srcContractAddress, parameters.targetBlock, srcBlock)
+                return this.differ.getDiffFromProof(this.srcContractAddress, parameters.targetBlock, srcBlock);
                 // srcTx is default
             default:
                 if (this.relayContract && this.proxyContract) {
