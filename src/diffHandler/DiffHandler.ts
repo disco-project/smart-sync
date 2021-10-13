@@ -146,7 +146,7 @@ class DiffHandler {
         }
 
         const diffs: StorageKeyDiff[] = [];
-        const srcTxHandler = new TransactionHandler(processedParameters.srcAddress, this.srcProvider);
+        const srcTxHandler = new TransactionHandler(processedParameters.srcAddress, this.srcProvider, this.batchSize);
 
         // getting all tx from srcAddress
         const txs = await srcTxHandler.getTransactions(processedParameters.targetBlock, processedParameters.srcBlock);

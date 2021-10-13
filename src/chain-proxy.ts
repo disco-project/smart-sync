@@ -237,6 +237,8 @@ export class ChainProxy {
         const logicFactory = new ethers.ContractFactory([], logicContractByteCode, this.deployer);
         try {
             const logicContract = await logicFactory.deploy();
+            const gasUsedForDeployment = (await logicContract.deployTransaction.wait()).gasUsed.toNumber();
+            logger.debug(`Gas used for deploying logicContract: ${gasUsedForDeployment}`);
             this.logicContractAddress = logicContract.address;
         } catch (e) {
             logger.error(e);
@@ -261,6 +263,8 @@ export class ChainProxy {
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
         try {
             this.proxyContract = await proxyFactory.deploy();
+            const gasUsedForDeployment = (await this.proxyContract.deployTransaction.wait()).gasUsed.toNumber();
+            logger.debug(`Gas used for deploying proxyContract: ${gasUsedForDeployment}`);
         } catch (e) {
             logger.error(e);
             return false;
