@@ -3,7 +3,7 @@ import { JsonRpcProvider } from '@ethersproject/providers';
 import { ConnectionInfo } from '@ethersproject/web';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumber, BigNumberish, ethers } from 'ethers';
-import { TransactionResponse } from '@ethersproject/abstract-provider';
+import { TransactionReceipt, TransactionResponse } from '@ethersproject/abstract-provider';
 import * as rlp from 'rlp';
 import { RelayContract, RelayContract__factory } from '../src-gen/types';
 import { PROXY_INTERFACE } from './config';
@@ -72,7 +72,7 @@ export class ChainProxy {
 
     readonly proxyContractAddress: string | undefined;
 
-    private srcContractAddress: string;
+    srcContractAddress: string;
 
     private logicContractAddress: string | undefined;
 
@@ -283,11 +283,28 @@ export class ChainProxy {
         });
 
         // todo adjust batch according to gas estimations
-        const storageAdds: any = [];
+        // todo add option for adjust key value pair batch
+        let storageAdds: Array<Promise<TransactionResponse>> = [];
+        let txs: Array<TransactionResponse> = [];
         while (proxyKeys.length > 0) {
             storageAdds.push(this.proxyContract.addStorage(proxyKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
+            if (storageAdds.length >= this.batchSize) {
+                // eslint-disable-next-line no-await-in-loop
+                txs = txs.concat(await Promise.all(storageAdds));
+                storageAdds = [];
+            }
         }
-        await Promise.all(storageAdds);
+        txs = txs.concat(await Promise.all(storageAdds));
+        const txsReceiptPromises: Array<Promise<TransactionReceipt>> = [];
+        let cumulativeGasUsed = 0;
+        txs.forEach((tx) => {
+            txsReceiptPromises.push(tx.wait());
+        });
+        const txsReceipts: Array<TransactionReceipt> = await Promise.all(txsReceiptPromises);
+        txsReceipts.forEach((receipt) => {
+            cumulativeGasUsed += receipt.gasUsed.toNumber();
+        });
+        logger.debug(`Gas used for migrating state in ${txs.length} txs: ${cumulativeGasUsed}`);
         logger.debug('done.');
 
         // validate migration
@@ -303,7 +320,9 @@ export class ChainProxy {
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
         try {
-            await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), blockNumber, { gasLimit: this.targetRPCConfig.gasLimit });
+            const tx = await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), blockNumber, { gasLimit: this.targetRPCConfig.gasLimit });
+            const gasUsedForTx = (await tx.wait()).gasUsed.toNumber();
+            logger.debug(`Gas used for verifying contract migration: ${gasUsedForTx}`);
         } catch (e) {
             logger.error(e);
             return false;
@@ -354,9 +373,8 @@ export class ChainProxy {
         try {
             txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number, { gasLimit: this.targetRPCConfig.gasLimit });
             receipt = await txResponse.wait();
-            logger.debug(receipt);
+            logger.debug(`Gas used for updating storage ${receipt.gasUsed.toNumber()}`);
         } catch (e) {
-            logger.error('something went wrong');
             logger.fatal(e);
             return false;
         }
@@ -371,6 +389,7 @@ export class ChainProxy {
         }
 
         let { srcBlock } = parameters;
+        let { targetBlock } = parameters;
         switch (method) {
             case 'storage':
                 if (!this.proxyContractAddress) {
@@ -385,12 +404,19 @@ export class ChainProxy {
                 if (this.relayContract && this.proxyContract) {
                     const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
                     if (srcBlock) {
-                        const givenSrcBlockNr = await toBlockNumber(parameters.srcBlock, this.srcProvider);
-                        if (synchedBlockNr.gte(givenSrcBlockNr)) {
-                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${givenSrcBlockNr}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
+                        srcBlock = await toBlockNumber(parameters.srcBlock, this.srcProvider);
+                        if (synchedBlockNr.gte(srcBlock)) {
+                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${srcBlock}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
                         }
                     } else {
                         srcBlock = synchedBlockNr.toNumber() + 1;
+                    }
+                }
+                if (targetBlock) {
+                    const givenTargetBlockNr = await toBlockNumber(targetBlock, this.srcProvider);
+                    if (BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
+                        logger.error(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr.`);
+                        process.exit(-1);
                     }
                 }
                 return this.differ.getDiffFromProof(this.srcContractAddress, parameters.targetBlock, srcBlock);
@@ -399,12 +425,19 @@ export class ChainProxy {
                 if (this.relayContract && this.proxyContract) {
                     const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
                     if (srcBlock) {
-                        const givenSrcBlockNr = await toBlockNumber(parameters.srcBlock, this.srcProvider);
-                        if (synchedBlockNr.gte(givenSrcBlockNr)) {
-                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${givenSrcBlockNr}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
+                        srcBlock = await toBlockNumber(parameters.srcBlock, this.srcProvider);
+                        if (synchedBlockNr.gte(srcBlock)) {
+                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${srcBlock}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
                         }
                     } else {
                         srcBlock = synchedBlockNr.toNumber() + 1;
+                    }
+                }
+                if (targetBlock) {
+                    const givenTargetBlockNr = await toBlockNumber(targetBlock, this.srcProvider);
+                    if (BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
+                        logger.error(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr.`);
+                        process.exit(-1);
                     }
                 }
                 return this.differ.getDiffFromSrcContractTxs(this.srcContractAddress, parameters.targetBlock, srcBlock);
@@ -432,6 +465,8 @@ export class ChainProxy {
             return BigNumber.from(-1);
         }
 
-        return this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
+        const currNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
+        this.srcBlock = currNr.toNumber();
+        return currNr;
     }
 }

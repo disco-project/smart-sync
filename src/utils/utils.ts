@@ -156,6 +156,7 @@ export async function processPromiseBatches<T>(promises: Array<Promise<T>>, batc
     let array: Array<T> = [];
     while (promises.length > 0) {
         try {
+            // eslint-disable-next-line no-await-in-loop
             const currBatch = await Promise.all(promises.splice(0, batch));
             array = array.concat(currBatch);
         } catch (e) {

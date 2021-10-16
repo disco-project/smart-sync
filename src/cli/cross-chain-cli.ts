@@ -6,6 +6,7 @@ import { Command, Option } from 'commander';
 import { TLogLevelName } from 'tslog';
 import * as CRON from 'node-cron';
 import { SIGTERM } from 'constants';
+import * as CliProgress from 'cli-progress';
 import {
     ChainProxy, ContractAddressMap, RPCConfig, GetDiffMethod,
 } from '../chain-proxy';
@@ -32,7 +33,8 @@ interface ViewContractInteractionOptions extends GeneralOptions {
 export interface TxContractInteractionOptions extends ViewContractInteractionOptions {
     diffMode?: string;
     gasLimit?: string;
-    batchSize?: string | undefined;
+    batchSize?: string;
+    batchPerSynch?: string;
 }
 
 export type ConfigTypish = GeneralOptions | TxContractInteractionOptions | ViewContractInteractionOptions;
@@ -147,7 +149,7 @@ continuousSynch
                 logger.error('Could not get changed keys');
                 return;
             }
-            const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys());
+            const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), adjustedOptions.targetBlocknr);
             if (synchronized) {
                 logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
             } else {
@@ -350,7 +352,7 @@ synchronize
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
-    .option('-b, --batch-size', 'Define how many blocks should be synchronized at once', undefined)
+    .option('-b, --batch-size', 'Define how many blocks/txs should be pulled at once', undefined)
     .action(async (proxyContract: string, options: TxContractInteractionOptions) => {
         let adjustedOptions = options;
         // override options here if config file was added
@@ -358,11 +360,75 @@ synchronize
             adjustedOptions = overrideFileOptions<TxContractInteractionOptions>(adjustedOptions.configFile, adjustedOptions);
         }
         logger.setSettings({ minLevel: adjustedOptions.logLevel });
-        let batchSize = -1;
+        const contractAddressMap: ContractAddressMap = {
+            proxyContract,
+        };
+        const srcConnectionInfo: ConnectionInfo = {
+            url: adjustedOptions.srcChainUrl,
+            timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
+        };
+        const targetConnectionInfo: ConnectionInfo = {
+            url: adjustedOptions.targetChainUrl,
+            timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
+        };
+        const targetRPCConfig: RPCConfig = {
+            gasLimit: adjustedOptions.gasLimit,
+            blockNr: adjustedOptions.targetBlocknr,
+        };
+        const srcRPCConfig: RPCConfig = {
+            blockNr: undefined,
+        };
+        let batchSize = 50;
         if (adjustedOptions.batchSize) {
             batchSize = BigNumber.from(adjustedOptions.batchSize).toNumber();
         }
-        // todo adjust block nrs
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig, batchSize);
+        await chainProxy.init();
+        adjustedOptions.srcBlocknr = (await chainProxy.getCurrentBlockNumber()).add(1).toString();
+
+        const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
+        if (!changedKeys) {
+            logger.error('Could not get changed keys');
+            return;
+        }
+
+        const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), adjustedOptions.targetBlocknr);
+        if (synchronized) {
+            logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
+        } else {
+            logger.error('Could not synch changes.');
+        }
+    });
+
+// todo: needs testing
+let batchSynchronize: Command = program.command('batch-synchronize') as Command;
+batchSynchronize = commonOptions(synchronize);
+batchSynchronize
+    .alias('b')
+    .description('Synchronizes the storage of a proxy contract with its source contracts storage up to an optionally provided block nr on the source chain with the help of batches. ')
+    .arguments('<proxy_contract_address> <batch_size>')
+    .addOption(
+        new Option('--diff-mode <mode>', 'Diff function to use. When using storage, option --src-BlockNr equals block on srcChain and --target-BlockNr block on targetChain. When using srcTx --src-BlockNr describes block from where to replay tx until --target-blockNr.')
+            .choices(['storage', 'srcTx', 'getProof'])
+            .default('srcTx'),
+    )
+    .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
+    .option('--gas-limit <limit>', 'gas limit for tx on target chain')
+    .option('-b, --batch-size', 'Define how many blocks/txs should be pulled at once', undefined)
+    .action(async (proxyContract: string, synchBatchSize: string, options: TxContractInteractionOptions) => {
+        let adjustedOptions = options;
+        // override options here if config file was added
+        if (adjustedOptions.configFile) {
+            adjustedOptions = overrideFileOptions<TxContractInteractionOptions>(adjustedOptions.configFile, adjustedOptions);
+        }
+        logger.setSettings({ minLevel: adjustedOptions.logLevel });
+        const batchPerSynch = BigNumber.from(synchBatchSize).toNumber();
+        try {
+            BigNumber.from(adjustedOptions.targetBlocknr).toNumber();
+        } catch (e) {
+            logger.error('The batch option currently only works if you provide target and source block number.');
+            process.exit(-1);
+        }
 
         const contractAddressMap: ContractAddressMap = {
             proxyContract,
@@ -382,20 +448,48 @@ synchronize
         const srcRPCConfig: RPCConfig = {
             blockNr: adjustedOptions.srcBlocknr,
         };
-        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
+        let batchSize = 50;
+        if (adjustedOptions.batchSize) {
+            batchSize = BigNumber.from(adjustedOptions.batchSize).toNumber();
+        }
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig, batchSize);
         await chainProxy.init();
-        // todo hier eine schleife einfügen
-        const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
-        if (!changedKeys) {
-            logger.error('Could not get changed keys');
-            return;
-        }
-        const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys());
-        if (synchronized) {
-            logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
+
+        // take the last synched block.
+        let srcBlockNr: number;
+        if (!adjustedOptions.srcBlocknr) {
+            logger.info('No source block number given. Will find the deployment block and go from there.');
+            srcBlockNr = (await chainProxy.getCurrentBlockNumber()).toNumber();
         } else {
-            logger.error('Could not synch changes.');
+            srcBlockNr = BigNumber.from(adjustedOptions.srcBlocknr).toNumber();
         }
+
+        const targetBlockNr = BigNumber.from(adjustedOptions.targetBlocknr).toNumber();
+        const processBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        processBar.start(targetBlockNr - srcBlockNr, 0);
+        do {
+            // eslint-disable-next-line no-await-in-loop
+            const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: srcBlockNr, targetBlock: targetBlockNr });
+            if (!changedKeys) {
+                logger.error('Could not get changed keys');
+                return;
+            }
+
+            // eslint-disable-next-line no-await-in-loop
+            const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), targetBlockNr);
+            if (synchronized) {
+                logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
+            } else {
+                logger.error('Could not synch changes.');
+                return;
+            }
+            processBar.increment(batchPerSynch);
+            srcBlockNr += batchPerSynch;
+            if (srcBlockNr > targetBlockNr) {
+                srcBlockNr = targetBlockNr;
+            }
+        } while (srcBlockNr < targetBlockNr);
+        processBar.stop();
     });
 
 program
