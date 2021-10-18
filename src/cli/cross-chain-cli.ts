@@ -35,6 +35,8 @@ export interface TxContractInteractionOptions extends ViewContractInteractionOpt
     gasLimit?: string;
     batchSize?: string;
     batchPerSynch?: string;
+    targetAccountEncryptedJson?: string;
+    targetAccountPassword?: string;
 }
 
 export type ConfigTypish = GeneralOptions | TxContractInteractionOptions | ViewContractInteractionOptions;
@@ -102,6 +104,8 @@ continuousSynch
             .default('srcTx'),
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
+    .option('--target-account-encrypted-json <file_path>', 'Encrypted json file path of account to use at target chain to sign txs')
+    .option('--target-account-password <target_account_password>', 'Password to decrypt account json file')
     .action(async (proxyContract: string, period: string, options: TxContractInteractionOptions) => {
         if (!CRON.validate(period)) {
             logger.error(`No valid period given (${period}). See --help for more information (description of argument period)`);
@@ -128,6 +132,8 @@ continuousSynch
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
             blockNr: adjustedOptions.targetBlocknr,
+            targetAccountEncryptedJsonPath: adjustedOptions.targetAccountEncryptedJson,
+            targetAccountPassword: adjustedOptions.targetAccountPassword,
         };
         const srcRPCConfig: RPCConfig = {
             blockNr: adjustedOptions.srcBlocknr,
@@ -175,6 +181,8 @@ fork
             .default('srcTx'),
     )
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
+    .option('--target-account-encrypted-json <file_path>', 'Encrypted json file path of account to use at target chain to sign txs')
+    .option('--target-account-password <target_account_password', 'Password to decrypt account json file')
     .action(async (srcContract: string, relayContractAddress: string | undefined, options: TxContractInteractionOptions) => {
         let adjustedOptions = options;
         // override options here if config file was added
@@ -198,6 +206,8 @@ fork
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
             blockNr: adjustedOptions.targetBlocknr,
+            targetAccountEncryptedJsonPath: adjustedOptions.targetAccountEncryptedJson,
+            targetAccountPassword: adjustedOptions.targetAccountPassword,
         };
         const srcRPCConfig: RPCConfig = {
             blockNr: adjustedOptions.srcBlocknr,
@@ -353,6 +363,8 @@ synchronize
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
     .option('-b, --batch-size', 'Define how many blocks/txs should be pulled at once', undefined)
+    .option('--target-account-encrypted-json <file_path>', 'Encrypted json file path of account to use at target chain to sign txs')
+    .option('--target-account-password <target_account_password', 'Password to decrypt account json file')
     .action(async (proxyContract: string, options: TxContractInteractionOptions) => {
         let adjustedOptions = options;
         // override options here if config file was added
@@ -374,6 +386,8 @@ synchronize
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
             blockNr: adjustedOptions.targetBlocknr,
+            targetAccountEncryptedJsonPath: adjustedOptions.targetAccountEncryptedJson,
+            targetAccountPassword: adjustedOptions.targetAccountPassword,
         };
         const srcRPCConfig: RPCConfig = {
             blockNr: undefined,
@@ -400,9 +414,9 @@ synchronize
         }
     });
 
-// todo: needs testing
+// todo: needs testing, integrate into normal synchronize command through option
 let batchSynchronize: Command = program.command('batch-synchronize') as Command;
-batchSynchronize = commonOptions(synchronize);
+batchSynchronize = commonOptions(batchSynchronize);
 batchSynchronize
     .alias('b')
     .description('Synchronizes the storage of a proxy contract with its source contracts storage up to an optionally provided block nr on the source chain with the help of batches. ')

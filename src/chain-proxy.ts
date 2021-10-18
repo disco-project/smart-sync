@@ -1,5 +1,5 @@
 import { Contract, ContractReceipt, ContractTransaction } from '@ethersproject/contracts';
-import { JsonRpcProvider } from '@ethersproject/providers';
+import { JsonRpcProvider, JsonRpcSigner } from '@ethersproject/providers';
 import { ConnectionInfo } from '@ethersproject/web';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumber, BigNumberish, ethers } from 'ethers';
@@ -16,6 +16,7 @@ import GetProof from './proofHandler/GetProof';
 import { BlockHeader } from './proofHandler/Types';
 import ProxyContractBuilder from './utils/proxy-contract-builder';
 import StorageDiff from './diffHandler/StorageDiff';
+import FileHandler from './utils/fileHandler';
 
 const KEY_VALUE_PAIR_PER_BATCH = 100;
 
@@ -33,6 +34,8 @@ export type DeployingTransation = TransactionResponse & {
 export type RPCConfig = {
     gasLimit?: BigNumberish;
     blockNr?: string | number;
+    targetAccountEncryptedJsonPath?: string;
+    targetAccountPassword?: string;
 };
 
 export type GetDiffMethod = 'srcTx' | 'storage' | 'getProof';
@@ -90,7 +93,7 @@ export class ChainProxy {
 
     private relayContract: RelayContract;
 
-    private deployer: SignerWithAddress;
+    private deployer: SignerWithAddress | ethers.Wallet;
 
     private differ: DiffHandler;
 
@@ -121,11 +124,29 @@ export class ChainProxy {
         this.migrationState = false;
         this.srcBlock = srcRPCConfig.blockNr ?? 'latest';
         this.targetBlock = targetRPCConfig.blockNr ?? 'latest';
+        if (targetRPCConfig.targetAccountEncryptedJsonPath && targetRPCConfig.targetAccountPassword) {
+            const fh = new FileHandler(targetRPCConfig.targetAccountEncryptedJsonPath);
+            const encryptedJson = fh.read();
+            if (!encryptedJson) {
+                logger.error(`Could not access json file at ${targetRPCConfig.targetAccountEncryptedJsonPath}`);
+                process.exit(-1);
+            }
+            logger.debug('Decrypting account json file...');
+            this.deployer = ethers.Wallet.fromEncryptedJsonSync(encryptedJson, targetRPCConfig.targetAccountPassword);
+            logger.debug('Done.');
+            this.deployer = new ethers.Wallet(this.deployer.privateKey, this.targetProvider);
+        } else if (targetRPCConfig.targetAccountEncryptedJsonPath) {
+            logger.error(`No password given to decrypt json file at ${targetRPCConfig.targetAccountEncryptedJsonPath}`);
+            process.exit(-1);
+        }
     }
 
     async init(): Promise<Boolean> {
         try {
-            this.deployer = await SignerWithAddress.create(this.targetProvider.getSigner());
+            if (!this.deployer) {
+                logger.info('No target account provided. Will try to get unlocked account from target chain client.');
+                this.deployer = await SignerWithAddress.create(this.targetProvider.getSigner());
+            }
         } catch (e) {
             logger.error(e);
             return false;
@@ -196,6 +217,10 @@ export class ChainProxy {
 
         if (!this.relayContract) {
             logger.info('No address for relayContract given, deploying new relay contract...');
+            const unlocked = await this.unlockAccount();
+            if (!unlocked) {
+                return false;
+            }
             const relayFactory = new RelayContract__factory(this.deployer);
             this.relayContract = await relayFactory.deploy();
             logger.info(`Relay contract address: ${this.relayContract.address}`);
@@ -207,6 +232,10 @@ export class ChainProxy {
         const initialValuesProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, keys, srcBlockParity]));
 
         // update relay
+        const unlocked = await this.unlockAccount();
+        if (!unlocked) {
+            return false;
+        }
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         // deploy logic contract
@@ -236,6 +265,10 @@ export class ChainProxy {
         const logicContractByteCode: string = await createDeployingByteCode(this.srcContractAddress, this.srcProvider);
         const logicFactory = new ethers.ContractFactory([], logicContractByteCode, this.deployer);
         try {
+            const unlocked = await this.unlockAccount();
+            if (!unlocked) {
+                return false;
+            }
             const logicContract = await logicFactory.deploy();
             const gasUsedForDeployment = (await logicContract.deployTransaction.wait()).gasUsed.toNumber();
             logger.debug(`Gas used for deploying logicContract: ${gasUsedForDeployment}`);
@@ -262,6 +295,10 @@ export class ChainProxy {
         if (compiledProxy.error) return false;
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
         try {
+            const unlocked = await this.unlockAccount();
+            if (!unlocked) {
+                return false;
+            }
             this.proxyContract = await proxyFactory.deploy();
             const gasUsedForDeployment = (await this.proxyContract.deployTransaction.wait()).gasUsed.toNumber();
             logger.debug(`Gas used for deploying proxyContract: ${gasUsedForDeployment}`);
@@ -284,17 +321,43 @@ export class ChainProxy {
 
         // todo adjust batch according to gas estimations
         // todo add option for adjust key value pair batch
-        let storageAdds: Array<Promise<TransactionResponse>> = [];
+        let storageAdds: Array<Promise<TransactionResponse | undefined>> = [];
         let txs: Array<TransactionResponse> = [];
         while (proxyKeys.length > 0) {
-            storageAdds.push(this.proxyContract.addStorage(proxyKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
+            const storageAddPromise = new Promise<TransactionResponse | undefined>((resolve) => {
+                this.unlockAccount().then((unlocked) => {
+                    if (!unlocked) {
+                        return resolve(undefined);
+                    }
+                    return resolve(this.proxyContract.addStorage(proxyKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
+                });
+            });
+            if (!storageAddPromise) {
+                return false;
+            }
+            storageAdds.push(storageAddPromise);
             if (storageAdds.length >= this.batchSize) {
                 // eslint-disable-next-line no-await-in-loop
-                txs = txs.concat(await Promise.all(storageAdds));
+                const resolvedTxs = await Promise.all(storageAdds);
+                resolvedTxs.forEach((tx) => {
+                    if (!tx) {
+                        logger.error('Could not add at least one storage batch.');
+                        process.exit(-1);
+                    }
+                });
+                txs = txs.concat(resolvedTxs as TransactionResponse[]);
                 storageAdds = [];
             }
         }
-        txs = txs.concat(await Promise.all(storageAdds));
+        const resolvedTxs = await Promise.all(storageAdds);
+        resolvedTxs.forEach((tx) => {
+            if (!tx) {
+                logger.error('Could not add at least one storage batch.');
+                process.exit(-1);
+            }
+        });
+        txs = txs.concat(resolvedTxs as TransactionResponse[]);
+
         const txsReceiptPromises: Array<Promise<TransactionReceipt>> = [];
         let cumulativeGasUsed = 0;
         txs.forEach((tx) => {
@@ -320,6 +383,10 @@ export class ChainProxy {
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
         try {
+            const unlocked = await this.unlockAccount();
+            if (!unlocked) {
+                return false;
+            }
             const tx = await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), blockNumber, { gasLimit: this.targetRPCConfig.gasLimit });
             const gasUsedForTx = (await tx.wait()).gasUsed.toNumber();
             logger.debug(`Gas used for verifying contract migration: ${gasUsedForTx}`);
@@ -343,7 +410,7 @@ export class ChainProxy {
         }
     }
 
-    async migrateChangesToProxy(changedKeys: Array<BigNumberish>, srcBlock: string | number = this.srcBlock): Promise<Boolean> {
+    async migrateChangesToProxy(changedKeys: Array<BigNumberish>, targetBlock: string | number = this.targetBlock): Promise<Boolean> {
         if (!this.initialized) {
             logger.error('ChainProxy is not initialized yet.');
             return false;
@@ -358,23 +425,33 @@ export class ChainProxy {
             return false;
         }
 
-        const paritySrcBlock = toParityQuantity(srcBlock);
-        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', [paritySrcBlock, true]);
+        const parityLatestSrcBlock = toParityQuantity(targetBlock);
+        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', [parityLatestSrcBlock, true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        const changedKeysProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, changedKeys, paritySrcBlock]));
+        const changedKeysProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, changedKeys, parityLatestSrcBlock]));
 
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
+
+        let unlocked = await this.unlockAccount();
+        if (!unlocked) {
+            return false;
+        }
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
         let txResponse: ContractTransaction;
         let receipt: ContractReceipt;
         try {
+            unlocked = await this.unlockAccount();
+            if (!unlocked) {
+                return false;
+            }
             txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number, { gasLimit: this.targetRPCConfig.gasLimit });
             receipt = await txResponse.wait();
             logger.debug(`Gas used for updating storage ${receipt.gasUsed.toNumber()}`);
         } catch (e) {
+            logger.fatal('Could not updateStorage.');
             logger.fatal(e);
             return false;
         }
@@ -389,7 +466,7 @@ export class ChainProxy {
         }
 
         let { srcBlock } = parameters;
-        let { targetBlock } = parameters;
+        const { targetBlock } = parameters;
         switch (method) {
             case 'storage':
                 if (!this.proxyContractAddress) {
@@ -403,20 +480,13 @@ export class ChainProxy {
             case 'getProof':
                 if (this.relayContract && this.proxyContract) {
                     const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
-                    if (srcBlock) {
-                        srcBlock = await toBlockNumber(parameters.srcBlock, this.srcProvider);
-                        if (synchedBlockNr.gte(srcBlock)) {
-                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${srcBlock}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
-                        }
-                    } else {
-                        srcBlock = synchedBlockNr.toNumber() + 1;
-                    }
+                    srcBlock = synchedBlockNr.toNumber() + 1;
                 }
                 if (targetBlock) {
                     const givenTargetBlockNr = await toBlockNumber(targetBlock, this.srcProvider);
                     if (BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
-                        logger.error(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr.`);
-                        process.exit(-1);
+                        logger.debug(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr (${targetBlock}).`);
+                        return new StorageDiff([]);
                     }
                 }
                 return this.differ.getDiffFromProof(this.srcContractAddress, parameters.targetBlock, srcBlock);
@@ -424,20 +494,13 @@ export class ChainProxy {
             default:
                 if (this.relayContract && this.proxyContract) {
                     const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
-                    if (srcBlock) {
-                        srcBlock = await toBlockNumber(parameters.srcBlock, this.srcProvider);
-                        if (synchedBlockNr.gte(srcBlock)) {
-                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${srcBlock}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
-                        }
-                    } else {
-                        srcBlock = synchedBlockNr.toNumber() + 1;
-                    }
+                    srcBlock = synchedBlockNr.toNumber() + 1;
                 }
                 if (targetBlock) {
                     const givenTargetBlockNr = await toBlockNumber(targetBlock, this.srcProvider);
                     if (BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
-                        logger.error(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr.`);
-                        process.exit(-1);
+                        logger.debug(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr (${givenTargetBlockNr}).`);
+                        return new StorageDiff([]);
                     }
                 }
                 return this.differ.getDiffFromSrcContractTxs(this.srcContractAddress, parameters.targetBlock, srcBlock);
@@ -468,5 +531,25 @@ export class ChainProxy {
         const currNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
         this.srcBlock = currNr.toNumber();
         return currNr;
+    }
+
+    async unlockAccount(): Promise<boolean> {
+        if (this.targetSignerAddress && this.targetSignerPassword) {
+            try {
+                const unlocked = await this.targetSigner.unlock(this.targetSignerPassword);
+                if (!unlocked) {
+                    logger.error(`Could not unlock account ${this.targetSignerAddress} with given password.`);
+                    return unlocked;
+                }
+            } catch (e) {
+                logger.error('Could not unlock account.');
+                logger.error(e);
+                return false;
+            }
+        } else if (this.targetSignerAddress) {
+            logger.error(`No password for target signer address ${this.targetSignerAddress} given`);
+            return false;
+        }
+        return true;
     }
 }

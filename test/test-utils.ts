@@ -22,6 +22,8 @@ export namespace TestCLI {
     export const tsNodeExec = './node_modules/ts-node/dist/bin-transpile.js';
     export const cliExec = './src/cli/cross-chain-cli.ts';
     export const defaultTestConfigFile = './test/config/test-cli-config.json';
+    export const targetAccountEncryptedJsonPath = './test/config/encryptedAccount.json';
+    export const targetAccountPassword = 'dev';
     export const DEFAULT_PROVIDER = 'http://localhost:8545';
     export const MAX_VALUE = 1000000;
 }

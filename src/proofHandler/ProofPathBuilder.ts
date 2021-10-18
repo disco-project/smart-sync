@@ -23,11 +23,11 @@ class ProofPathBuilder {
             this.root = new LeafNode(root, storageKey);
         } else if (root.length === 2) {
             // root is extension
-            this.logger.debug('extension as root');
+            this.logger.trace('extension as root');
             this.root = root;
         } else {
             // root is branch
-            this.logger.debug('branch as root');
+            this.logger.trace('branch as root');
             this.root = root;
             this.children = Array(17).fill(null);
         }

@@ -111,6 +111,46 @@ describe('Test CLI', async () => {
         return expect(newLogicContractAddress.toLowerCase()).to.equal(logicContractAddress.toLowerCase());
     });
 
+    it('should fork with targetAccount and password', async () => {
+        logger.setSettings({ name: 'should fork with targetAccount and password' });
+
+        const forkCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} f ${srcContract.address} ${relayContract.address} -c ${TestCLI.defaultTestConfigFile} --target-account-encrypted-json ${TestCLI.targetAccountEncryptedJsonPath} --target-account-password ${TestCLI.targetAccountPassword} -l ${logger.settings.minLevel}`;
+        logger.debug(`Executing:\n${forkCommand}`);
+
+        const output = execSync(forkCommand);
+        logger.debug(`\n${output}`);
+
+        const matcher = output.toString().match(/[\w\W]+Logic contract address: (0x[\w\d]{40})[\w\W]+Address of proxyContract: (0x[\w\d]{40})/);
+
+        expect(matcher).to.not.be.null;
+        if (matcher === null) return false;
+
+        const logicContractAddress = matcher[1];
+        const proxyContractAddress = matcher[2];
+
+        logger.debug(`logicAddress: ${logicContractAddress}, proxyContractAddress: ${proxyContractAddress}`);
+
+        const migrated = await relayContract.getMigrationState(proxyContractAddress);
+        expect(migrated).to.be.true;
+
+        const proxyProof = await targetProvider.send('eth_getProof', [proxyContractAddress, []]);
+        const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
+        const srcStorageRoot = srcProof.storageHash.toLowerCase();
+        expect(proxyStorageRoot).to.equal(srcStorageRoot);
+
+        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContractAddress, srcContract.address);
+        expect(compiledProxy.error).to.be.false;
+        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, targetDeployer);
+        const proxyContract = proxyFactory.attach(proxyContractAddress);
+
+        const newSrcContractAddress = await proxyContract.getSourceAddress();
+        expect(newSrcContractAddress.toLowerCase()).to.equal(srcContract.address.toLowerCase());
+
+        const newLogicContractAddress = await proxyContract.getLogicAddress();
+        return expect(newLogicContractAddress.toLowerCase()).to.equal(logicContractAddress.toLowerCase());
+    });
+
     it('should fork without relayContract', async () => {
         logger.setSettings({ name: 'should fork without relayContract' });
 
@@ -166,14 +206,11 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        // get blocknumber before changing src contract
-        const currBlockNr = await srcProvider.getBlockNumber();
-
         // insert some new values
         const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
         expect(changedValues).to.be.true;
 
-        const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${synchCommand}`);
 
         const output = execSync(synchCommand);
