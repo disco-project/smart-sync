@@ -216,11 +216,11 @@ class DiffHandler {
                 continue;
             }
             if (index !== -1) {
-                oldKeys.splice(index, 1);
                 // check if there are any differences in the values
                 if (oldProof.storageProof[index].value !== newStorageProof.value) {
                     diffs.push(new Change(key, oldProof.storageProof[index].value, newStorageProof.value));
                 }
+                oldProof.storageProof.splice(index, 1);
             } else {
                 // key is only present in newProof
                 diffs.push(new Add(key, newStorageProof.value));
@@ -228,14 +228,8 @@ class DiffHandler {
         }
         // keys that are present in block `srcBlock` but not in `targetBlock`.
         /* eslint-disable no-restricted-syntax */
-        for (const key of oldKeys) {
-            const currStorageProof = oldProof.storageProof.find((storageProof) => BigNumber.from(key).eq(storageProof.key));
-            if (!currStorageProof) {
-                logger.error(`Could not find storage proof for key ${key}`);
-                // eslint-disable-next-line no-continue
-                continue;
-            }
-            diffs.push(new Remove(key, currStorageProof.value));
+        for (const proof of oldProof.storageProof) {
+            diffs.push(new Remove(proof.key, proof.value));
         }
         return new StorageDiff(diffs);
     }

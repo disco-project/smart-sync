@@ -2,6 +2,7 @@
 
 import { BigNumber } from '@ethersproject/bignumber';
 import { ConnectionInfo } from '@ethersproject/web';
+import { BigNumberish } from 'ethers';
 import { Command, Option } from 'commander';
 import { TLogLevelName } from 'tslog';
 import * as CRON from 'node-cron';
@@ -12,13 +13,14 @@ import {
 } from '../chain-proxy';
 import FileHandler from '../utils/fileHandler';
 import { logger } from '../utils/logger';
+import { toBlockNumber } from '../utils/utils';
 
 const DEFAULT_CONFIG_FILE_PATH = `${__dirname}/../../config/cli-config.json`;
 const program = new Command();
 
 interface GeneralOptions {
-    srcChainUrl: string;
-    targetChainUrl: string;
+    srcChainRpcUrl: string;
+    targetChainRpcUrl: string;
     connectionTimeout?: string;
     logLevel?: TLogLevelName;
     srcBlocknr?: string;
@@ -37,6 +39,7 @@ export interface TxContractInteractionOptions extends ViewContractInteractionOpt
     batchPerSynch?: string;
     targetAccountEncryptedJson?: string;
     targetAccountPassword?: string;
+    blockBatchSize?: string;
 }
 
 export type ConfigTypish = GeneralOptions | TxContractInteractionOptions | ViewContractInteractionOptions;
@@ -59,7 +62,7 @@ function commonOptions(command: Command): Command {
             .default(defaultOptions.logLevel)
             .choices(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silly']),
     );
-    command.option('-s, --src-chain-rpc-host <url>', 'url of src chain rpc');
+    command.option('-s, --src-chain-rpc-url <url>', 'url of src chain rpc');
     command.option('-t, --target-chain-rpc-url <url>', 'url of target chain rpc');
     command.option('-c, --config-file <path>', 'path to the config file', DEFAULT_CONFIG_FILE_PATH);
     command.option('--connection-timeout <timeout>', 'connection timeout in ms');
@@ -122,11 +125,11 @@ continuousSynch
             proxyContract,
         };
         const srcConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.srcChainUrl,
+            url: adjustedOptions.srcChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.targetChainUrl,
+            url: adjustedOptions.targetChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetRPCConfig: RPCConfig = {
@@ -196,11 +199,11 @@ fork
             relayContract: relayContractAddress || adjustedOptions.relayContractAddress,
         };
         const srcConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.srcChainUrl,
+            url: adjustedOptions.srcChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.targetChainUrl,
+            url: adjustedOptions.targetChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetRPCConfig: RPCConfig = {
@@ -229,7 +232,7 @@ migrationStatus
     .alias('status')
     .description('Checks if the storage root of the proxy contract equals the current storage root of the source contract in the relay contract on the target chain.')
     .arguments('<proxy_contract_address>')
-    .action(async (proxyContractAddress: string, options) => {
+    .action(async (proxyContractAddress: string, options: TxContractInteractionOptions) => {
         let adjustedOptions = options;
         // override options here if config file was added
         if (adjustedOptions.configFile) {
@@ -241,11 +244,11 @@ migrationStatus
             proxyContract: proxyContractAddress,
         };
         const srcConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.srcChainUrl,
+            url: adjustedOptions.srcChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.targetChainUrl,
+            url: adjustedOptions.targetChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetRPCConfig: RPCConfig = {
@@ -267,7 +270,7 @@ getCurrBlockNumber
     .alias('blocknr')
     .description('Get the synched block number of src chain for the provided proxy contract.')
     .arguments('<proxy_contract_address>')
-    .action(async (proxyContractAddress: string | undefined, options) => {
+    .action(async (proxyContractAddress: string | undefined, options: TxContractInteractionOptions) => {
         let adjustedOptions = options;
         // override options here if config file was added
         if (adjustedOptions.configFile) {
@@ -276,14 +279,14 @@ getCurrBlockNumber
         logger.setSettings({ minLevel: adjustedOptions.logLevel });
 
         const contractAddressMap: ContractAddressMap = {
-            proxyContract: proxyContractAddress || adjustedOptions.proxyContractAddress,
+            proxyContract: proxyContractAddress,
         };
         const srcConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.srcChainUrl,
+            url: adjustedOptions.srcChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.targetChainUrl,
+            url: adjustedOptions.targetChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetRPCConfig: RPCConfig = {
@@ -311,7 +314,7 @@ stateDiff
             .default('srcTx'),
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
-    .action(async (srcContractAddress: string, proxyContractAddress: string | undefined, options) => {
+    .action(async (srcContractAddress: string, proxyContractAddress: string | undefined, options: TxContractInteractionOptions) => {
         let adjustedOptions = options;
         // override options here if config file was added
         if (adjustedOptions.configFile) {
@@ -324,11 +327,11 @@ stateDiff
             proxyContract: proxyContractAddress,
         };
         const srcConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.srcChainUrl,
+            url: adjustedOptions.srcChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.targetChainUrl,
+            url: adjustedOptions.targetChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetRPCConfig: RPCConfig = {
@@ -363,6 +366,7 @@ synchronize
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
     .option('-b, --batch-size', 'Define how many blocks/txs should be pulled at once', undefined)
+    .option('--block-batch-size', 'Block counter how many blocks should be synched at once', undefined)
     .option('--target-account-encrypted-json <file_path>', 'Encrypted json file path of account to use at target chain to sign txs')
     .option('--target-account-password <target_account_password', 'Password to decrypt account json file')
     .action(async (proxyContract: string, options: TxContractInteractionOptions) => {
@@ -376,11 +380,11 @@ synchronize
             proxyContract,
         };
         const srcConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.srcChainUrl,
+            url: adjustedOptions.srcChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.targetChainUrl,
+            url: adjustedOptions.targetChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetRPCConfig: RPCConfig = {
@@ -392,26 +396,51 @@ synchronize
         const srcRPCConfig: RPCConfig = {
             blockNr: undefined,
         };
-        let batchSize = 50;
-        if (adjustedOptions.batchSize) {
-            batchSize = BigNumber.from(adjustedOptions.batchSize).toNumber();
-        }
+        let batchSize = adjustedOptions.batchSize ?? 50;
+        batchSize = BigNumber.from(batchSize).toNumber();
+
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig, batchSize);
         await chainProxy.init();
-        adjustedOptions.srcBlocknr = (await chainProxy.getCurrentBlockNumber()).add(1).toString();
 
-        const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
-        if (!changedKeys) {
-            logger.error('Could not get changed keys');
-            return;
-        }
-
-        const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), adjustedOptions.targetBlocknr);
-        if (synchronized) {
-            logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
+        // prepare for possible batch synch
+        if (adjustedOptions.blockBatchSize && adjustedOptions.diffMode === 'storage') {
+            logger.error('The option blockBatchSize is not supported with diffmode storage.');
+            process.exit(-1);
+        } else if (adjustedOptions.diffMode === 'srcTx') {
+            adjustedOptions.srcBlocknr = adjustedOptions.srcBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.srcBlocknr, chainProxy.srcProvider)).toString() : (await chainProxy.getCurrentBlockNumber()).add(1).toString();
+            adjustedOptions.targetBlocknr = adjustedOptions.targetBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.targetBlocknr, chainProxy.srcProvider)).toString() : BigNumber.from(await toBlockNumber('latest', chainProxy.srcProvider)).toString();
         } else {
-            logger.error('Could not synch changes.');
+            adjustedOptions.srcBlocknr = adjustedOptions.srcBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.srcBlocknr, chainProxy.srcProvider)).toString() : (await chainProxy.getCurrentBlockNumber()).add(1).toString();
+            adjustedOptions.targetBlocknr = adjustedOptions.targetBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.targetBlocknr, chainProxy.targetProvider)).toString() : BigNumber.from(await toBlockNumber('latest', chainProxy.targetProvider)).toString();
         }
+        // todo add test for batching blocks
+        let blockBatchSize: BigNumberish = adjustedOptions.blockBatchSize ?? Number.MAX_SAFE_INTEGER.toString();
+        blockBatchSize = BigNumber.from(blockBatchSize);
+
+        // do synch
+        let srcBlock = BigNumber.from(adjustedOptions.srcBlocknr);
+        const targetBlock = BigNumber.from(adjustedOptions.targetBlocknr);
+        const batchProgress = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        batchProgress.start(targetBlock.sub(srcBlock).toNumber(), 0);
+        do {
+            // eslint-disable-next-line no-await-in-loop
+            const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
+            if (!changedKeys) {
+                logger.error('Could not get changed keys');
+                return;
+            }
+
+            // eslint-disable-next-line no-await-in-loop
+            const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), (adjustedOptions.diffMode === 'srcTx') ? adjustedOptions.targetBlocknr : adjustedOptions.srcBlocknr);
+            if (synchronized) {
+                logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
+            } else {
+                logger.error('Could not synch changes.');
+            }
+            batchProgress.increment(blockBatchSize.gt(targetBlock.sub(srcBlock)) ? targetBlock.sub(srcBlock).toNumber() : blockBatchSize.toNumber());
+            srcBlock = srcBlock.add(blockBatchSize);
+        } while (targetBlock.gt(srcBlock));
+        batchProgress.stop();
     });
 
 // todo: needs testing, integrate into normal synchronize command through option
@@ -448,11 +477,11 @@ batchSynchronize
             proxyContract,
         };
         const srcConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.srcChainUrl,
+            url: adjustedOptions.srcChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.targetChainUrl,
+            url: adjustedOptions.targetChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetRPCConfig: RPCConfig = {

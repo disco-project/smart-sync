@@ -1,5 +1,5 @@
 import { Contract, ContractReceipt, ContractTransaction } from '@ethersproject/contracts';
-import { JsonRpcProvider, JsonRpcSigner } from '@ethersproject/providers';
+import { JsonRpcProvider } from '@ethersproject/providers';
 import { ConnectionInfo } from '@ethersproject/web';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumber, BigNumberish, ethers } from 'ethers';
@@ -217,10 +217,6 @@ export class ChainProxy {
 
         if (!this.relayContract) {
             logger.info('No address for relayContract given, deploying new relay contract...');
-            const unlocked = await this.unlockAccount();
-            if (!unlocked) {
-                return false;
-            }
             const relayFactory = new RelayContract__factory(this.deployer);
             this.relayContract = await relayFactory.deploy();
             logger.info(`Relay contract address: ${this.relayContract.address}`);
@@ -232,10 +228,6 @@ export class ChainProxy {
         const initialValuesProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, keys, srcBlockParity]));
 
         // update relay
-        const unlocked = await this.unlockAccount();
-        if (!unlocked) {
-            return false;
-        }
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         // deploy logic contract
@@ -265,10 +257,6 @@ export class ChainProxy {
         const logicContractByteCode: string = await createDeployingByteCode(this.srcContractAddress, this.srcProvider);
         const logicFactory = new ethers.ContractFactory([], logicContractByteCode, this.deployer);
         try {
-            const unlocked = await this.unlockAccount();
-            if (!unlocked) {
-                return false;
-            }
             const logicContract = await logicFactory.deploy();
             const gasUsedForDeployment = (await logicContract.deployTransaction.wait()).gasUsed.toNumber();
             logger.debug(`Gas used for deploying logicContract: ${gasUsedForDeployment}`);
@@ -295,10 +283,6 @@ export class ChainProxy {
         if (compiledProxy.error) return false;
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
         try {
-            const unlocked = await this.unlockAccount();
-            if (!unlocked) {
-                return false;
-            }
             this.proxyContract = await proxyFactory.deploy();
             const gasUsedForDeployment = (await this.proxyContract.deployTransaction.wait()).gasUsed.toNumber();
             logger.debug(`Gas used for deploying proxyContract: ${gasUsedForDeployment}`);
@@ -321,21 +305,10 @@ export class ChainProxy {
 
         // todo adjust batch according to gas estimations
         // todo add option for adjust key value pair batch
-        let storageAdds: Array<Promise<TransactionResponse | undefined>> = [];
+        let storageAdds: Array<Promise<TransactionResponse>> = [];
         let txs: Array<TransactionResponse> = [];
         while (proxyKeys.length > 0) {
-            const storageAddPromise = new Promise<TransactionResponse | undefined>((resolve) => {
-                this.unlockAccount().then((unlocked) => {
-                    if (!unlocked) {
-                        return resolve(undefined);
-                    }
-                    return resolve(this.proxyContract.addStorage(proxyKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
-                });
-            });
-            if (!storageAddPromise) {
-                return false;
-            }
-            storageAdds.push(storageAddPromise);
+            storageAdds.push(this.proxyContract.addStorage(proxyKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
             if (storageAdds.length >= this.batchSize) {
                 // eslint-disable-next-line no-await-in-loop
                 const resolvedTxs = await Promise.all(storageAdds);
@@ -345,7 +318,7 @@ export class ChainProxy {
                         process.exit(-1);
                     }
                 });
-                txs = txs.concat(resolvedTxs as TransactionResponse[]);
+                txs = txs.concat(resolvedTxs);
                 storageAdds = [];
             }
         }
@@ -356,7 +329,7 @@ export class ChainProxy {
                 process.exit(-1);
             }
         });
-        txs = txs.concat(resolvedTxs as TransactionResponse[]);
+        txs = txs.concat(resolvedTxs);
 
         const txsReceiptPromises: Array<Promise<TransactionReceipt>> = [];
         let cumulativeGasUsed = 0;
@@ -383,10 +356,6 @@ export class ChainProxy {
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
         try {
-            const unlocked = await this.unlockAccount();
-            if (!unlocked) {
-                return false;
-            }
             const tx = await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), blockNumber, { gasLimit: this.targetRPCConfig.gasLimit });
             const gasUsedForTx = (await tx.wait()).gasUsed.toNumber();
             logger.debug(`Gas used for verifying contract migration: ${gasUsedForTx}`);
@@ -433,20 +402,12 @@ export class ChainProxy {
 
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
 
-        let unlocked = await this.unlockAccount();
-        if (!unlocked) {
-            return false;
-        }
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
         let txResponse: ContractTransaction;
         let receipt: ContractReceipt;
         try {
-            unlocked = await this.unlockAccount();
-            if (!unlocked) {
-                return false;
-            }
             txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number, { gasLimit: this.targetRPCConfig.gasLimit });
             receipt = await txResponse.wait();
             logger.debug(`Gas used for updating storage ${receipt.gasUsed.toNumber()}`);
@@ -533,23 +494,12 @@ export class ChainProxy {
         return currNr;
     }
 
-    async unlockAccount(): Promise<boolean> {
-        if (this.targetSignerAddress && this.targetSignerPassword) {
-            try {
-                const unlocked = await this.targetSigner.unlock(this.targetSignerPassword);
-                if (!unlocked) {
-                    logger.error(`Could not unlock account ${this.targetSignerAddress} with given password.`);
-                    return unlocked;
-                }
-            } catch (e) {
-                logger.error('Could not unlock account.');
-                logger.error(e);
-                return false;
-            }
-        } else if (this.targetSignerAddress) {
-            logger.error(`No password for target signer address ${this.targetSignerAddress} given`);
-            return false;
+    async getBlockNumber(number: BigNumberish, provider: 'target' | 'src' = 'src'): Promise<number> {
+        switch (provider) {
+            case 'target':
+                return toBlockNumber(number, this.targetProvider);
+            default:
+                return toBlockNumber(number, this.srcProvider);
         }
-        return true;
     }
 }

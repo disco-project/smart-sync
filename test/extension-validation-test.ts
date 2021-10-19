@@ -34,7 +34,7 @@ describe('Extension Validation', async () => {
             process.exit(-1);
         }
         logger.setSettings({ minLevel: 'info', name: 'extension-validation-test.ts' });
-        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
         deployer = await SignerWithAddress.create(provider.getSigner());
     });
 
