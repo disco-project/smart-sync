@@ -17,6 +17,7 @@ import { BlockHeader } from './proofHandler/Types';
 import ProxyContractBuilder from './utils/proxy-contract-builder';
 import StorageDiff from './diffHandler/StorageDiff';
 import FileHandler from './utils/fileHandler';
+import ProviderHandler from './utils/providerHandler';
 
 const KEY_VALUE_PAIR_PER_BATCH = 100;
 
@@ -36,6 +37,7 @@ export type RPCConfig = {
     blockNr?: string | number;
     targetAccountEncryptedJsonPath?: string;
     targetAccountPassword?: string;
+    providerApiKey?: string;
 };
 
 export type GetDiffMethod = 'srcTx' | 'storage' | 'getProof';
@@ -116,9 +118,11 @@ export class ChainProxy {
         this.relayContractAddress = contractAddresses.relayContract;
         this.proxyContractAddress = contractAddresses.proxyContract;
         this.srcProviderConnectionInfo = srcProviderConnectionInfo;
-        this.srcProvider = new ethers.providers.JsonRpcProvider(this.srcProviderConnectionInfo);
+        const srcProviderHandler = new ProviderHandler(this.srcProviderConnectionInfo, srcRPCConfig.providerApiKey);
+        this.srcProvider = srcProviderHandler.getProviderInstance();
         this.targetProviderConnectionInfo = targetProviderConnectionInfo;
-        this.targetProvider = new ethers.providers.JsonRpcProvider(this.targetProviderConnectionInfo);
+        const targetProviderHandler = new ProviderHandler(this.targetProviderConnectionInfo, targetRPCConfig.providerApiKey);
+        this.targetProvider = targetProviderHandler.getProviderInstance();
         this.targetRPCConfig = targetRPCConfig;
         this.initialized = false;
         this.migrationState = false;
