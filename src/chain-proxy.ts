@@ -294,6 +294,7 @@ export class ChainProxy {
             logger.error(e);
             return false;
         }
+        logger.info(`Proxy contract address: ${this.proxyContract.address}`);
         return true;
     }
 
@@ -353,7 +354,7 @@ export class ChainProxy {
 
         //  getting account proof from proxy contract
         const latestProxyChainBlock = await this.targetProvider.send('eth_getBlockByNumber', ['latest', false]);
-        const proxyChainProof = new GetProof(await this.targetProvider.send('eth_getProof', [this.proxyContract.address, []]));
+        const proxyChainProof = new GetProof(await this.targetProvider.send('eth_getProof', [this.proxyContract.address, [ethers.utils.hexZeroPad(initialValuesProof.storageProof[0].key, 32)], 'latest']));
         const proxyAccountProof = await proxyChainProof.optimizedProof(latestProxyChainBlock.stateRoot, false);
 
         //  getting encoded block header
