@@ -19,3 +19,5 @@ data/
 target/
 node_modules
 .vscode/
+
+görliTestAccount.json
