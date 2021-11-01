@@ -5,6 +5,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumber, BigNumberish, ethers } from 'ethers';
 import { TransactionReceipt, TransactionResponse } from '@ethersproject/abstract-provider';
 import * as rlp from 'rlp';
+import * as CliProgress from 'cli-progress';
 import { RelayContract, RelayContract__factory } from '../src-gen/types';
 import { PROXY_INTERFACE } from './config';
 import DiffHandler from './diffHandler/DiffHandler';
@@ -45,6 +46,11 @@ export type GetDiffMethod = 'srcTx' | 'storage' | 'getProof';
 export function encodeBlockHeader(blockHeader: BlockHeader): Buffer {
     // needed parameters for block header hash
     // https://ethereum.stackexchange.com/questions/67055/block-header-hash-verification
+    const gasUsed = ethers.BigNumber.from(blockHeader.gasUsed).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.gasUsed).toHexString();
+    const timestamp = ethers.BigNumber.from(blockHeader.timestamp).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.timestamp).toHexString();
+    const number = ethers.BigNumber.from(blockHeader.number).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.number).toHexString();
+    const gasLimit = ethers.BigNumber.from(blockHeader.gasLimit).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.gasLimit).toHexString();
+    const difficulty = ethers.BigNumber.from(blockHeader.difficulty).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.difficulty).toHexString();
     const cleanBlockHeader = [
         blockHeader.parentHash,
         blockHeader.sha3Uncles,
@@ -53,18 +59,23 @@ export function encodeBlockHeader(blockHeader: BlockHeader): Buffer {
         blockHeader.transactionsRoot,
         blockHeader.receiptsRoot,
         blockHeader.logsBloom,
-        ethers.BigNumber.from(blockHeader.difficulty).toHexString(),
-        ethers.BigNumber.from(blockHeader.number).toHexString(),
-        ethers.BigNumber.from(blockHeader.gasLimit).toHexString(),
-        ethers.BigNumber.from(blockHeader.gasUsed).toHexString(),
-        ethers.BigNumber.from(blockHeader.timestamp).toHexString(),
+        difficulty,
+        number,
+        gasLimit,
+        gasUsed,
+        timestamp,
         blockHeader.extraData,
     ];
     if (blockHeader.mixHash && blockHeader.nonce) {
-    // if chain is PoW
+        // if chain is PoW
         cleanBlockHeader.push(blockHeader.mixHash);
         cleanBlockHeader.push(blockHeader.nonce);
     } // else chain is PoA
+    if (blockHeader.baseFeePerGas) {
+        // if EIP 1559 is activated
+        const baseFeePerGas = ethers.BigNumber.from(blockHeader.baseFeePerGas).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.baseFeePerGas).toHexString();
+        cleanBlockHeader.push(baseFeePerGas);
+    }
     return Buffer.from(rlp.encode(cleanBlockHeader));
 }
 
@@ -227,7 +238,7 @@ export class ChainProxy {
         }
         const srcBlockParity = toParityQuantity(srcBlock);
         const keys = await getAllKeys(this.srcContractAddress, this.srcProvider, srcBlockParity, this.batchSize);
-        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', [srcBlockParity, true]);
+        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', [srcBlockParity, false]);
         // create a proof of the source contract's storage
         const initialValuesProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, keys, srcBlockParity]));
 
@@ -310,31 +321,29 @@ export class ChainProxy {
 
         // todo adjust batch according to gas estimations
         // todo add option for adjust key value pair batch
-        let storageAdds: Array<Promise<TransactionResponse>> = [];
-        let txs: Array<TransactionResponse> = [];
+        const txs: Array<TransactionResponse> = [];
+        const progressBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        progressBar.start(initialValuesProof.storageProof.length, 0);
         while (proxyKeys.length > 0) {
-            storageAdds.push(this.proxyContract.addStorage(proxyKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
-            if (storageAdds.length >= this.batchSize) {
-                // eslint-disable-next-line no-await-in-loop
-                const resolvedTxs = await Promise.all(storageAdds);
-                resolvedTxs.forEach((tx) => {
-                    if (!tx) {
-                        logger.error('Could not add at least one storage batch.');
-                        process.exit(-1);
-                    }
+            const currProcessedKeys = (proxyKeys.length - KEY_VALUE_PAIR_PER_BATCH) >= 0 ? KEY_VALUE_PAIR_PER_BATCH : proxyKeys.length;
+            /*
+             * We cannot promise-batch the following request since we don't know in which order they are processed.
+             * If addStorage with a higher nonce is processed earlier than a lower nonce then it creates a problem.
+             */
+            // eslint-disable-next-line no-await-in-loop
+            const promise = await this.proxyContract.addStorage(proxyKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH))
+                .catch((error: any) => {
+                    logger.error(error);
+                    process.exit(-1);
                 });
-                txs = txs.concat(resolvedTxs);
-                storageAdds = [];
-            }
-        }
-        const resolvedTxs = await Promise.all(storageAdds);
-        resolvedTxs.forEach((tx) => {
-            if (!tx) {
+            if (!promise) {
                 logger.error('Could not add at least one storage batch.');
                 process.exit(-1);
             }
-        });
-        txs = txs.concat(resolvedTxs);
+            progressBar.increment(currProcessedKeys);
+            txs.push(promise);
+        }
+        progressBar.stop();
 
         const txsReceiptPromises: Array<Promise<TransactionReceipt>> = [];
         let cumulativeGasUsed = 0;
@@ -362,7 +371,9 @@ export class ChainProxy {
 
         try {
             const tx = await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), blockNumber, { gasLimit: this.targetRPCConfig.gasLimit });
-            const gasUsedForTx = (await tx.wait()).gasUsed.toNumber();
+            const receipt = await tx.wait();
+            logger.trace(receipt);
+            const gasUsedForTx = receipt.gasUsed.toNumber();
             logger.debug(`Gas used for verifying contract migration: ${gasUsedForTx}`);
         } catch (e) {
             logger.error(e);
