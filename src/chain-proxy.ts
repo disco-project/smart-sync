@@ -38,7 +38,6 @@ export type RPCConfig = {
     blockNr?: string | number;
     targetAccountEncryptedJsonPath?: string;
     targetAccountPassword?: string;
-    providerApiKey?: string;
 };
 
 export type GetDiffMethod = 'srcTx' | 'storage' | 'getProof';
@@ -129,10 +128,10 @@ export class ChainProxy {
         this.relayContractAddress = contractAddresses.relayContract;
         this.proxyContractAddress = contractAddresses.proxyContract;
         this.srcProviderConnectionInfo = srcProviderConnectionInfo;
-        const srcProviderHandler = new ProviderHandler(this.srcProviderConnectionInfo, srcRPCConfig.providerApiKey);
+        const srcProviderHandler = new ProviderHandler(this.srcProviderConnectionInfo);
         this.srcProvider = srcProviderHandler.getProviderInstance();
         this.targetProviderConnectionInfo = targetProviderConnectionInfo;
-        const targetProviderHandler = new ProviderHandler(this.targetProviderConnectionInfo, targetRPCConfig.providerApiKey);
+        const targetProviderHandler = new ProviderHandler(this.targetProviderConnectionInfo);
         this.targetProvider = targetProviderHandler.getProviderInstance();
         this.targetRPCConfig = targetRPCConfig;
         this.initialized = false;

@@ -64,8 +64,8 @@ function commonOptions(command: Command): Command {
             .default(defaultOptions.logLevel)
             .choices(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silly']),
     );
-    command.option('-s, --src-chain-rpc-url <url>', 'URL of src chain rpc. You can also specify an API Provider here (currently supported: "infura"). If an API Provider is specified, you also need to provide an API key.');
-    command.option('-t, --target-chain-rpc-url <url>', 'URL of target chain rpc. You can also specify an API Provider here (currently supported: "infura"). If an API Provider is specified, you also need to provide an API key.');
+    command.option('-s, --src-chain-rpc-url <url>', 'URL of src chain rpc.');
+    command.option('-t, --target-chain-rpc-url <url>', 'URL of target chain rpc.');
     command.option('--target-api-provider-key <api_key>', 'API key of the specified api provider');
     command.option('--src-api-provider-key <api_key>', 'API key of the specified api provider');
     command.option('-c, --config-file <path>', 'path to the config file', DEFAULT_CONFIG_FILE_PATH);
