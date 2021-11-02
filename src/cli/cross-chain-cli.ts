@@ -2,7 +2,6 @@
 
 import { BigNumber } from '@ethersproject/bignumber';
 import { ConnectionInfo } from '@ethersproject/web';
-import { BigNumberish } from 'ethers';
 import { Command, Option } from 'commander';
 import { TLogLevelName } from 'tslog';
 import * as CRON from 'node-cron';
@@ -107,6 +106,8 @@ continuousSynch
             .default('srcTx'),
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
+    .option('-b, --batch-size', 'Define how many blocks/txs should be pulled at once', '50')
+    .option('--block-batch-size', 'Block counter how many blocks should be synched at once', Number.MAX_SAFE_INTEGER.toString())
     .option('--target-account-encrypted-json <file_path>', 'Encrypted json file path of account to use at target chain to sign txs')
     .option('--target-account-password <target_account_password>', 'Password to decrypt account json file')
     .action(async (proxyContract: string, period: string, options: TxContractInteractionOptions) => {
@@ -141,8 +142,13 @@ continuousSynch
         const srcRPCConfig: RPCConfig = {
             blockNr: adjustedOptions.srcBlocknr,
         };
-        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
+        const batchSize = BigNumber.from(adjustedOptions.batchSize).toNumber();
+        const blockBatchSize = BigNumber.from(adjustedOptions.blockBatchSize);
+
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig, batchSize);
         await chainProxy.init();
+
+        adjustedOptions.srcBlocknr = adjustedOptions.srcBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.srcBlocknr, chainProxy.srcProvider)).toString() : (await chainProxy.getCurrentBlockNumber()).add(1).toString();
 
         // if cli is called as a child process, this will be used to kill it.
         process.on('message', (m) => {
@@ -153,21 +159,40 @@ continuousSynch
 
         // todo adjust batches according to gas estimation and gas-limit
         CRON.schedule(period, async () => {
-            const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
-            if (!changedKeys) {
-                logger.error('Could not get changed keys');
-                return;
-            }
-            const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), adjustedOptions.targetBlocknr);
-            if (synchronized) {
-                logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
+            if (adjustedOptions.diffMode === 'srcTx') {
+                adjustedOptions.targetBlocknr = adjustedOptions.targetBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.targetBlocknr, chainProxy.srcProvider)).toString() : BigNumber.from(await toBlockNumber('latest', chainProxy.srcProvider)).toString();
             } else {
-                logger.error('Could not synch changes.');
+                adjustedOptions.targetBlocknr = adjustedOptions.targetBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.targetBlocknr, chainProxy.targetProvider)).toString() : BigNumber.from(await toBlockNumber('latest', chainProxy.targetProvider)).toString();
             }
+            // do synch
+            let srcBlock = BigNumber.from(adjustedOptions.srcBlocknr);
+            const targetBlock = BigNumber.from(adjustedOptions.targetBlocknr);
+            const batchProgress = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+            batchProgress.start(targetBlock.sub(srcBlock).toNumber(), 0);
+            do {
+                // eslint-disable-next-line no-await-in-loop
+                const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
+                if (!changedKeys) {
+                    logger.error('Could not get changed keys');
+                    return;
+                }
+
+                // eslint-disable-next-line no-await-in-loop
+                const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), (adjustedOptions.diffMode === 'srcTx') ? adjustedOptions.targetBlocknr : adjustedOptions.srcBlocknr);
+                if (synchronized) {
+                    logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
+                } else {
+                    logger.error('Could not synch changes.');
+                }
+                const synchronizedBlockAmount = blockBatchSize.gt(targetBlock.sub(srcBlock)) ? targetBlock.sub(srcBlock).toNumber() : blockBatchSize.toNumber();
+                batchProgress.increment(synchronizedBlockAmount);
+                srcBlock = srcBlock.add(synchronizedBlockAmount);
+            } while (targetBlock.gt(srcBlock));
+            batchProgress.stop();
 
             // update compared blocks
             adjustedOptions.srcBlocknr = adjustedOptions.diffMode === 'srcTx' ? (await chainProxy.getCurrentBlockNumber()).add(1).toString() : 'latest';
-            adjustedOptions.targetBlocknr = undefined;
+            adjustedOptions.targetBlocknr = 'latest';
         });
     });
 
@@ -360,8 +385,8 @@ synchronize
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
-    .option('-b, --batch-size', 'Define how many blocks/txs should be pulled at once', undefined)
-    .option('--block-batch-size', 'Block counter how many blocks should be synched at once', undefined)
+    .option('-b, --batch-size', 'Define how many blocks/txs should be pulled at once', '50')
+    .option('--block-batch-size', 'Block counter how many blocks should be synched at once', Number.MAX_SAFE_INTEGER.toString())
     .option('--target-account-encrypted-json <file_path>', 'Encrypted json file path of account to use at target chain to sign txs')
     .option('--target-account-password <target_account_password', 'Password to decrypt account json file')
     .action(async (proxyContract: string, options: TxContractInteractionOptions) => {
@@ -391,8 +416,7 @@ synchronize
         const srcRPCConfig: RPCConfig = {
             blockNr: undefined,
         };
-        let batchSize = adjustedOptions.batchSize ?? 50;
-        batchSize = BigNumber.from(batchSize).toNumber();
+        const batchSize = BigNumber.from(adjustedOptions.batchSize).toNumber();
 
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig, batchSize);
         await chainProxy.init();
@@ -402,15 +426,14 @@ synchronize
             logger.error('The option blockBatchSize is not supported with diffmode storage.');
             process.exit(-1);
         } else if (adjustedOptions.diffMode === 'srcTx') {
-            adjustedOptions.srcBlocknr = adjustedOptions.srcBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.srcBlocknr, chainProxy.srcProvider)).toString() : (await chainProxy.getCurrentBlockNumber()).add(1).toString();
             adjustedOptions.targetBlocknr = adjustedOptions.targetBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.targetBlocknr, chainProxy.srcProvider)).toString() : BigNumber.from(await toBlockNumber('latest', chainProxy.srcProvider)).toString();
         } else {
-            adjustedOptions.srcBlocknr = adjustedOptions.srcBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.srcBlocknr, chainProxy.srcProvider)).toString() : (await chainProxy.getCurrentBlockNumber()).add(1).toString();
             adjustedOptions.targetBlocknr = adjustedOptions.targetBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.targetBlocknr, chainProxy.targetProvider)).toString() : BigNumber.from(await toBlockNumber('latest', chainProxy.targetProvider)).toString();
         }
+        adjustedOptions.srcBlocknr = adjustedOptions.srcBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.srcBlocknr, chainProxy.srcProvider)).toString() : (await chainProxy.getCurrentBlockNumber()).add(1).toString();
+
         // todo add test for batching blocks
-        let blockBatchSize: BigNumberish = adjustedOptions.blockBatchSize ?? Number.MAX_SAFE_INTEGER.toString();
-        blockBatchSize = BigNumber.from(blockBatchSize);
+        const blockBatchSize = BigNumber.from(adjustedOptions.blockBatchSize);
 
         // do synch
         let srcBlock = BigNumber.from(adjustedOptions.srcBlocknr);
