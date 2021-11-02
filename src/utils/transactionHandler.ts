@@ -116,7 +116,7 @@ class TransactionHandler {
         }
 
         // gather all transactions
-        logger.debug(`Getting ${latest - earliest + 1} blocks...`);
+        logger.info(`Getting ${latest - earliest + 1} blocks...`);
         const blockBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
         blockBar.start(latest - earliest + 1, 0);
         let blockPromises: Array<Promise<Block>> = [];
@@ -141,7 +141,7 @@ class TransactionHandler {
             blockBar.increment(blockPromises.length);
         }
         blockBar.stop();
-        logger.debug('Done.');
+        logger.info('Done.');
         blocks = blocks.filter((value) => (!!value));
 
         const transactionBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
@@ -151,7 +151,7 @@ class TransactionHandler {
             transactionHashes = transactionHashes.concat(transactions);
         });
         let transactions: Array<TransactionResponse> = [];
-        logger.debug(`Getting ${transactionHashes.length} transactions...`);
+        logger.info(`Getting ${transactionHashes.length} transactions...`);
         transactionBar.start(transactionHashes.length, 0);
         while (transactionHashes.length > 0) {
             const currTx = transactionHashes.pop();
@@ -175,9 +175,9 @@ class TransactionHandler {
             transactionBar.increment(transactionPromises.length);
         }
         transactionBar.stop();
-        logger.debug('Done.');
+        logger.info('Done.');
 
-        logger.debug('Getting receipts and related txs...');
+        logger.info('Getting receipts and related txs...');
         const receiptBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
         let receiptPromises: Array<Promise<TransactionReceipt>> = [];
         const receiptHashes: Array<string> = [];
@@ -223,7 +223,7 @@ class TransactionHandler {
             }
         });
         receiptBar.stop();
-        logger.debug('Done.');
+        logger.info('Done.');
 
         return relatedTransactions;
     }

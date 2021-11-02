@@ -320,6 +320,7 @@ export class ChainProxy {
 
         // todo adjust batch according to gas estimations
         // todo add option for adjust key value pair batch
+        logger.info('Adding storage to proxy contract...');
         const txs: Array<TransactionResponse> = [];
         const progressBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
         progressBar.start(initialValuesProof.storageProof.length, 0);
@@ -343,6 +344,7 @@ export class ChainProxy {
             txs.push(promise);
         }
         progressBar.stop();
+        logger.info('Done.');
 
         const txsReceiptPromises: Array<Promise<TransactionReceipt>> = [];
         let cumulativeGasUsed = 0;
