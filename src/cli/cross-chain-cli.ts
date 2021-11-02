@@ -142,13 +142,18 @@ continuousSynch
         const srcRPCConfig: RPCConfig = {
             blockNr: adjustedOptions.srcBlocknr,
         };
-        const batchSize = BigNumber.from(adjustedOptions.batchSize).toNumber();
-        const blockBatchSize = BigNumber.from(adjustedOptions.blockBatchSize);
+        const batchSize = adjustedOptions.batchSize ? BigNumber.from(adjustedOptions.batchSize).toNumber() : 50;
+        const blockBatchSize = adjustedOptions.blockBatchSize ? BigNumber.from(adjustedOptions.blockBatchSize) : BigNumber.from(Number.MAX_SAFE_INTEGER.toString());
 
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig, batchSize);
         await chainProxy.init();
 
         adjustedOptions.srcBlocknr = adjustedOptions.srcBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.srcBlocknr, chainProxy.srcProvider)).toString() : (await chainProxy.getCurrentBlockNumber()).add(1).toString();
+        if (adjustedOptions.diffMode === 'srcTx') {
+            adjustedOptions.targetBlocknr = adjustedOptions.targetBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.targetBlocknr, chainProxy.srcProvider)).toString() : BigNumber.from(await toBlockNumber('latest', chainProxy.srcProvider)).toString();
+        } else {
+            adjustedOptions.targetBlocknr = adjustedOptions.targetBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.targetBlocknr, chainProxy.targetProvider)).toString() : BigNumber.from(await toBlockNumber('latest', chainProxy.targetProvider)).toString();
+        }
 
         // if cli is called as a child process, this will be used to kill it.
         process.on('message', (m) => {
@@ -159,14 +164,9 @@ continuousSynch
 
         // todo adjust batches according to gas estimation and gas-limit
         CRON.schedule(period, async () => {
-            if (adjustedOptions.diffMode === 'srcTx') {
-                adjustedOptions.targetBlocknr = adjustedOptions.targetBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.targetBlocknr, chainProxy.srcProvider)).toString() : BigNumber.from(await toBlockNumber('latest', chainProxy.srcProvider)).toString();
-            } else {
-                adjustedOptions.targetBlocknr = adjustedOptions.targetBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.targetBlocknr, chainProxy.targetProvider)).toString() : BigNumber.from(await toBlockNumber('latest', chainProxy.targetProvider)).toString();
-            }
             // do synch
-            let srcBlock = BigNumber.from(adjustedOptions.srcBlocknr);
-            const targetBlock = BigNumber.from(adjustedOptions.targetBlocknr);
+            let srcBlock = adjustedOptions.diffMode !== 'srcTx' ? BigNumber.from(1) : BigNumber.from(adjustedOptions.srcBlocknr);
+            const targetBlock = adjustedOptions.diffMode !== 'srcTx' ? BigNumber.from(2) : BigNumber.from(adjustedOptions.targetBlocknr);
             const batchProgress = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
             batchProgress.start(targetBlock.sub(srcBlock).toNumber(), 0);
             do {
@@ -187,12 +187,12 @@ continuousSynch
                 const synchronizedBlockAmount = blockBatchSize.gt(targetBlock.sub(srcBlock)) ? targetBlock.sub(srcBlock).toNumber() : blockBatchSize.toNumber();
                 batchProgress.increment(synchronizedBlockAmount);
                 srcBlock = srcBlock.add(synchronizedBlockAmount);
-            } while (targetBlock.gt(srcBlock));
+            } while (adjustedOptions.diffMode !== 'srcTx' && targetBlock.gt(srcBlock));
             batchProgress.stop();
 
             // update compared blocks
             adjustedOptions.srcBlocknr = adjustedOptions.diffMode === 'srcTx' ? (await chainProxy.getCurrentBlockNumber()).add(1).toString() : 'latest';
-            adjustedOptions.targetBlocknr = 'latest';
+            adjustedOptions.targetBlocknr = adjustedOptions.diffMode === 'srcTx' ? BigNumber.from(await toBlockNumber('latest', chainProxy.srcProvider)).toString() : 'latest';
         });
     });
 
@@ -416,7 +416,7 @@ synchronize
         const srcRPCConfig: RPCConfig = {
             blockNr: undefined,
         };
-        const batchSize = BigNumber.from(adjustedOptions.batchSize).toNumber();
+        const batchSize = adjustedOptions.batchSize ? BigNumber.from(adjustedOptions.batchSize).toNumber() : 50;
 
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig, batchSize);
         await chainProxy.init();
@@ -433,7 +433,7 @@ synchronize
         adjustedOptions.srcBlocknr = adjustedOptions.srcBlocknr !== undefined ? BigNumber.from(await toBlockNumber(adjustedOptions.srcBlocknr, chainProxy.srcProvider)).toString() : (await chainProxy.getCurrentBlockNumber()).add(1).toString();
 
         // todo add test for batching blocks
-        const blockBatchSize = BigNumber.from(adjustedOptions.blockBatchSize);
+        const blockBatchSize = adjustedOptions.blockBatchSize ? BigNumber.from(adjustedOptions.blockBatchSize) : BigNumber.from(Number.MAX_SAFE_INTEGER.toString());
 
         // do synch
         let srcBlock = BigNumber.from(adjustedOptions.srcBlocknr);
@@ -457,7 +457,7 @@ synchronize
             }
             batchProgress.increment(blockBatchSize.gt(targetBlock.sub(srcBlock)) ? targetBlock.sub(srcBlock).toNumber() : blockBatchSize.toNumber());
             srcBlock = srcBlock.add(blockBatchSize);
-        } while (targetBlock.gt(srcBlock));
+        } while (adjustedOptions.diffMode !== 'srcTx' && targetBlock.gt(srcBlock));
         batchProgress.stop();
     });
 

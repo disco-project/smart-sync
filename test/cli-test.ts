@@ -338,7 +338,7 @@ describe('Test CLI', async () => {
             expect(diff.getKeys().length).to.equal(5, 'There is no diff.');
 
             await new Promise((resolve) => {
-                setTimeout(() => resolve(resolve), 3000);
+                setTimeout(() => resolve(resolve), 4000);
             });
 
             const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
@@ -519,7 +519,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --diff-mode storage -c ${TestCLI.defaultTestConfigFile}`;
+        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --diff-mode storage -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${synchContinuousCommand}`);
         const cronJob = spawn(synchContinuousCommand, {
             shell: true,
