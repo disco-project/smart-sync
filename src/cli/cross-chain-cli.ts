@@ -40,8 +40,6 @@ export interface TxContractInteractionOptions extends ViewContractInteractionOpt
     targetAccountEncryptedJson?: string;
     targetAccountPassword?: string;
     blockBatchSize?: string;
-    targetProviderApiKey?: string;
-    srcProviderApiKey?: string;
 }
 
 export type ConfigTypish = GeneralOptions | TxContractInteractionOptions | ViewContractInteractionOptions;
@@ -66,8 +64,6 @@ function commonOptions(command: Command): Command {
     );
     command.option('-s, --src-chain-rpc-url <url>', 'URL of src chain rpc.');
     command.option('-t, --target-chain-rpc-url <url>', 'URL of target chain rpc.');
-    command.option('--target-api-provider-key <api_key>', 'API key of the specified api provider');
-    command.option('--src-api-provider-key <api_key>', 'API key of the specified api provider');
     command.option('-c, --config-file <path>', 'path to the config file', DEFAULT_CONFIG_FILE_PATH);
     command.option('--connection-timeout <timeout>', 'connection timeout in ms');
     command.option('--src-blocknr <number>', 'block number of src chain to use');
@@ -141,11 +137,9 @@ continuousSynch
             blockNr: adjustedOptions.targetBlocknr,
             targetAccountEncryptedJsonPath: adjustedOptions.targetAccountEncryptedJson,
             targetAccountPassword: adjustedOptions.targetAccountPassword,
-            providerApiKey: adjustedOptions.targetProviderApiKey,
         };
         const srcRPCConfig: RPCConfig = {
             blockNr: adjustedOptions.srcBlocknr,
-            providerApiKey: adjustedOptions.srcProviderApiKey,
         };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
@@ -212,11 +206,9 @@ fork
             blockNr: adjustedOptions.targetBlocknr,
             targetAccountEncryptedJsonPath: adjustedOptions.targetAccountEncryptedJson,
             targetAccountPassword: adjustedOptions.targetAccountPassword,
-            providerApiKey: adjustedOptions.targetProviderApiKey,
         };
         const srcRPCConfig: RPCConfig = {
             blockNr: adjustedOptions.srcBlocknr,
-            providerApiKey: adjustedOptions.srcProviderApiKey,
         };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
@@ -257,11 +249,9 @@ migrationStatus
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
             blockNr: adjustedOptions.targetBlocknr,
-            providerApiKey: adjustedOptions.targetProviderApiKey,
         };
         const srcRPCConfig: RPCConfig = {
             blockNr: adjustedOptions.srcBlocknr,
-            providerApiKey: adjustedOptions.srcProviderApiKey,
         };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
@@ -297,11 +287,9 @@ getCurrBlockNumber
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
             blockNr: adjustedOptions.targetBlocknr,
-            providerApiKey: adjustedOptions.targetProviderApiKey,
         };
         const srcRPCConfig: RPCConfig = {
             blockNr: adjustedOptions.srcBlocknr,
-            providerApiKey: adjustedOptions.srcProviderApiKey,
         };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
@@ -344,11 +332,9 @@ stateDiff
         const targetRPCConfig: RPCConfig = {
             gasLimit: adjustedOptions.gasLimit,
             blockNr: adjustedOptions.targetBlocknr,
-            providerApiKey: adjustedOptions.targetProviderApiKey,
         };
         const srcRPCConfig: RPCConfig = {
             blockNr: adjustedOptions.srcBlocknr,
-            providerApiKey: adjustedOptions.srcProviderApiKey,
         };
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
@@ -401,11 +387,9 @@ synchronize
             blockNr: adjustedOptions.targetBlocknr,
             targetAccountEncryptedJsonPath: adjustedOptions.targetAccountEncryptedJson,
             targetAccountPassword: adjustedOptions.targetAccountPassword,
-            providerApiKey: adjustedOptions.targetProviderApiKey,
         };
         const srcRPCConfig: RPCConfig = {
             blockNr: undefined,
-            providerApiKey: adjustedOptions.srcProviderApiKey,
         };
         let batchSize = adjustedOptions.batchSize ?? 50;
         batchSize = BigNumber.from(batchSize).toNumber();
