@@ -108,8 +108,8 @@ continuousSynch
             .default('srcTx'),
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
-    .option('-b, --batch-size', 'Define how many blocks/txs should be pulled at once', '50')
-    .option('--block-batch-size', 'Block counter how many blocks should be synched at once', Number.MAX_SAFE_INTEGER.toString())
+    .option('-b, --batch-size <number>', 'Define how many blocks/txs should be pulled at once', '50')
+    .option('--block-batch-size <number>', 'Block counter how many blocks should be synched at once', Number.MAX_SAFE_INTEGER.toString())
     .action(async (proxyContract: string, period: string, options: TxContractInteractionOptions) => {
         if (!CRON.validate(period)) {
             logger.error(`No valid period given (${period}). See --help for more information (description of argument period)`);
@@ -335,6 +335,7 @@ stateDiff
             .choices(['storage', 'srcTx', 'getProof'])
             .default('srcTx'),
     )
+    .option('-b, --batch-size <number>', 'Define how many blocks/txs should be pulled at once', '50')
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .action(async (srcContractAddress: string, proxyContractAddress: string | undefined, options: TxContractInteractionOptions) => {
         let adjustedOptions = options;
@@ -365,7 +366,8 @@ stateDiff
         const srcRPCConfig: RPCConfig = {
             blockNr: adjustedOptions.srcBlocknr,
         };
-        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
+        const batchSize = adjustedOptions.batchSize ? BigNumber.from(adjustedOptions.batchSize).toNumber() : 50;
+        const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig, batchSize);
         await chainProxy.init();
 
         const diff = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
@@ -389,8 +391,8 @@ synchronize
     )
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
-    .option('-b, --batch-size', 'Define how many blocks/txs should be pulled at once', '50')
-    .option('--block-batch-size', 'Block counter how many blocks should be synched at once', Number.MAX_SAFE_INTEGER.toString())
+    .option('-b, --batch-size <number>', 'Define how many blocks/txs should be pulled at once', '50')
+    .option('--block-batch-size <number>', 'Block counter how many blocks should be synched at once', Number.MAX_SAFE_INTEGER.toString())
     .action(async (proxyContract: string, options: TxContractInteractionOptions) => {
         let adjustedOptions = options;
         // override options here if config file was added
