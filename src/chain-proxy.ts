@@ -200,7 +200,7 @@ export class ChainProxy {
         }
 
         // todo batch size in DiffHandler
-        this.differ = new DiffHandler(this.srcProvider, this.targetProvider);
+        this.differ = new DiffHandler(this.srcProvider, this.targetProvider, this.batchSize);
         this.initialized = true;
         return true;
     }
@@ -448,14 +448,11 @@ export class ChainProxy {
         const { targetBlock } = parameters;
         switch (method) {
             case 'storage':
-                if (!this.proxyContractAddress) {
-                    logger.error('Proxy address not given.');
-                    return undefined;
-                } if (!this.migrationState) {
+                if (this.proxyContractAddress && !this.migrationState) {
                     logger.error('Proxy contract is not initialized yet.');
                     return undefined;
                 }
-                return this.differ.getDiffFromStorage(this.srcContractAddress, this.proxyContractAddress, parameters.srcBlock, parameters.targetBlock);
+                return this.differ.getDiffFromStorage(this.srcContractAddress, this.proxyContractAddress ?? this.srcContractAddress, parameters.srcBlock, parameters.targetBlock);
             case 'getProof':
                 if (this.relayContract && this.proxyContract) {
                     const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
