@@ -368,7 +368,11 @@ stateDiff
         };
         const batchSize = adjustedOptions.batchSize ? BigNumber.from(adjustedOptions.batchSize).toNumber() : 50;
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig, batchSize);
-        await chainProxy.init();
+        if (adjustedOptions.diffMode === 'srcTx') {
+            await chainProxy.init();
+        } else {
+            await chainProxy.lightInit();
+        }
 
         const diff = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
 
@@ -426,7 +430,7 @@ synchronize
         await chainProxy.init();
 
         // prepare for possible batch synch
-        if (adjustedOptions.blockBatchSize && adjustedOptions.diffMode === 'storage') {
+        if (adjustedOptions.blockBatchSize !== Number.MAX_SAFE_INTEGER.toString() && adjustedOptions.diffMode === 'storage') {
             logger.error('The option blockBatchSize is not supported with diffmode storage.');
             process.exit(-1);
         } else if (adjustedOptions.diffMode === 'srcTx') {

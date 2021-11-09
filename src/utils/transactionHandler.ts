@@ -115,11 +115,11 @@ class TransactionHandler {
 
         // gather all transactions
         logger.info(`Getting all txs related to ${this.contractAddress} from ${latest - earliest + 1} blocks...`);
-        let related_txs = await this.provider.send('trace_filter', [{"fromBlock": toParityQuantity(earliest),"toBlock": toParityQuantity(latest),"toAddress":[this.contractAddress]}]);
-        logger.debug(`Got ${related_txs.length} related txs.`);
+        const relatedTxs = await this.provider.send('trace_filter', [{ fromBlock: toParityQuantity(earliest), toBlock: toParityQuantity(latest), toAddress: [this.contractAddress] }]);
+        logger.debug(`Got ${relatedTxs.length} related txs.`);
         logger.info('Done.');
 
-        return [...new Set<string>(related_txs.map(({ transactionHash }) => transactionHash))];
+        return [...new Set<string>(relatedTxs.map(({ transactionHash }) => transactionHash))];
     }
 }
 

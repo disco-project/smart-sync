@@ -2,6 +2,7 @@ import { ethers } from 'ethers';
 import assert from 'assert';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { BigNumberish, BigNumber } from '@ethersproject/bignumber';
+import * as CliProgress from 'cli-progress';
 import {
     getAllKeys, toBlockNumber, toParityQuantity,
 } from '../utils/utils';
@@ -13,7 +14,6 @@ import Change from './Change';
 import Add from './Add';
 import { ProcessedParameters, StorageKeyDiff } from './Types';
 import GetProof from '../proofHandler/GetProof';
-import * as CliProgress from 'cli-progress';
 
 async function processParameters(srcAddress: string, srcProvider: JsonRpcProvider, srcBlock?: string | number, targetAddress?: string, targetProvider?: JsonRpcProvider, targetBlock?: string | number): Promise<ProcessedParameters> {
     assert(ethers.utils.isAddress(srcAddress), 'contract address is not a valid address');
@@ -162,6 +162,7 @@ class DiffHandler {
         const progressBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
         progressBar.start(txs.length, 0);
         while (txs.length > 0) {
+            // eslint-disable-next-line no-await-in-loop
             const currTxs = await Promise.all(txs.splice(0, this.batchSize).map((tx) => srcTxHandler.replayTransaction(tx)));
             txStorages = txStorages.concat(currTxs);
             progressBar.increment(currTxs.length);
@@ -187,11 +188,9 @@ class DiffHandler {
                 diffs.push(new Add(key, changedStorage[key]));
             } else if (!changedStorage[key].match(/0x[0]{64}/g)) {
                 // check if value is equal the old state again
-                const oldIndex = oldProof.storageProof.findIndex((proof) => {
-                    return ethers.utils.hexZeroPad(changedStorage[key], 32) === ethers.utils.hexZeroPad(proof.value, 32);
-                });
+                const oldValue = oldProof.storageProof.findIndex((proof) => ethers.utils.hexZeroPad(changedStorage[key], 32) === ethers.utils.hexZeroPad(proof.value, 32) && ethers.utils.hexZeroPad(proof.key, 32) === ethers.utils.hexZeroPad(key, 32));
 
-                if (oldIndex < 0) {
+                if (oldValue < 0) {
                     // changed key
                     diffs.push(new Change(key, 0, changedStorage[key]));
                 }
