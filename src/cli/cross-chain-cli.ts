@@ -426,7 +426,7 @@ synchronize
         await chainProxy.init();
 
         // prepare for possible batch synch
-        if (adjustedOptions.blockBatchSize && adjustedOptions.diffMode === 'storage') {
+        if (adjustedOptions.blockBatchSize !== Number.MAX_SAFE_INTEGER.toString() && adjustedOptions.diffMode === 'storage') {
             logger.error('The option blockBatchSize is not supported with diffmode storage.');
             process.exit(-1);
         } else if (adjustedOptions.diffMode === 'srcTx') {
