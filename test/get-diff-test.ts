@@ -1,11 +1,13 @@
-import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { JsonRpcProvider } from '@ethersproject/providers';
-import { HttpNetworkConfig } from 'hardhat/types';
+import { BigNumber, ethers } from 'ethers';
 import DiffHandler from '../src/diffHandler/DiffHandler';
 import { SimpleStorage, SimpleStorage__factory } from '../src-gen/types';
 import { logger } from '../src/utils/logger';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import FileHandler from '../src/utils/fileHandler';
+import { TestCLI } from './test-utils';
 
 describe('Get contract storage diff', () => {
     let deployer: SignerWithAddress;
@@ -13,17 +15,22 @@ describe('Get contract storage diff', () => {
     let storageTarget: SimpleStorage;
     let differ: DiffHandler;
     let provider: JsonRpcProvider;
-    let httpConfig: HttpNetworkConfig;
+    let chainConfigs: TxContractInteractionOptions | undefined;
 
     before(async () => {
-        [deployer] = await ethers.getSigners();
-        httpConfig = network.config as HttpNetworkConfig;
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
+        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fh.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        deployer = await SignerWithAddress.create(provider.getSigner());
         logger.setSettings({ minLevel: 'info', name: 'get-diff-test.ts' });
     });
 
     beforeEach(async () => {
-        differ = new DiffHandler();
+        differ = new DiffHandler(provider);
         const Storage = new SimpleStorage__factory(deployer);
         storageSrc = await Storage.deploy();
         storageTarget = await Storage.deploy();
@@ -47,7 +54,7 @@ describe('Get contract storage diff', () => {
         expect(diff.diffs.length).to.equal(1);
         const adds = diff.adds();
         expect(adds.length).to.equal(1);
-        expect(ethers.BigNumber.from(adds[0].key)).to.equal(ethers.BigNumber.from(0));
+        expect(ethers.BigNumber.from(adds[0].key).eq(ethers.BigNumber.from(0))).to.be.true;
 
         // comparing the latest block against the second latest ('latest' - 1)
         // results in a diff with a removed key
@@ -55,7 +62,7 @@ describe('Get contract storage diff', () => {
         expect(diff.diffs.length).to.equal(1);
         const removes = diff.removes();
         expect(removes.length).to.equal(1);
-        expect(ethers.BigNumber.from(removes[0].key)).to.equal(ethers.BigNumber.from(0));
+        expect(ethers.BigNumber.from(removes[0].key).eq(ethers.BigNumber.from(0))).to.be.true;
     });
 
     it('Should get a single additional key in diff.getDiffFromSrcContractTxs after setting a value', async () => {
@@ -68,7 +75,7 @@ describe('Get contract storage diff', () => {
         expect(diff.diffs.length).to.equal(1);
         const adds = diff.adds();
         expect(adds.length).to.equal(1);
-        expect(ethers.BigNumber.from(adds[0].key)).to.equal(ethers.BigNumber.from(0));
+        expect(ethers.BigNumber.from(adds[0].key).eq(ethers.BigNumber.from(0))).to.be.true;
 
         // cannot differentiate between add, change and remove
         tx = await storageSrc.setA(0x0);
@@ -78,7 +85,7 @@ describe('Get contract storage diff', () => {
         expect(diff.diffs.length).to.equal(1);
         const removes = diff.removes();
         expect(removes.length).to.equal(1);
-        expect(ethers.BigNumber.from(removes[0].key)).to.equal(ethers.BigNumber.from(0));
+        expect(ethers.BigNumber.from(removes[0].key).eq(ethers.BigNumber.from(0))).to.be.true;
     });
 
     it('Should get a single changed key in diff.getDiffFromStorage after changing a value in the same contract', async () => {
@@ -91,13 +98,13 @@ describe('Get contract storage diff', () => {
         expect(diff.diffs.length).to.equal(1);
         const changed = diff.changes();
         expect(changed.length).to.equal(1);
-        expect(ethers.BigNumber.from(changed[0].key)).to.equal(ethers.BigNumber.from(0));
+        expect(ethers.BigNumber.from(changed[0].key).eq(ethers.BigNumber.from(0))).to.be.true;
 
         // value was changed from 1337 to 42, so the srcValue represents the old value...
-        expect(ethers.BigNumber.from(changed[0].srcValue)).to.equal(ethers.BigNumber.from(1337));
+        expect(ethers.BigNumber.from(changed[0].srcValue).eq(ethers.BigNumber.from(1337))).to.be.true;
 
         // ...and the target value the new value
-        expect(ethers.BigNumber.from(changed[0].targetValue)).to.equal(ethers.BigNumber.from(42));
+        expect(ethers.BigNumber.from(changed[0].targetValue).eq(ethers.BigNumber.from(42))).to.be.true;
     });
 
     it('Should get a single changed key in diff.getDiffFromSrcContractTxs after changing a value in the same contract', async () => {
@@ -110,7 +117,7 @@ describe('Get contract storage diff', () => {
         expect(diff.diffs.length).to.equal(1);
         const changed = diff.changes();
         expect(changed.length).to.equal(1);
-        expect(ethers.BigNumber.from(changed[0].key)).to.equal(ethers.BigNumber.from(0));
+        expect(ethers.BigNumber.from(changed[0].key).eq(ethers.BigNumber.from(0))).to.be.true;
     });
 
     it('Should get correct diff.getDiffFromStorage between different contracts', async () => {
@@ -128,11 +135,11 @@ describe('Get contract storage diff', () => {
         expect(diff.diffs.length).to.equal(1);
         const changed = diff.changes();
         expect(changed.length).to.equal(1);
-        expect(ethers.BigNumber.from(changed[0].key)).to.equal(ethers.BigNumber.from(0));
+        expect(ethers.BigNumber.from(changed[0].key).eq(ethers.BigNumber.from(0))).to.be.true;
 
-        expect(ethers.BigNumber.from(changed[0].srcValue)).to.equal(ethers.BigNumber.from(1337));
+        expect(ethers.BigNumber.from(changed[0].srcValue).eq(ethers.BigNumber.from(1337))).to.be.true;
 
-        expect(ethers.BigNumber.from(changed[0].targetValue)).to.equal(ethers.BigNumber.from(9000));
+        expect(ethers.BigNumber.from(changed[0].targetValue).eq(ethers.BigNumber.from(9000))).to.be.true;
     });
 
     it('Should get all new changes through getDiffFromSrcBlockTxs', async () => {

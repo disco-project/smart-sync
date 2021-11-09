@@ -2,7 +2,7 @@ import stringify from 'csv-stringify';
 import { BigNumberish, ethers } from 'ethers';
 import fs from 'fs';
 import * as rlp from 'rlp';
-import { StorageProof } from '../src/verify-proof';
+import { StorageProof } from '../src/proofHandler/Types';
 
 export interface CSVDataTemplateBasicMTEdge {
     from: string;

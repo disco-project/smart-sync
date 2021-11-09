@@ -1,7 +1,5 @@
-import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
-import { Contract } from 'ethers';
-import { HttpNetworkConfig } from 'hardhat/types';
+import { BigNumber, Contract, ethers } from 'ethers';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import {
@@ -13,6 +11,9 @@ import { PROXY_INTERFACE } from '../src/config';
 import { logger } from '../src/utils/logger';
 import GetProof from '../src/proofHandler/GetProof';
 import ProxyContractBuilder from '../src/utils/proxy-contract-builder';
+import FileHandler from '../src/utils/fileHandler';
+import { TestCLI } from './test-utils';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
 
 describe('Extension Validation', async () => {
     let deployer: SignerWithAddress;
@@ -23,13 +24,18 @@ describe('Extension Validation', async () => {
     let relayContract: RelayContract;
     let latestBlock;
     let proxyContract: Contract;
-    let httpConfig: HttpNetworkConfig;
+    let chainConfigs: TxContractInteractionOptions | undefined;
 
     before(async () => {
-        [deployer] = await ethers.getSigners();
-        httpConfig = network.config as HttpNetworkConfig;
+        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fh.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
         logger.setSettings({ minLevel: 'info', name: 'extension-validation-test.ts' });
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
+        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        deployer = await SignerWithAddress.create(provider.getSigner());
     });
 
     beforeEach(async () => {
@@ -88,6 +94,7 @@ describe('Extension Validation', async () => {
         await relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
+        expect(compiledProxy.error).to.be.false;
 
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
@@ -100,7 +107,7 @@ describe('Extension Validation', async () => {
             proxyKeys.push(ethers.utils.hexZeroPad(p.key, 32));
             proxyValues.push(ethers.utils.hexZeroPad(p.value, 32));
         });
-        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: httpConfig.gas });
+        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: chainConfigs?.gasLimit });
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         const differ = new DiffHandler(provider);

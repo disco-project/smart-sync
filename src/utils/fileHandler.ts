@@ -17,7 +17,9 @@ class FileHandler {
 
     getJSON<T>(): T | undefined {
         try {
-            return JSON.parse(this.read() ?? '{}');
+            const fileContent = this.read();
+            if (!fileContent) return undefined;
+            return JSON.parse(fileContent);
         } catch (e) {
             logger.error(e);
             return undefined;

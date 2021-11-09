@@ -1,63 +1,76 @@
-/* eslint-env mocha */
-import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
 import { JsonRpcProvider } from '@ethersproject/providers';
-import { HttpNetworkConfig } from 'hardhat/types';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { BigNumber, ethers } from 'ethers';
 import DiffHandler from '../src/diffHandler/DiffHandler';
 import { logger } from '../src/utils/logger';
-import { TestChainProxy, InitializationResult } from './test-utils';
+import { TestChainProxy, InitializationResult, TestCLI } from './test-utils';
 import {
     RelayContract__factory, MappingContract, MappingContract__factory, RelayContract,
 } from '../src-gen/types';
+import FileHandler from '../src/utils/fileHandler';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
 
 const MAX_VALUE = 1000000;
 
 describe('New Initialization', async () => {
-    let deployer: SignerWithAddress;
+    let srcDeployer: SignerWithAddress;
+    let targetDeployer: SignerWithAddress;
     let srcContract: MappingContract;
     let logicContract: MappingContract;
     let factory: MappingContract__factory;
-    let provider: JsonRpcProvider;
+    let srcProvider: JsonRpcProvider;
+    let targetProvider: JsonRpcProvider;
     let relayContract: RelayContract;
-    let httpConfig: HttpNetworkConfig;
+    let chainConfigs: TxContractInteractionOptions | undefined;
     let chainProxy: TestChainProxy;
 
     before(async () => {
-        httpConfig = network.config as HttpNetworkConfig;
+        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fh.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.targetChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        srcDeployer = await SignerWithAddress.create(srcProvider.getSigner());
+        targetDeployer = await SignerWithAddress.create(targetProvider.getSigner());
         logger.setSettings({ minLevel: 'info', name: 'new-initialization.ts' });
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
-        [deployer] = await ethers.getSigners();
     });
 
     beforeEach(async () => {
-        factory = new MappingContract__factory(deployer);
+        factory = new MappingContract__factory(srcDeployer);
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
         // deploy the relay contract
-        const Relayer = new RelayContract__factory(deployer);
+        const Relayer = new RelayContract__factory(targetDeployer);
         relayContract = await Relayer.deploy();
-        chainProxy = new TestChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        chainProxy = new TestChainProxy(srcContract, logicContract, chainConfigs, srcDeployer, targetDeployer, relayContract, srcProvider, targetProvider);
     });
 
-    it('Contract with map containing 1000 values, update 20 values', async () => {
-        const mapSize = 1000;
+    it('Contract with map containing 50 values, update 10 values', async () => {
+        const mapSize = 50;
         let initialization: InitializationResult;
         try {
             initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
             expect(initialization.migrationState).to.be.true;
         } catch (e) {
-            logger.fatal(e);
-            process.exit(-1);
+            logger.error(e);
+            return false;
         }
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
-        const differ = new DiffHandler(provider);
+        const differ = new DiffHandler(srcProvider, targetProvider);
         let diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
         // change all the previous synced values
-        const result = await chainProxy.changeDeepestValues(20, MAX_VALUE);
+        const result = await chainProxy.changeDeepestValues(10, MAX_VALUE);
         expect(result).to.be.true;
 
         diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
@@ -71,10 +84,10 @@ describe('New Initialization', async () => {
             process.exit(-1);
         }
 
-        logger.info('Gas used for updating 20 values in map with 1000 values: ', migrationResult.receipt.gasUsed.toNumber());
+        logger.info('Gas used for updating 10 values in map with 50 values: ', migrationResult.receipt.gasUsed.toNumber());
 
         // after update storage layouts are equal, no diffs
         diff = await differ.getDiffFromStorage(srcContract.address, initialization.proxyContract.address);
-        expect(diff.isEmpty()).to.be.true;
+        return expect(diff.isEmpty()).to.be.true;
     });
 });

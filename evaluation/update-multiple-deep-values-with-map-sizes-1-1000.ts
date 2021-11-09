@@ -1,11 +1,9 @@
 import { ethers } from 'ethers';
-import { network } from 'hardhat';
 import { expect } from 'chai';
 import { JsonRpcProvider } from '@ethersproject/providers';
-import { HttpNetworkConfig } from 'hardhat/types';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { BigNumberish } from '@ethersproject/bignumber';
-import { TestChainProxy } from '../test/test-utils';
+import { BigNumber, BigNumberish } from '@ethersproject/bignumber';
+import { TestChainProxy, TestCLI } from '../test/test-utils';
 import { CSVDataTemplateMultipleValues, CSVManager } from './eval-utils';
 import {
     RelayContract__factory, MappingContract, MappingContract__factory, RelayContract,
@@ -13,29 +11,41 @@ import {
 import DiffHandler from '../src/diffHandler/DiffHandler';
 import { logger } from '../src/utils/logger';
 import StorageDiff from '../src/diffHandler/StorageDiff';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import FileHandler from '../src/utils/fileHandler';
 
 const MAX_VALUE = 1000000;
 const MAX_CHANGED_VALUES = 100;
 
 describe('update-multiple-values-with-map-sizes-1-1000', async () => {
-    let deployer: SignerWithAddress;
+    let srcDeployer: SignerWithAddress;
+    let targetDeployer: SignerWithAddress;
     let srcContract: MappingContract;
     let logicContract: MappingContract;
     let factory: MappingContract__factory;
-    let provider: JsonRpcProvider;
+    let srcProvider: JsonRpcProvider;
+    let targetProvider: JsonRpcProvider;
     let relayContract: RelayContract;
-    let httpConfig: HttpNetworkConfig;
+    let chainConfigs: TxContractInteractionOptions | undefined;
     let chainProxy: TestChainProxy;
     let csvManager: CSVManager<CSVDataTemplateMultipleValues>;
     let differ: DiffHandler;
     let currBlockNr: number;
 
-    before(() => {
-        httpConfig = network.config as HttpNetworkConfig;
+    before(async () => {
+        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fh.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.targetChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        srcDeployer = await SignerWithAddress.create(srcProvider.getSigner());
+        targetDeployer = await SignerWithAddress.create(targetProvider.getSigner());
         logger.setSettings({ minLevel: 'info', name: 'update-multiple-deep-values-with-map-sizes-1-1000.ts' });
         csvManager = new CSVManager<CSVDataTemplateMultipleValues>('measurements-multiple-deep-values-with-map-sizes-1-to-1000.csv');
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
-        differ = new DiffHandler(provider);
+        differ = new DiffHandler(srcProvider, targetProvider);
     });
 
     after(async () => {
@@ -43,14 +53,17 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
     });
 
     beforeEach(async () => {
-        deployer = await SignerWithAddress.create(provider.getSigner());
-        factory = new MappingContract__factory(deployer);
+        factory = new MappingContract__factory(srcDeployer);
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
         // deploy the relay contract
-        const Relayer = new RelayContract__factory(deployer);
+        const Relayer = new RelayContract__factory(targetDeployer);
         relayContract = await Relayer.deploy();
-        chainProxy = new TestChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        chainProxy = new TestChainProxy(srcContract, logicContract, chainConfigs, srcDeployer, targetDeployer, relayContract, srcProvider, targetProvider);
     });
 
     afterEach(async () => {
@@ -60,7 +73,7 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
         const mapSize = 10;
         const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
-        currBlockNr = await provider.getBlockNumber() + 1;
+        currBlockNr = await srcProvider.getBlockNumber() + 1;
 
         for (let i = 0; i < mapSize; i += 1) {
             const valueCount = i + 1;
@@ -74,7 +87,7 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
             const diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
             const changedKeys: Array<BigNumberish> = diff.getKeys();
             logger.debug(`valueCount: ${valueCount}, changedKeys: ${changedKeys.length}`);
-            currBlockNr = await provider.getBlockNumber() + 1;
+            currBlockNr = await srcProvider.getBlockNumber() + 1;
             const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
             expect(migrationResult.migrationResult).to.be.true;
             if (!migrationResult.receipt) {
@@ -99,7 +112,7 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
         const mapSize = 100;
         const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
-        currBlockNr = await provider.getBlockNumber() + 1;
+        currBlockNr = await srcProvider.getBlockNumber() + 1;
 
         for (let i = 0; i < mapSize; i += 1) {
             const valueCount = i + 1;
@@ -113,7 +126,7 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
             const diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
             const changedKeys: Array<BigNumberish> = diff.getKeys();
             logger.debug(`valueCount: ${valueCount}, changedKeys: ${changedKeys.length}`);
-            currBlockNr = await provider.getBlockNumber() + 1;
+            currBlockNr = await srcProvider.getBlockNumber() + 1;
             const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
             expect(migrationResult.migrationResult).to.be.true;
             if (!migrationResult.receipt) {
@@ -138,7 +151,7 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
         const mapSize = 1000;
         const initialization = await chainProxy.initializeProxyContract(mapSize, MAX_VALUE);
         expect(initialization.migrationState).to.be.true;
-        currBlockNr = await provider.getBlockNumber() + 1;
+        currBlockNr = await srcProvider.getBlockNumber() + 1;
 
         for (let i = 0; i < MAX_CHANGED_VALUES; i += 1) {
             const valueCount = i + 1;
@@ -152,7 +165,7 @@ describe('update-multiple-values-with-map-sizes-1-1000', async () => {
             const diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
             const changedKeys: Array<BigNumberish> = diff.getKeys();
             logger.debug(`valueCount: ${valueCount}, changedKeys: ${changedKeys.length}`);
-            currBlockNr = await provider.getBlockNumber() + 1;
+            currBlockNr = await srcProvider.getBlockNumber() + 1;
             const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
             expect(migrationResult.migrationResult).to.be.true;
             if (!migrationResult.receipt) {

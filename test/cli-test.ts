@@ -1,7 +1,6 @@
-import { ethers, network } from 'hardhat';
+import { BigNumber, ethers } from 'ethers';
 import { expect } from 'chai';
 import { JsonRpcProvider } from '@ethersproject/providers';
-import { HttpNetworkConfig } from 'hardhat/types';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import {
     execSync, spawn,
@@ -10,7 +9,7 @@ import { Contract } from '@ethersproject/contracts';
 import { SIGTERM } from 'constants';
 import { logger } from '../src/utils/logger';
 import { PROXY_INTERFACE } from '../src/config';
-import { InitializationResult, TestChainProxy } from './test-utils';
+import { InitializationResult, TestChainProxy, TestCLI } from './test-utils';
 import {
     RelayContract__factory, MappingContract, MappingContract__factory, RelayContract,
 } from '../src-gen/types';
@@ -19,32 +18,36 @@ import DiffHandler from '../src/diffHandler/DiffHandler';
 import Change from '../src/diffHandler/Change';
 import Add from '../src/diffHandler/Add';
 import Remove from '../src/diffHandler/Remove';
-
-namespace TestCLI {
-    export const tsNodeExec = './node_modules/ts-node/dist/bin-transpile.js';
-    export const cliExec = './src/cli/cross-chain-cli.ts';
-    export const defaultTestConfigFile = './test/config/test-cli-config.json';
-    export const MAX_VALUE = 1000000;
-}
+import FileHandler from '../src/utils/fileHandler';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
 
 describe('Test CLI', async () => {
-    let deployer: SignerWithAddress;
+    let targetDeployer: SignerWithAddress;
+    let srcDeployer: SignerWithAddress;
     let srcContract: MappingContract;
     let logicContract: MappingContract;
     let factory: MappingContract__factory;
-    let provider: JsonRpcProvider;
+    let targetProvider: JsonRpcProvider;
+    let srcProvider: JsonRpcProvider;
     let relayContract: RelayContract;
-    let httpConfig: HttpNetworkConfig;
     let differ: DiffHandler;
     let chainProxy: TestChainProxy;
+    let chainConfigs: TxContractInteractionOptions | undefined;
 
     before(async () => {
-        httpConfig = network.config as HttpNetworkConfig;
+        const fileHandler = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fileHandler.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
         logger.setSettings({ minLevel: 'info', name: 'cli-test.ts' });
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
-        differ = new DiffHandler(provider);
-        deployer = await SignerWithAddress.create(provider.getSigner());
-        factory = new MappingContract__factory(deployer);
+        targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.targetChainUrl || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
+        srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.srcBlocknr || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
+        differ = new DiffHandler(srcProvider, targetProvider);
+        targetDeployer = await SignerWithAddress.create(targetProvider.getSigner());
+        srcDeployer = await SignerWithAddress.create(srcProvider.getSigner());
+        factory = new MappingContract__factory(srcDeployer);
     });
 
     after(async () => {
@@ -55,10 +58,14 @@ describe('Test CLI', async () => {
         srcContract = await factory.deploy();
         logicContract = await factory.deploy();
         // deploy the relay contract
-        const Relayer = new RelayContract__factory(deployer);
+        const Relayer = new RelayContract__factory(targetDeployer);
         relayContract = await Relayer.deploy();
         logger.debug(`srcContract: ${srcContract.address}, relayContract: ${relayContract.address}`);
-        chainProxy = new TestChainProxy(srcContract, logicContract, httpConfig, deployer, relayContract, provider);
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        chainProxy = new TestChainProxy(srcContract, logicContract, chainConfigs, srcDeployer, targetDeployer, relayContract, srcProvider, targetProvider);
     });
 
     afterEach(async () => {
@@ -86,14 +93,15 @@ describe('Test CLI', async () => {
         const migrated = await relayContract.getMigrationState(proxyContractAddress);
         expect(migrated).to.be.true;
 
-        const proxyProof = await provider.send('eth_getProof', [proxyContractAddress, []]);
+        const proxyProof = await targetProvider.send('eth_getProof', [proxyContractAddress, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
         expect(proxyStorageRoot).to.equal(srcStorageRoot);
 
         const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContractAddress, srcContract.address);
-        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
+        expect(compiledProxy.error).to.be.false;
+        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, targetDeployer);
         const proxyContract = proxyFactory.attach(proxyContractAddress);
 
         const newSrcContractAddress = await proxyContract.getSourceAddress();
@@ -123,19 +131,19 @@ describe('Test CLI', async () => {
 
         logger.debug(`relayAddress: ${relayContractAddress}, logicAddress: ${logicContractAddress}, proxyContractAddress: ${proxyContractAddress}`);
 
-        const relayFactory = new RelayContract__factory(deployer);
+        const relayFactory = new RelayContract__factory(targetDeployer);
         relayContract = relayFactory.attach(relayContractAddress);
         const migrated = await relayContract.getMigrationState(proxyContractAddress);
         expect(migrated).to.be.true;
 
-        const proxyProof = await provider.send('eth_getProof', [proxyContractAddress, []]);
+        const proxyProof = await targetProvider.send('eth_getProof', [proxyContractAddress, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
         expect(proxyStorageRoot).to.equal(srcStorageRoot);
 
         const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContractAddress, srcContract.address);
-        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
+        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, targetDeployer);
         const proxyContract = proxyFactory.attach(proxyContractAddress);
 
         const newSrcContractAddress = await proxyContract.getSourceAddress();
@@ -159,7 +167,7 @@ describe('Test CLI', async () => {
         }
 
         // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
+        const currBlockNr = await srcProvider.getBlockNumber();
 
         // insert some new values
         const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
@@ -171,9 +179,9 @@ describe('Test CLI', async () => {
         const output = execSync(synchCommand);
         logger.debug(`\n${output}`);
 
-        const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+        const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
         return expect(proxyStorageRoot).to.equal(srcStorageRoot);
     });
@@ -192,7 +200,7 @@ describe('Test CLI', async () => {
         }
 
         // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
+        const currBlockNr = await srcProvider.getBlockNumber();
 
         const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${synchContinuousCommand}`);
@@ -228,9 +236,9 @@ describe('Test CLI', async () => {
             setTimeout(() => resolve(resolve), 8000);
         });
 
-        const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+        const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
 
         // kill child process executing the cron job
@@ -252,7 +260,7 @@ describe('Test CLI', async () => {
         }
 
         // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
+        const currBlockNr = await srcProvider.getBlockNumber();
 
         const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${synchContinuousCommand}`);
@@ -296,9 +304,9 @@ describe('Test CLI', async () => {
                 setTimeout(() => resolve(resolve), 3000);
             });
 
-            const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+            const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
             const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-            const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+            const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
             const srcStorageRoot = srcProof.storageHash.toLowerCase();
 
             expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
@@ -322,7 +330,7 @@ describe('Test CLI', async () => {
         }
 
         // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
+        const currBlockNr = await srcProvider.getBlockNumber();
 
         // insert some new values
         const changedValues = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);
@@ -334,9 +342,9 @@ describe('Test CLI', async () => {
         const output = execSync(synchCommand);
         logger.debug(`\n${output}`);
 
-        const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+        const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
         return expect(proxyStorageRoot).to.equal(srcStorageRoot);
     });
@@ -355,7 +363,7 @@ describe('Test CLI', async () => {
         }
 
         // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
+        const currBlockNr = await srcProvider.getBlockNumber();
 
         // insert some new values
         const changedValues = await chainProxy.deleteValueAtIndex(0);
@@ -367,11 +375,11 @@ describe('Test CLI', async () => {
         const output = execSync(synchCommand);
         logger.debug(`\n${output}`);
 
-        const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+        const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
-        return expect(proxyStorageRoot).to.equal(srcStorageRoot);
+        return expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
     });
 
     it('should synch (diff mode = storage, changed values)', async () => {
@@ -397,9 +405,9 @@ describe('Test CLI', async () => {
         const output = execSync(synchCommand);
         logger.debug(`\n${output}`);
 
-        const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+        const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
         return expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
     });
@@ -451,9 +459,9 @@ describe('Test CLI', async () => {
             setTimeout(() => resolve(resolve), 8000);
         });
 
-        const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+        const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
 
         // kill child process executing the cron job
@@ -516,9 +524,9 @@ describe('Test CLI', async () => {
                 setTimeout(() => resolve(resolve), 3000);
             });
 
-            const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+            const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
             const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-            const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+            const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
             const srcStorageRoot = srcProof.storageHash.toLowerCase();
 
             expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
@@ -551,9 +559,9 @@ describe('Test CLI', async () => {
         const output = execSync(synchCommand);
         logger.debug(`\n${output}`);
 
-        const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+        const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
         return expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
     });
@@ -581,9 +589,9 @@ describe('Test CLI', async () => {
         const output = execSync(synchCommand);
         logger.debug(`\n${output}`);
 
-        const proxyProof = await provider.send('eth_getProof', [initialization.proxyContract.address, []]);
+        const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await provider.send('eth_getProof', [srcContract.address, []]);
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
         const srcStorageRoot = srcProof.storageHash.toLowerCase();
         return expect(proxyStorageRoot).to.equal(srcStorageRoot, 'storageHashes of proxy and src are not the same');
     });
@@ -593,7 +601,7 @@ describe('Test CLI', async () => {
 
         // deploy the proxy with the state of the `srcContract`
         const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
-        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
+        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, targetDeployer);
         let cleanSlateProxy: Contract;
         try {
             cleanSlateProxy = await proxyFactory.deploy();
@@ -649,7 +657,7 @@ describe('Test CLI', async () => {
         expect(result).to.not.be.null;
 
         // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
+        const currBlockNr = await srcProvider.getBlockNumber();
 
         // insert some new values
         const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
@@ -694,7 +702,7 @@ describe('Test CLI', async () => {
         expect(result).to.not.be.null;
 
         // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
+        const currBlockNr = await srcProvider.getBlockNumber();
 
         // insert some new values
         const addedValue = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);
@@ -739,7 +747,7 @@ describe('Test CLI', async () => {
         expect(result).to.not.be.null;
 
         // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
+        const currBlockNr = await srcProvider.getBlockNumber();
 
         // insert some new values
         const deletedValue = await chainProxy.deleteValueAtIndex(0);
@@ -826,7 +834,7 @@ describe('Test CLI', async () => {
         expect(result).to.not.be.null;
 
         // get blocknumber before changing src contract
-        const currBlockNr = await provider.getBlockNumber();
+        const currBlockNr = await srcProvider.getBlockNumber();
 
         // insert some new values
         const addedValue = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);

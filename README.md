@@ -1,22 +1,15 @@
 # Getting started
 
-## Installation
+## Installation CLI
 
-First, install the project and compile all required components:
-```bash
-npm i
-npx hardhat compile
+Download the tarballed npm package on our [GitHub Respository](https://github.com/disco-project/cross-chain-contracts) and execute the following
+```
+$ npm i {CROSS_CHAIN_CLI_NPM_PACKAGE} -g
 ```
 
-## CLI
+To compile the project yourself and install it, see section [Getting started (Dev)](#getting-started-dev)
 
-To use the command line interface, `ts-node` and the project must be installed globally:
-```bash
-npm i ts-node -g
-npm i -g
-```
-
-Under `./config` you can find the default configuration for the cli. Adjust the fields according to your needs or pass them as options in the command line
+Under `{INSTALL_DIR}/config` you can find the default configuration for the cli. Adjust the fields according to your needs or pass them as options in the command line.
 
 To execute tests, please refer to the [test](#tests) section.
 
@@ -172,29 +165,63 @@ $ cross-chain-cli diff 0x20a508640B446990c781Cd541B9a2828ACA3a350 0xf8f22ab160e8
 
 # Getting started (Dev)
 
-This project uses [hardhat](https://hardhat.org/getting-started/) and [ethers](https://docs.ethers.io/v5/). 
+This project uses [hardhat](https://hardhat.org/getting-started/) and [ethers](https://docs.ethers.io/v5/) among other things.
 
-To start the chain [see](../README.md)
-
-To compile all the contracts and files run.
+### Install dev packages
 
 ```bash
-npx hardhat compile
+$ npm i --development
 ```
 
+### Compile project
+To execute the compile-pipeline of this project run:
+
+```bash
+npx grunt compile-project
+```
+
+This cleans the dist folder, compiles the contracts, lints the src files and executes tsc. If you want to execute those steps individually see `npx grunt --help` for all available individual commands:
+
+Available tasks:
+Command | Description
+------------ | -------------
+eslint | Validate files with ESLint *                        
+mochaTest | Run node unit tests with Mocha *                    
+clean | Clean files and folders. *                          
+default | Alias for "eslint" task.                            
+start-chains | Startup chain                                       
+stop-chains | Stopping chain                                      
+compile-project | Generate js-files                                   
+compile-contracts | Generate contract type info                         
+tsc | Compile ts files                                    
+install | Install cross-chain-cli locally                     
+install-global | Install cross-chain-cli globally                    
+pack | npm pack cross-chain-cli                            
+npm-pack | npm packaging command                               
+full-pipeline-test | Testing precompiled *.ts project                    
+full-pipeline-dist-test | Testing compiled *.js project inside dist folder    
+full-pipeline-evaluation | Evaluating project                                  
+evaluate | Run evaluation                                      
+test | Run tests
+
+### Install CLI
+To compile and install the CLI run:
+```bash
+npx grunt install
+```
 ## Chain
 Generally, you don't need to start the chain individually since its already started if you execute the command:
 ``` bash
 $ npm run test
 ```
-See [readme](chain/README.md) on how to start the test chain.
+See [readme](chain/README.md) on how to start the test chains.
 
 ## Linter
 We use the code style from [airbnb](https://www.npmjs.com/package/eslint-config-airbnb-base).
 To execute the linter just type:
 
 ```bash
-$ grunt eslint
+$ npx grunt eslint
 ```
 
 ## Tests
@@ -204,7 +231,7 @@ To run all the tests run (requires a running ethereum node, see [hardhat.config.
 $ npm run test
 ```
 
-Or a single test (chain needs to be started manually):
+Or a single test (chains needs to be started manually):
 
 ```bash
 $ npx hardhat test tests/list-storage-test.ts

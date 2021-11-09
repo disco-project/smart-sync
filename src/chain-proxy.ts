@@ -130,6 +130,7 @@ export class ChainProxy {
             try {
                 // attach to proxy
                 const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract?.address ?? this.proxyContractAddress, this.logicContractAddress ?? this.proxyContractAddress, this.srcContractAddress ?? this.proxyContractAddress);
+                if (compiledProxy.error) return false;
                 const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
                 this.proxyContract = proxyFactory.attach(this.proxyContractAddress);
 
@@ -173,10 +174,16 @@ export class ChainProxy {
             logger.error(`Given source contract address not a valid address (${this.srcContractAddress})`);
             return false;
         }
-        if ((await this.srcProvider.getCode(this.srcContractAddress)).length < 3) {
-            logger.error(`No contract found under src contract address ${this.srcContractAddress}.`);
+        try {
+            if ((await this.srcProvider.getCode(this.srcContractAddress)).length < 3) {
+                logger.error(`No contract found under src contract address ${this.srcContractAddress}.`);
+                return false;
+            }
+        } catch (e) {
+            logger.error(e);
             return false;
         }
+
         if (!this.relayContract) {
             logger.info('No address for relayContract given, deploying new relay contract...');
             const relayFactory = new RelayContract__factory(this.deployer);
@@ -240,6 +247,7 @@ export class ChainProxy {
             return false;
         }
         const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract.address, this.logicContractAddress, this.srcContractAddress);
+        if (compiledProxy.error) return false;
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
         try {
             this.proxyContract = await proxyFactory.deploy();
@@ -273,8 +281,8 @@ export class ChainProxy {
         const sourceAccountProof = await initialValuesProof.optimizedProof(stateRoot, false);
 
         //  getting account proof from proxy contract
-        const latestProxyChainBlock = await this.srcProvider.send('eth_getBlockByNumber', ['latest', false]);
-        const proxyChainProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.proxyContract.address, []]));
+        const latestProxyChainBlock = await this.targetProvider.send('eth_getBlockByNumber', ['latest', false]);
+        const proxyChainProof = new GetProof(await this.targetProvider.send('eth_getProof', [this.proxyContract.address, []]));
         const proxyAccountProof = await proxyChainProof.optimizedProof(latestProxyChainBlock.stateRoot, false);
 
         //  getting encoded block header
@@ -288,13 +296,18 @@ export class ChainProxy {
         }
 
         //  validating
-        const migrationValidated = await this.relayContract.getMigrationState(this.proxyContract.address);
-        this.migrationState = migrationValidated;
-        if (!this.migrationState) {
-            logger.error('Could not migrate srcContract.');
+        try {
+            const migrationValidated = await this.relayContract.getMigrationState(this.proxyContract.address);
+            this.migrationState = migrationValidated;
+            if (!this.migrationState) {
+                logger.error('Could not migrate srcContract.');
+                return false;
+            }
+            return true;
+        } catch (e) {
+            logger.error(e);
             return false;
         }
-        return true;
     }
 
     async migrateChangesToProxy(changedKeys: Array<BigNumberish>): Promise<Boolean> {

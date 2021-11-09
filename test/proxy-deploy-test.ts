@@ -1,7 +1,5 @@
-import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
-import { Contract } from 'ethers';
-import { HttpNetworkConfig } from 'hardhat/types';
+import { BigNumber, Contract, ethers } from 'ethers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import {
@@ -14,6 +12,9 @@ import { logger } from '../src/utils/logger';
 import GetProof from '../src/proofHandler/GetProof';
 import ProxyContractBuilder from '../src/utils/proxy-contract-builder';
 import { encodeBlockHeader } from '../src/chain-proxy';
+import { TestCLI } from './test-utils';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import FileHandler from '../src/utils/fileHandler';
 
 describe('Deploy proxy and logic contract', async () => {
     let deployer: SignerWithAddress;
@@ -26,13 +27,18 @@ describe('Deploy proxy and logic contract', async () => {
     let proxyContract: Contract;
     let callRelayContract: CallRelayContract;
     let proof: GetProof;
-    let httpConfig: HttpNetworkConfig;
+    let chainConfigs: TxContractInteractionOptions | undefined;
 
     before(async () => {
-        httpConfig = network.config as HttpNetworkConfig;
+        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fh.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        deployer = await SignerWithAddress.create(provider.getSigner());
         logger.setSettings({ minLevel: 'info', name: 'proxy-deploy-test.ts' });
-        [deployer] = await ethers.getSigners();
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
     });
 
     it('Should deploy initial contract and set an initial value', async () => {
@@ -44,7 +50,7 @@ describe('Deploy proxy and logic contract', async () => {
         relayContract = await Relayer.deploy();
         await srcContract.setValueA(42);
         await srcContract.setValueB(100);
-        expect(await srcContract.getValueA()).to.be.equal(ethers.BigNumber.from(42));
+        expect((await srcContract.getValueA()).eq(ethers.BigNumber.from(42))).to.be.true;
     });
 
     it('Should copy the source contract', async () => {
@@ -60,6 +66,7 @@ describe('Deploy proxy and logic contract', async () => {
 
     it('Should compile and deploy the proxy', async () => {
         const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
+        expect(compiledProxy.error).to.be.false;
 
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
@@ -72,7 +79,7 @@ describe('Deploy proxy and logic contract', async () => {
             proxyKeys.push(ethers.utils.hexZeroPad(p.key, 32));
             proxyValues.push(ethers.utils.hexZeroPad(p.value, 32));
         });
-        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: httpConfig.gas });
+        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: chainConfigs?.gasLimit });
 
         // The storage diff between `srcContract` and `proxyContract` comes up empty: both storage layouts are the same
         const differ = new DiffHandler(provider);
@@ -102,6 +109,7 @@ describe('Deploy proxy and logic contract', async () => {
         await relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContract.address, srcContract.address);
+        expect(compiledProxy.error).to.be.false;
 
         // deploy the proxy with the state of the `srcContract`
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, deployer);
@@ -114,14 +122,14 @@ describe('Deploy proxy and logic contract', async () => {
             proxyKeys.push(ethers.utils.hexZeroPad(p.key, 32));
             proxyValues.push(ethers.utils.hexZeroPad(p.value, 32));
         });
-        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: httpConfig.gas });
+        await proxyContract.addStorage(proxyKeys, proxyValues, { gasLimit: chainConfigs?.gasLimit });
 
         // validate migration
         //  getting account proof from source contract
         const sourceAccountProof = await proof.optimizedProof(latestBlock.stateRoot, false);
 
         //  getting account proof from proxy contract
-        const proxyProvider = new ethers.providers.JsonRpcProvider(httpConfig.url);
+        const proxyProvider = new ethers.providers.JsonRpcProvider(chainConfigs?.srcChainUrl);
         const latestProxyChainBlock = await proxyProvider.send('eth_getBlockByNumber', ['latest', false]);
         const proxyChainProof = new GetProof(await proxyProvider.send('eth_getProof', [proxyContract.address, []]));
         const proxyAccountProof = await proxyChainProof.optimizedProof(latestProxyChainBlock.stateRoot, false);
@@ -129,7 +137,7 @@ describe('Deploy proxy and logic contract', async () => {
         //  getting encoded block header
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
-        await relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), ethers.BigNumber.from(latestBlock.number).toNumber(), { gasLimit: httpConfig.gas });
+        await relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), ethers.BigNumber.from(latestBlock.number).toNumber(), { gasLimit: chainConfigs?.gasLimit });
 
         //  validating
         const migrationValidated = await relayContract.getMigrationState(proxyContract.address);
@@ -235,12 +243,12 @@ describe('Deploy proxy and logic contract', async () => {
         }
         // TODO: Why do external static calls not work?
         // expect(await proxyContract.callStatic.getValue(691)).to.equal(9);
-        expect(await callRelayContract.callStatic.getValue(691)).to.equal(ethers.BigNumber.from(9));
+        expect((await callRelayContract.callStatic.getValue(691)).eq(ethers.BigNumber.from(9))).to.be.true;
     });
 
     it('should be possible to retreive values via fallback through calling contract', async () => {
-        expect(await callRelayContract.callStatic.getValue(691)).to.equal(ethers.BigNumber.from(9));
-        expect(await callRelayContract.callStatic.getValue(333)).to.equal(ethers.BigNumber.from(33));
+        expect((await callRelayContract.callStatic.getValue(691)).eq(ethers.BigNumber.from(9))).to.be.true;
+        expect((await callRelayContract.callStatic.getValue(333)).eq(ethers.BigNumber.from(33))).to.be.true;
     });
 
     it('should reject state changes via fallback through calling contract', async () => {
@@ -249,6 +257,6 @@ describe('Deploy proxy and logic contract', async () => {
         } catch (error) {
             // ignore error
         }
-        expect(await callRelayContract.getValue(691)).to.equal(9);
+        expect((await callRelayContract.getValue(691)).eq(9)).to.be.true;
     });
 });

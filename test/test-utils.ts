@@ -2,7 +2,6 @@ import { Contract } from '@ethersproject/contracts';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumberish, ethers } from 'ethers';
-import { HttpNetworkConfig } from 'hardhat/types';
 import { Trie } from 'merkle-patricia-tree/dist/baseTrie';
 import { MappingContract, RelayContract } from '../src-gen/types';
 import { PROXY_INTERFACE } from '../src/config';
@@ -15,8 +14,17 @@ import {
 import GetProof, { encodeAccount, formatProofNodes } from '../src/proofHandler/GetProof';
 import { Account, StorageProof } from '../src/proofHandler/Types';
 import { encodeBlockHeader } from '../src/chain-proxy';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
 
 const KEY_VALUE_PAIR_PER_BATCH = 100;
+
+export namespace TestCLI {
+    export const tsNodeExec = './node_modules/ts-node/dist/bin-transpile.js';
+    export const cliExec = './src/cli/cross-chain-cli.ts';
+    export const defaultTestConfigFile = './test/config/test-cli-config.json';
+    export const DEFAULT_PROVIDER = 'http://localhost:8545';
+    export const MAX_VALUE = 1000000;
+}
 
 export interface InitializationResult {
     migrationState: Boolean;
@@ -107,15 +115,19 @@ export class TestChainProxy {
 
     readonly srcContract: MappingContract;
 
-    readonly provider: JsonRpcProvider;
+    readonly srcProvider: JsonRpcProvider;
 
-    readonly httpConfig: HttpNetworkConfig;
+    readonly targetProvider: JsonRpcProvider;
+
+    readonly httpConfig: TxContractInteractionOptions;
 
     readonly logicContract: MappingContract;
 
     readonly relayContract: RelayContract;
 
-    readonly deployer: SignerWithAddress;
+    readonly srcDeployer: SignerWithAddress;
+
+    readonly targetDeployer: SignerWithAddress;
 
     private max_mpt_depth: number;
 
@@ -127,19 +139,20 @@ export class TestChainProxy {
 
     private migrationState: Boolean;
 
-    constructor(srcContract: MappingContract, logicContract: MappingContract, httpConfig: HttpNetworkConfig, deployer: SignerWithAddress, relayContract: RelayContract, provider: JsonRpcProvider) {
+    constructor(srcContract: MappingContract, logicContract: MappingContract, httpConfig: TxContractInteractionOptions, srcDeployer: SignerWithAddress, targetDeployer: SignerWithAddress, relayContract: RelayContract, srcProvider: JsonRpcProvider, targetProvider: JsonRpcProvider) {
         this.srcContract = srcContract;
         this.logicContract = logicContract;
         this.relayContract = relayContract;
         this.httpConfig = httpConfig;
-        this.deployer = deployer;
-        this.provider = provider;
-        this.differ = new DiffHandler(this.provider);
+        this.srcDeployer = srcDeployer;
+        this.targetDeployer = targetDeployer;
+        this.srcProvider = srcProvider;
+        this.targetProvider = targetProvider;
+        this.differ = new DiffHandler(this.srcProvider, this.targetProvider);
         this.migrationState = false;
     }
 
     async initializeProxyContract(map_size: number, max_value: number): Promise<InitializationResult> {
-        this.map_size = map_size;
         // insert some random values
         const srcKeys: Array<number> = [];
         const srcValues: Array<number> = [];
@@ -152,10 +165,10 @@ export class TestChainProxy {
         }
         await this.insertValues(srcKeys, srcValues);
 
-        const keys = await getAllKeys(this.srcContract.address, this.provider);
-        const latestBlock = await this.provider.send('eth_getBlockByNumber', ['latest', true]);
+        const keys = await getAllKeys(this.srcContract.address, this.srcProvider);
+        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', ['latest', true]);
         // create a proof of the source contract's storage
-        this.initialValuesProof = new GetProof(await this.provider.send('eth_getProof', [this.srcContract.address, keys]));
+        this.initialValuesProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContract.address, keys]));
 
         // getting depth of mpt
         this.max_mpt_depth = 0;
@@ -172,9 +185,13 @@ export class TestChainProxy {
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(this.relayContract.address, this.logicContract.address, this.srcContract.address);
+        if (compiledProxy.error) {
+            logger.error('Could not get the compiled proxy...');
+            process.exit(-1);
+        }
 
         // deploy the proxy with the state of the `srcContract`
-        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
+        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.targetDeployer);
         this.proxyContract = await proxyFactory.deploy();
 
         // migrate storage
@@ -185,7 +202,7 @@ export class TestChainProxy {
             proxykeys.push(ethers.utils.hexZeroPad(storageProof.key, 32));
             proxyValues.push(ethers.utils.hexZeroPad(storageProof.value, 32));
         });
-        const storageAdds = [];
+        const storageAdds: Promise<any>[] = [];
         while (proxykeys.length > 0) {
             storageAdds.push(this.proxyContract.addStorage(proxykeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
         }
@@ -203,14 +220,14 @@ export class TestChainProxy {
         const sourceAccountProof = await this.initialValuesProof.optimizedProof(latestBlock.stateRoot, false);
 
         //  getting account proof from proxy contract
-        const latestProxyChainBlock = await this.provider.send('eth_getBlockByNumber', ['latest', false]);
-        const proxyChainProof = new GetProof(await this.provider.send('eth_getProof', [this.proxyContract.address, []]));
+        const latestProxyChainBlock = await this.targetProvider.send('eth_getBlockByNumber', ['latest', false]);
+        const proxyChainProof = new GetProof(await this.targetProvider.send('eth_getProof', [this.proxyContract.address, []]));
         const proxyAccountProof = await proxyChainProof.optimizedProof(latestProxyChainBlock.stateRoot, false);
 
         //  getting encoded block header
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
-        await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), ethers.BigNumber.from(latestBlock.number).toNumber(), { gasLimit: this.httpConfig.gas });
+        await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), ethers.BigNumber.from(latestBlock.number).toNumber(), { gasLimit: this.httpConfig.gasLimit });
 
         //  validating
         const migrationValidated = await this.relayContract.getMigrationState(this.proxyContract.address);
@@ -309,7 +326,7 @@ export class TestChainProxy {
     }
 
     private async insertValues(srcKeys: Array<number>, srcValues: Array<number>): Promise<Boolean> {
-        const promises = [];
+        const promises: Promise<any>[] = [];
         while (srcKeys.length > 0) {
             promises.push(this.srcContract.insertMultiple(srcKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), srcValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
         }
@@ -397,10 +414,10 @@ export class TestChainProxy {
             };
         }
 
-        const latestBlock = await this.provider.send('eth_getBlockByNumber', ['latest', true]);
+        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', ['latest', true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        const changedKeysProof = new GetProof(await this.provider.send('eth_getProof', [this.srcContract.address, changedKeys]));
+        const changedKeysProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContract.address, changedKeys]));
 
         // get depth of value
         let maxValueMptDept = 0;
@@ -417,7 +434,7 @@ export class TestChainProxy {
         try {
             txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number);
             receipt = await txResponse.wait();
-        } catch (e) {
+        } catch (e: any) {
             logger.error('something went wrong');
             const regexr = new RegExp(/Reverted 0x(.*)/);
             const checker = regexr.exec(e.data);

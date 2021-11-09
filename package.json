@@ -1,18 +1,25 @@
 {
-  "name": "disco-client",
-  "version": "1.0.0",
+  "name": "@disco-project/cross-chain-cli",
+  "version": "0.2.0",
   "description": "",
-  "main": "src/cli/cross-chain-cli.ts",
-  "bin": {
-    "cross-chain-cli": "./src/cli/cross-chain-cli.ts"
+  "repository": {
+    "url": "git@github.com:disco-project/cross-chain-contracts.git"
   },
+  "main": "./dist/src/cli/cross-chain-cli.js",
+  "types": "./dist/src/**/*.d.ts",
+  "bin": {
+    "cross-chain-cli": "./bin/cross-chain-cli"
+  },
+  "files": [
+    "dist/**/*"
+  ],
   "scripts": {
     "compile-contracts": "npx grunt compile-contracts",
-    "start": "ts-node-dev --respawn src/cli/cross-chain-cli.ts",
     "refresh": "rm -rf ./node_modules ./package-lock.json && npm install",
-    "test": "npx grunt full-pipeline --force",
+    "test": "npx grunt full-pipeline-test --force",
     "lint": "npx grunt eslint",
-    "evaluate": "npx grunt full-pipeline-evaluation --force"
+    "evaluate": "npx grunt full-pipeline-evaluation --force",
+    "build": "tsc -p tsconfig.json"
   },
   "author": "",
   "license": "ISC",
@@ -37,7 +44,6 @@
     "solidity-patricia-tree": "^2.0.2",
     "solidity-rlp": "^2.0.2",
     "ts-generator": "^0.1.1",
-    "ts-node": "^10.2.1",
     "tslog": "^3.2.1",
     "typechain": "^4.0.3",
     "web3": "^1.5.2"
@@ -61,11 +67,13 @@
     "ethereum-waffle": "^3.4.0",
     "grunt": "^1.4.1",
     "grunt-cli": "^1.4.3",
+    "grunt-contrib-clean": "^2.0.0",
     "grunt-contrib-watch": "^1.1.0",
     "grunt-eslint": "^23.0.0",
+    "grunt-mocha-test": "^0.13.3",
     "hardhat-typechain": "^0.3.3",
     "mocha": "^9.1.1",
-    "nodemon": "^2.0.12",
+    "ts-node": "^10.2.1",
     "ts-node-dev": "^1.1.8",
     "typescript": "^4.3.3"
   }

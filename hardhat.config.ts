@@ -25,6 +25,11 @@ export default {
       url: "http://127.0.0.1:8545",
       gas: 1000000000,
       timeout: 3600000
+    },
+    disco2: {
+        url: "http://127.0.0.1:8547",
+        gas: 1000000000,
+        timeout: 3600000
     }
   },
   typechain: {

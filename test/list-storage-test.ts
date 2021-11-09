@@ -1,31 +1,39 @@
-import { ethers, network } from 'hardhat';
 import { expect } from 'chai';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { HttpNetworkConfig } from 'hardhat/types';
 import { JsonRpcProvider } from '@ethersproject/providers';
+import { BigNumber, ethers } from 'ethers';
 import { SimpleStorage, SimpleStorage__factory } from '../src-gen/types';
-import { verifyEthGetProof } from './test-utils';
+import { verifyEthGetProof, TestCLI } from './test-utils';
 import GetProof from '../src/proofHandler/GetProof';
+import FileHandler from '../src/utils/fileHandler';
+import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { logger } from '../src/utils/logger';
 
 describe('Storage', async () => {
     let deployer: SignerWithAddress;
     let storage: SimpleStorage;
-    let httpConfig: HttpNetworkConfig;
     let provider: JsonRpcProvider;
+    let chainConfigs: TxContractInteractionOptions | undefined;
 
     before(async () => {
-        httpConfig = network.config as HttpNetworkConfig;
-        provider = new ethers.providers.JsonRpcProvider(httpConfig.url);
+        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        chainConfigs = fh.getJSON<TxContractInteractionOptions>();
+        if (!chainConfigs) {
+            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            process.exit(-1);
+        }
+        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        deployer = await SignerWithAddress.create(provider.getSigner());
+        logger.setSettings({ minLevel: 'info', name: 'list-storage-test.ts' });
     });
 
     it('Should deploy and return default values', async () => {
-        [deployer] = await ethers.getSigners();
         const Storage = new SimpleStorage__factory(deployer);
         storage = await Storage.deploy();
 
-        expect(await storage.getA()).to.equal(0);
-        expect(await storage.getB()).to.equal(42);
-        expect(await storage.getValue(deployer.address)).to.equal(0);
+        expect((await storage.getA()).eq(0)).to.be.true;
+        expect((await storage.getB()).eq(42)).to.be.true;
+        expect((await storage.getValue(deployer.address)).eq(0)).to.be.true;
     });
 
     it('Should read correct storage after transactions', async () => {
@@ -40,7 +48,7 @@ describe('Storage', async () => {
 
         // `a` is the first field of the contract and its value is stored at slot 0
         const aValue = await provider.getStorageAt(storage.address, 0);
-        expect(aValue).to.equal(ethers.BigNumber.from(newValue));
+        expect(ethers.BigNumber.from(newValue).eq(aValue)).to.be.true;
     });
 
     it('Should read correct mapping storage', async () => {
