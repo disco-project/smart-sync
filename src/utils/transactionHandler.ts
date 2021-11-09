@@ -1,8 +1,7 @@
-import { Block, TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import * as CliProgress from 'cli-progress';
 import { logger } from './logger';
-import { findDeploymentBlock, toBlockNumber } from './utils';
+import { findDeploymentBlock, toBlockNumber, toParityQuantity } from './utils';
 
 type KeyObject = {
     '*'?: {
@@ -80,6 +79,7 @@ class TransactionHandler {
                 const tx = response.stateDiff[this.contractAddress.toLowerCase()];
                 logger.debug('tx: ', transaction);
                 if (tx) {
+                    logger.debug(tx.storage);
                     const txStorage = tx.storage;
                     const keys = Object.keys(txStorage);
                     const obj: { [ key: string ]: string } = {};
@@ -101,8 +101,6 @@ class TransactionHandler {
 
     async getTransactions(latest_block_number: number | string, earliest_block_number?: number | string): Promise<Array<string>> {
         logger.debug('Called getTransactions');
-        const contractAddress: string = this.contractAddress.toUpperCase();
-        const relatedTransactions: Array<string> = [];
         let latest = latest_block_number;
         if (typeof (latest) === 'string') latest = await toBlockNumber(latest, this.provider);
 
@@ -116,116 +114,12 @@ class TransactionHandler {
         }
 
         // gather all transactions
-        logger.info(`Getting ${latest - earliest + 1} blocks...`);
-        const blockBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
-        blockBar.start(latest - earliest + 1, 0);
-        let blockPromises: Array<Promise<Block>> = [];
-        let blocks: Array<Block> = [];
-        for (let i = earliest; i <= latest; i += 1) {
-            blockPromises.push(this.provider.getBlock(i));
-            if (blockPromises.length >= this.batch) {
-                blockPromises.forEach((blockPromise) => {
-                    blockPromise.catch((error) => {
-                        logger.error(error);
-                        process.exit(-1);
-                    });
-                });
-                // eslint-disable-next-line no-await-in-loop
-                blocks = blocks.concat(await Promise.all(blockPromises));
-                blockPromises = [];
-                blockBar.increment(this.batch);
-            }
-        }
-        if (blockPromises.length > 0) {
-            blocks = blocks.concat(await Promise.all(blockPromises));
-            blockBar.increment(blockPromises.length);
-        }
-        blockBar.stop();
-        logger.info('Done.');
-        blocks = blocks.filter((value) => (!!value));
-
-        const transactionBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
-        let transactionPromises: Array<Promise<TransactionResponse>> = [];
-        let transactionHashes: Array<string> = [];
-        blocks.forEach(({ transactions }) => {
-            transactionHashes = transactionHashes.concat(transactions);
-        });
-        let transactions: Array<TransactionResponse> = [];
-        logger.info(`Getting ${transactionHashes.length} transactions...`);
-        transactionBar.start(transactionHashes.length, 0);
-        while (transactionHashes.length > 0) {
-            const currTx = transactionHashes.pop();
-            if (currTx) {
-                const txPromise = this.provider.getTransaction(currTx);
-                txPromise.catch((error) => {
-                    logger.error(error);
-                    process.exit(-1);
-                });
-                transactionPromises.push(txPromise);
-                if (transactionPromises.length >= this.batch) {
-                    // eslint-disable-next-line no-await-in-loop
-                    transactions = transactions.concat(await Promise.all(transactionPromises));
-                    transactionPromises = [];
-                    transactionBar.increment(this.batch);
-                }
-            }
-        }
-        if (transactionPromises.length > 0) {
-            transactions = transactions.concat(await Promise.all(transactionPromises));
-            transactionBar.increment(transactionPromises.length);
-        }
-        transactionBar.stop();
+        logger.info(`Getting all txs related to ${this.contractAddress} from ${latest - earliest + 1} blocks...`);
+        let related_txs = await this.provider.send('trace_filter', [{"fromBlock": toParityQuantity(earliest),"toBlock": toParityQuantity(latest),"toAddress":[this.contractAddress]}]);
+        logger.debug(`Got ${related_txs.length} related txs.`);
         logger.info('Done.');
 
-        logger.info('Getting receipts and related txs...');
-        const receiptBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
-        let receiptPromises: Array<Promise<TransactionReceipt>> = [];
-        const receiptHashes: Array<string> = [];
-        let receipts: Array<TransactionReceipt> = [];
-        receiptBar.start(transactions.length, 0);
-        transactions.forEach((tx) => {
-            if (tx.to) {
-                if (tx.to.toUpperCase() === contractAddress) {
-                    relatedTransactions.push(tx.hash);
-                    receiptBar.increment();
-                }
-            } else {
-                receiptHashes.push(tx.hash);
-            }
-        });
-        while (receiptHashes.length > 0) {
-            const currReceiptHash = receiptHashes.pop();
-            if (currReceiptHash) {
-                receiptPromises.push(this.provider.getTransactionReceipt(currReceiptHash));
-                if (receiptPromises.length >= this.batch) {
-                    receiptPromises.forEach((receiptPromise) => {
-                        receiptPromise.catch((error) => {
-                            logger.error(error);
-                            process.exit(-1);
-                        });
-                    });
-                    // eslint-disable-next-line no-await-in-loop
-                    receipts = receipts.concat(await Promise.all(receiptPromises));
-                    receiptPromises = [];
-                    receiptBar.increment(this.batch);
-                }
-            }
-        }
-        if (receiptPromises.length > 0) {
-            receipts = receipts.concat(await Promise.all(receiptPromises));
-            receiptBar.increment(receiptPromises.length);
-        }
-
-        receipts.forEach((receipt) => {
-            if (receipt.contractAddress && receipt.contractAddress.toUpperCase() === contractAddress) {
-                relatedTransactions.push(receipt.transactionHash);
-                receiptBar.increment();
-            }
-        });
-        receiptBar.stop();
-        logger.info('Done.');
-
-        return relatedTransactions;
+        return [...new Set<string>(related_txs.map(({ transactionHash }) => transactionHash))];
     }
 }
 

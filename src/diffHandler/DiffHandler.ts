@@ -13,6 +13,7 @@ import Change from './Change';
 import Add from './Add';
 import { ProcessedParameters, StorageKeyDiff } from './Types';
 import GetProof from '../proofHandler/GetProof';
+import * as CliProgress from 'cli-progress';
 
 async function processParameters(srcAddress: string, srcProvider: JsonRpcProvider, srcBlock?: string | number, targetAddress?: string, targetProvider?: JsonRpcProvider, targetBlock?: string | number): Promise<ProcessedParameters> {
     assert(ethers.utils.isAddress(srcAddress), 'contract address is not a valid address');
@@ -111,13 +112,13 @@ class DiffHandler {
                 }
             } else {
                 // key is only present in `sourceAddress`
-                diffs.push(new Add(key, await this.srcProvider.getStorageAt(processedParameters.srcAddress, key, processedParameters.srcBlock)));
+                diffs.push(new Remove(key, await this.srcProvider.getStorageAt(processedParameters.srcAddress, key, processedParameters.srcBlock)));
             }
         }
-        // keys that are present in block `srcBlock` but not in `targetBlock`.
+        // keys that are present in block `target` but not in `srcBlock`.
         /* eslint-disable no-restricted-syntax */
         for (const key of toKeys) {
-            diffs.push(new Remove(key, await this.targetProvider.getStorageAt(processedParameters.targetAddress, key, processedParameters.targetBlock)));
+            diffs.push(new Add(key, await this.targetProvider.getStorageAt(processedParameters.targetAddress, key, processedParameters.targetBlock)));
         }
         /* eslint-enable no-await-in-loop */
         /* eslint-enable no-restricted-syntax */
@@ -151,11 +152,21 @@ class DiffHandler {
         // getting all tx from srcAddress
         const txs = await srcTxHandler.getTransactions(processedParameters.targetBlock, processedParameters.srcBlock);
         const oldKeys = await getAllKeys(srcAddress, this.srcProvider, processedParameters.srcBlock - 1);
+        const oldProof = new GetProof(await this.srcProvider.send('eth_getProof', [srcAddress, oldKeys, toParityQuantity(processedParameters.srcBlock - 1)]));
 
         const changedStorage: { [ key: string ]: string } = {};
 
         // replay storage changes
-        const txStorages = await Promise.all(txs.map((tx) => srcTxHandler.replayTransaction(tx)));
+        logger.info(`Replaying ${txs.length} transactions...`);
+        let txStorages: Array<{ [ key: string ]: string } | undefined> = [];
+        const progressBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        progressBar.start(txs.length, 0);
+        while (txs.length > 0) {
+            const currTxs = await Promise.all(txs.splice(0, this.batchSize).map((tx) => srcTxHandler.replayTransaction(tx)));
+            txStorages = txStorages.concat(currTxs);
+            progressBar.increment(currTxs.length);
+        }
+        progressBar.stop();
         txStorages.forEach((storage) => {
             if (storage) {
                 logger.debug('srcTx txStorage: ', storage);
@@ -165,6 +176,7 @@ class DiffHandler {
                 });
             }
         });
+        logger.info('Done.');
 
         // gather diffs
         const newKeys = Object.keys(changedStorage);
@@ -174,8 +186,15 @@ class DiffHandler {
                 // newly added key
                 diffs.push(new Add(key, changedStorage[key]));
             } else if (!changedStorage[key].match(/0x[0]{64}/g)) {
-                // changed key
-                diffs.push(new Change(key, 0, changedStorage[key]));
+                // check if value is equal the old state again
+                const oldIndex = oldProof.storageProof.findIndex((proof) => {
+                    return ethers.utils.hexZeroPad(changedStorage[key], 32) === ethers.utils.hexZeroPad(proof.value, 32);
+                });
+
+                if (oldIndex < 0) {
+                    // changed key
+                    diffs.push(new Change(key, 0, changedStorage[key]));
+                }
             } else {
                 // removed key
                 diffs.push(new Remove(key, 0));
@@ -185,7 +204,6 @@ class DiffHandler {
         return new StorageDiff(diffs);
     }
 
-    // todo doesn't work yet
     async getDiffFromProof(srcAddress: string, latestSrcBlock: string | number, earliestSrcBlock: string | number): Promise<StorageDiff> {
         let processedParameters: ProcessedParameters;
         try {
