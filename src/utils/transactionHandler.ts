@@ -116,6 +116,10 @@ class TransactionHandler {
         // gather all transactions
         logger.info(`Getting all txs related to ${this.contractAddress} from ${latest - earliest + 1} blocks...`);
         const relatedTxs = await this.provider.send('trace_filter', [{ fromBlock: toParityQuantity(earliest), toBlock: toParityQuantity(latest), toAddress: [this.contractAddress] }]);
+        if (relatedTxs === null) {
+            logger.error('Could not get relatedTxs through trace_filter. Most likely the used node was not started with --tracing on');
+            throw new Error();
+        }
         logger.debug(`Got ${relatedTxs.length} related txs.`);
         logger.info('Done.');
 
