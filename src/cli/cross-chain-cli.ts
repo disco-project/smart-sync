@@ -39,6 +39,7 @@ export interface TxContractInteractionOptions extends ViewContractInteractionOpt
     targetAccountEncryptedJson?: string;
     targetAccountPassword?: string;
     blockBatchSize?: string;
+    keyValuePairPerBatch?: string;
 }
 
 export type ConfigTypish = GeneralOptions | TxContractInteractionOptions | ViewContractInteractionOptions;
@@ -236,7 +237,7 @@ fork
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig);
         await chainProxy.init();
         // todo check for return value
-        const migrated = await chainProxy.migrateSrcContract(adjustedOptions.srcBlocknr);
+        const migrated = await chainProxy.migrateSrcContract(adjustedOptions.srcBlocknr, adjustedOptions.keyValuePairPerBatch ? BigNumber.from(adjustedOptions.keyValuePairPerBatch).toNumber() : undefined);
         if (migrated) {
             logger.info('Migration successfull.');
         } else {
