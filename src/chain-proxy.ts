@@ -472,7 +472,6 @@ export class ChainProxy {
                 // srcTx is default
             default:
                 if (this.relayContract && this.proxyContract) {
-                    logger.info('here');
                     const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
                     srcBlock = synchedBlockNr.toNumber() + 1;
                 }
