@@ -3,6 +3,7 @@ import { JsonRpcProvider } from '@ethersproject/providers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumberish, ethers } from 'ethers';
 import { Trie } from 'merkle-patricia-tree/dist/baseTrie';
+import { TLogLevelName } from 'tslog';
 import { MappingContract, RelayContract } from '../src-gen/types';
 import { PROXY_INTERFACE } from '../src/config';
 import ProxyContractBuilder from '../src/utils/proxy-contract-builder';
@@ -50,6 +51,10 @@ export interface MigrationResult {
 export interface ChangeValueAtIndexResult {
     success: Boolean;
     newValue?: BigNumberish;
+}
+
+export function buildCLICommand(command: string, args: string, tx: Boolean, logLevel?: TLogLevelName, options?: string, confFile?: string) {
+    return `${TestCLI.tsNodeExec} ${TestCLI.cliExec} ${command} ${args} -c ${confFile || TestCLI.defaultTestConfigFile} -l ${logLevel}${tx ? ` --target-account-encrypted-json ${TestCLI.targetAccountEncryptedJsonPath} --target-account-password ${TestCLI.targetAccountPassword}` : ''}${options ? ` ${options}` : ''}`;
 }
 
 async function verifyStorageProof(storageProof: StorageProof, root) {

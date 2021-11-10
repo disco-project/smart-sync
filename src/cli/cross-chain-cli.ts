@@ -67,8 +67,6 @@ function commonOptions(command: Command): Command {
     command.option('-c, --config-file <path>', 'path to the config file', DEFAULT_CONFIG_FILE_PATH);
     command.option('--connection-timeout <timeout>', 'connection timeout in ms');
     command.option('--src-blocknr <number>', 'block number of src chain to use');
-    command.option('--target-account-encrypted-json <file_path>', 'Encrypted json file path of account to use at target chain to sign txs');
-    command.option('--target-account-password <target_account_password', 'Password to decrypt account json file');
     return command;
 }
 
@@ -111,6 +109,8 @@ continuousSynch
     .option('--target-blocknr <number>', 'see --diff-mode for further explanation')
     .option('-b, --batch-size <number>', 'Define how many blocks/txs should be pulled at once', '50')
     .option('--block-batch-size <number>', 'Block counter how many blocks should be synched at once', Number.MAX_SAFE_INTEGER.toString())
+    .option('--target-account-encrypted-json <file_path>', 'Encrypted json file path of account to use at target chain to sign txs')
+    .option('--target-account-password <target_account_password', 'Password to decrypt account json file')
     .action(async (proxyContract: string, period: string, options: TxContractInteractionOptions) => {
         if (!CRON.validate(period)) {
             logger.error(`No valid period given (${period}). See --help for more information (description of argument period)`);
@@ -120,6 +120,10 @@ continuousSynch
         // override options here if config file was added
         if (adjustedOptions.configFile) {
             adjustedOptions = overrideFileOptions<TxContractInteractionOptions>(adjustedOptions.configFile, adjustedOptions);
+        }
+        if (!adjustedOptions.targetAccountEncryptedJson || !adjustedOptions.targetAccountPassword) {
+            logger.error('No target account given for signing txs.');
+            process.exit(-1);
         }
         logger.setSettings({ minLevel: adjustedOptions.logLevel });
 
@@ -205,11 +209,17 @@ fork
     .description('Migrates a given contract address to a target chain and deploys a proxy contract. If no relay contract is provided, a relay contract will be deployed too.')
     .arguments('<src_contract_address> [relay_contract_address]')
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
+    .option('--target-account-encrypted-json <file_path>', 'Encrypted json file path of account to use at target chain to sign txs')
+    .option('--target-account-password <target_account_password', 'Password to decrypt account json file')
     .action(async (srcContract: string, relayContractAddress: string | undefined, options: TxContractInteractionOptions) => {
         let adjustedOptions = options;
         // override options here if config file was added
         if (adjustedOptions.configFile) {
             adjustedOptions = overrideFileOptions<TxContractInteractionOptions>(adjustedOptions.configFile, adjustedOptions);
+        }
+        if (!adjustedOptions.targetAccountEncryptedJson || !adjustedOptions.targetAccountPassword) {
+            logger.error('No target account given for signing txs.');
+            process.exit(-1);
         }
         logger.setSettings({ minLevel: adjustedOptions.logLevel });
 
@@ -398,11 +408,17 @@ synchronize
     .option('--gas-limit <limit>', 'gas limit for tx on target chain')
     .option('-b, --batch-size <number>', 'Define how many blocks/txs should be pulled at once', '50')
     .option('--block-batch-size <number>', 'Block counter how many blocks should be synched at once', Number.MAX_SAFE_INTEGER.toString())
+    .option('--target-account-encrypted-json <file_path>', 'Encrypted json file path of account to use at target chain to sign txs')
+    .option('--target-account-password <target_account_password', 'Password to decrypt account json file')
     .action(async (proxyContract: string, options: TxContractInteractionOptions) => {
         let adjustedOptions = options;
         // override options here if config file was added
         if (adjustedOptions.configFile) {
             adjustedOptions = overrideFileOptions<TxContractInteractionOptions>(adjustedOptions.configFile, adjustedOptions);
+        }
+        if (!adjustedOptions.targetAccountEncryptedJson || !adjustedOptions.targetAccountPassword) {
+            logger.error('No target account given for signing txs.');
+            process.exit(-1);
         }
         logger.setSettings({ minLevel: adjustedOptions.logLevel });
         const contractAddressMap: ContractAddressMap = {

@@ -153,19 +153,10 @@ export class ChainProxy {
             logger.error(`No password given to decrypt json file at ${targetRPCConfig.targetAccountEncryptedJsonPath}`);
             process.exit(-1);
         }
+        this.deployer = this.deployer || new ethers.VoidSigner(ethers.Wallet.createRandom().address, this.targetProvider);
     }
 
     async init(): Promise<Boolean> {
-        try {
-            if (!this.deployer) {
-                logger.info('No target account provided. Will try to get unlocked account from target chain client.');
-                this.deployer = await SignerWithAddress.create(this.targetProvider.getSigner());
-            }
-        } catch (e) {
-            logger.error(e);
-            return false;
-        }
-
         if (this.relayContractAddress) {
             const relayContractFactory = new RelayContract__factory(this.deployer);
             this.relayContract = relayContractFactory.attach(this.relayContractAddress);
@@ -199,7 +190,6 @@ export class ChainProxy {
             }
         }
 
-        // todo batch size in DiffHandler
         this.differ = new DiffHandler(this.srcProvider, this.targetProvider, this.batchSize);
         this.initialized = true;
         return true;
