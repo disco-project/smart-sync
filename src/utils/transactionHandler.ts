@@ -1,7 +1,7 @@
 import { JsonRpcProvider } from '@ethersproject/providers';
 import * as CliProgress from 'cli-progress';
 import { logger } from './logger';
-import { findDeploymentBlock, toBlockNumber, toParityQuantity } from './utils';
+import { findDeploymentBlock, isDebug, toBlockNumber, toParityQuantity } from './utils';
 
 type KeyObject = {
     '*'?: {
@@ -42,8 +42,11 @@ class TransactionHandler {
         let txStorages: Array<{ [ key: string ]: string } | undefined> = [];
 
         logger.debug(`Replaying ${txs.length} transactions...`);
-        const replayBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
-        replayBar.start(txs.length, 0);
+        let replayBar: CliProgress.SingleBar | undefined;
+        if (!isDebug(logger.settings.minLevel)) {
+            replayBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+            replayBar.start(txs.length, 0);
+        }
         while (txs.length > 0) {
             const currTx = txs.pop();
             if (currTx) {
@@ -51,11 +54,11 @@ class TransactionHandler {
                 if (txStoragePromises.length >= this.batch) {
                     // eslint-disable-next-line no-await-in-loop
                     txStorages = txStorages.concat(await Promise.all(txStoragePromises));
-                    replayBar.increment(this.batch);
+                    replayBar?.increment(this.batch);
                 }
             }
         }
-        replayBar.stop();
+        replayBar?.stop();
         logger.debug('Done.');
         txStorages.forEach((storage) => {
             if (storage) {

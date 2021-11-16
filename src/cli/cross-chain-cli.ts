@@ -12,7 +12,7 @@ import {
 } from '../chain-proxy';
 import FileHandler from '../utils/fileHandler';
 import { logger } from '../utils/logger';
-import { toBlockNumber } from '../utils/utils';
+import { isDebug, toBlockNumber } from '../utils/utils';
 
 const DEFAULT_CONFIG_FILE_PATH = `${__dirname}/../../config/cli-config.json`;
 const program = new Command();
@@ -172,8 +172,11 @@ continuousSynch
             // do synch
             let srcBlock = adjustedOptions.diffMode !== 'srcTx' ? BigNumber.from(1) : BigNumber.from(adjustedOptions.srcBlocknr);
             const targetBlock = adjustedOptions.diffMode !== 'srcTx' ? BigNumber.from(2) : BigNumber.from(adjustedOptions.targetBlocknr);
-            const batchProgress = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
-            batchProgress.start(targetBlock.sub(srcBlock).toNumber(), 0);
+            let batchProgress: CliProgress.SingleBar | undefined;
+            if (!isDebug(logger.settings.minLevel)) {
+                batchProgress = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+                batchProgress.start(targetBlock.sub(srcBlock).toNumber(), 0);
+            }
             do {
                 // eslint-disable-next-line no-await-in-loop
                 const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
@@ -190,10 +193,10 @@ continuousSynch
                     logger.error('Could not synch changes.');
                 }
                 const synchronizedBlockAmount = blockBatchSize.gt(targetBlock.sub(srcBlock)) ? targetBlock.sub(srcBlock).toNumber() : blockBatchSize.toNumber();
-                batchProgress.increment(synchronizedBlockAmount);
+                batchProgress?.increment(synchronizedBlockAmount);
                 srcBlock = srcBlock.add(synchronizedBlockAmount);
             } while (adjustedOptions.diffMode !== 'srcTx' && targetBlock.gt(srcBlock));
-            batchProgress.stop();
+            batchProgress?.stop();
 
             // update compared blocks
             adjustedOptions.srcBlocknr = adjustedOptions.diffMode === 'srcTx' ? (await chainProxy.getCurrentBlockNumber()).add(1).toString() : 'latest';
@@ -463,8 +466,11 @@ synchronize
         // do synch
         let srcBlock = BigNumber.from(adjustedOptions.srcBlocknr);
         const targetBlock = BigNumber.from(adjustedOptions.targetBlocknr);
-        const batchProgress = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
-        batchProgress.start(targetBlock.sub(srcBlock).toNumber(), 0);
+        let batchProgress: CliProgress.SingleBar | undefined;
+        if (!isDebug(logger.settings.minLevel)) {
+            batchProgress = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+            batchProgress.start(targetBlock.sub(srcBlock).toNumber(), 0);
+        }
         do {
             // eslint-disable-next-line no-await-in-loop
             const changedKeys = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
@@ -480,10 +486,10 @@ synchronize
             } else {
                 logger.error('Could not synch changes.');
             }
-            batchProgress.increment(blockBatchSize.gt(targetBlock.sub(srcBlock)) ? targetBlock.sub(srcBlock).toNumber() : blockBatchSize.toNumber());
+            batchProgress?.increment(blockBatchSize.gt(targetBlock.sub(srcBlock)) ? targetBlock.sub(srcBlock).toNumber() : blockBatchSize.toNumber());
             srcBlock = srcBlock.add(blockBatchSize);
         } while (adjustedOptions.diffMode !== 'srcTx' && targetBlock.gt(srcBlock));
-        batchProgress.stop();
+        batchProgress?.stop();
     });
 
 program

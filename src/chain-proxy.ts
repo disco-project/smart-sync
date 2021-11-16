@@ -11,7 +11,7 @@ import { PROXY_INTERFACE } from './config';
 import DiffHandler from './diffHandler/DiffHandler';
 import { logger } from './utils/logger';
 import {
-    getAllKeys, toParityQuantity, toBlockNumber, createDeployingByteCode, BLOCKNUMBER_TAGS,
+    getAllKeys, toParityQuantity, toBlockNumber, createDeployingByteCode, BLOCKNUMBER_TAGS, isDebug,
 } from './utils/utils';
 import GetProof from './proofHandler/GetProof';
 import { BlockHeader } from './proofHandler/Types';
@@ -319,8 +319,11 @@ export class ChainProxy {
         // todo add option for adjust key value pair batch
         logger.info('Adding storage to proxy contract...');
         const txs: Array<TransactionResponse> = [];
-        const progressBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
-        progressBar.start(initialValuesProof.storageProof.length, 0);
+        let progressBar: CliProgress.SingleBar | undefined;
+        if (!isDebug(logger.settings.minLevel)) {
+            progressBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+            progressBar.start(initialValuesProof.storageProof.length, 0);
+        }
         while (proxyKeys.length > 0) {
             const currProcessedKeys = (proxyKeys.length - key_value_pair_per_batch) >= 0 ? key_value_pair_per_batch : proxyKeys.length;
             /*
@@ -337,10 +340,10 @@ export class ChainProxy {
                 logger.error('Could not add at least one storage batch.');
                 process.exit(-1);
             }
-            progressBar.increment(currProcessedKeys);
+            progressBar?.increment(currProcessedKeys);
             txs.push(promise);
         }
-        progressBar.stop();
+        progressBar?.stop();
         logger.info('Done.');
 
         const txsReceiptPromises: Array<Promise<TransactionReceipt>> = [];
