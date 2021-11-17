@@ -1,5 +1,5 @@
 /* eslint-disable import/no-cycle */
-import { BigNumber, ethers } from 'ethers';
+import { ethers } from 'ethers';
 import { Logger } from 'tslog';
 import * as rlp from 'rlp';
 import { logger } from '../utils/logger';
@@ -187,13 +187,25 @@ export function addDeletedValue(parentNode: ParentNode, storageProof: StoragePro
         const node = rlp.decode(storageProof.proof[i]) as Buffer[];
         if (node.length === 17) pathPtr += 1;
         else if (node.length === 2) {
-            const extension = BigNumber.from(node[0]).toHexString().length - 2;
-            pathPtr += extension;
+            const stringRep = node[0].toString('hex');
+            if ((stringRep[0] + stringRep[1]) === '00') {
+                pathPtr += stringRep.length - 2;
+            } else {
+                pathPtr += stringRep.length - 1;
+            }
         }
     }
-    const adjustedPath = Buffer.from(path.substring(2), 'hex');
-    // comment on why change the first slot: the hashed keys in the leafs of a mt on the bc have a leading nibble of 0011.
-    adjustedPath[0] = 48 + (adjustedPath[0] % 16);
+    // calc rest of key for leaf creation
+    const even = (pathPtr % 2) === 0;
+    let adjustedPath: Buffer;
+    if (even) {
+        // eslint-disable-next-line no-bitwise
+        adjustedPath = Buffer.from((2 << 4).toString(16) + path.substring(pathPtr), 'hex');
+    } else {
+        adjustedPath = Buffer.from(path.substring(pathPtr - 1), 'hex');
+        // eslint-disable-next-line no-bitwise
+        adjustedPath[0] = (3 << 4) + (adjustedPath[0] % 16);
+    }
     const artificialNode = [adjustedPath, Buffer.from([0x0])];
     const pathNibble = parseInt(path[pathPtr], 16);
     parentNode.children[pathNibble] = new LeafNode(artificialNode, storageProof.key);
