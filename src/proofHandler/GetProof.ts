@@ -153,7 +153,7 @@ class GetProof implements IGetProof {
                     // todo leaf as root could also be deleted...
                     if (i === storageProof.proof.length - 1 && storageProof.value !== '0x0') { // node.length === 2
                         // only one node in the tree
-                        this.logger.debug('Leaf as root');
+                        this.logger.trace('Leaf as root');
                         pathNodes = new ProofPathBuilder(node, storageProof.key);
                     } else {
                         // its an extension or branch
@@ -167,6 +167,7 @@ class GetProof implements IGetProof {
                     if (i !== (storageProof.proof.length - 1)) return;
                 }
                 if (!pathNodes || !parentNode) {
+                    // todo apparently possible
                     this.logger.debug('not possible.');
                     process.exit(-1);
                 }
@@ -181,17 +182,17 @@ class GetProof implements IGetProof {
                             addDeletedValue(parentNode, storageProof);
                         }
                     } else {
-                        this.logger.debug('branch');
+                        this.logger.trace('branch');
                         parentNode = pathNodes.addBranch(node, parentNode, undefined);
                     }
                 } else if (node.length === 2) {
                     if (i === storageProof.proof.length - 1) {
-                        this.logger.debug('leaf');
+                        this.logger.trace('leaf');
                         // leaf
                         pathNodes.addValue(storageProof.key, node, parentNode);
                     } else {
                         // extension
-                        this.logger.debug('extension');
+                        this.logger.trace('extension');
                         parentNode = pathNodes.addExtension(node, parentNode);
                     }
                 }

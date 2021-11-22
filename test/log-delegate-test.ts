@@ -36,7 +36,7 @@ describe('Test static proxy calls', () => {
             logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
             process.exit(-1);
         }
-        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
         deployer = await SignerWithAddress.create(provider.getSigner());
     });
 

@@ -23,11 +23,11 @@ class ProofPathBuilder {
             this.root = new LeafNode(root, storageKey);
         } else if (root.length === 2) {
             // root is extension
-            this.logger.debug('extension as root');
+            this.logger.trace('extension as root');
             this.root = root;
         } else {
             // root is branch
-            this.logger.debug('branch as root');
+            this.logger.trace('branch as root');
             this.root = root;
             this.children = Array(17).fill(null);
         }
@@ -176,11 +176,12 @@ export function addDeletedValue(parentNode: ParentNode, storageProof: StoragePro
     if (parentNode instanceof ExtensionNode) {
         logger.error('Can not add deleted value to ExtensionNode');
         return undefined;
-    } if (!parentNode.children) {
+    }
+    if (!parentNode.children) {
         logger.error('ParentNode is a leaf node');
         return undefined;
     }
-    const path = ethers.utils.keccak256(storageProof.key);
+    const path = ethers.utils.keccak256(ethers.utils.hexZeroPad(storageProof.key, 32));
     let pathPtr = 2;
     for (let i = 0; i < storageProof.proof.length - 1; i += 1) {
         const node = rlp.decode(storageProof.proof[i]) as Buffer[];

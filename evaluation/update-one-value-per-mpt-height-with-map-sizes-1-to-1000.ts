@@ -40,8 +40,8 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
             logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
             process.exit(-1);
         }
-        srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
-        targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.targetChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.targetChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
         srcDeployer = await SignerWithAddress.create(srcProvider.getSigner());
         targetDeployer = await SignerWithAddress.create(targetProvider.getSigner());
         logger.setSettings({ minLevel: 'info', name: 'update-one-value-per-mpt-height-with-map-sizes-1-to-1000.ts' });

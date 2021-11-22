@@ -36,7 +36,7 @@ describe('Deploy proxy and logic contract', async () => {
             logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
             process.exit(-1);
         }
-        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
+        provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
         deployer = await SignerWithAddress.create(provider.getSigner());
         logger.setSettings({ minLevel: 'info', name: 'proxy-deploy-test.ts' });
     });
@@ -129,7 +129,7 @@ describe('Deploy proxy and logic contract', async () => {
         const sourceAccountProof = await proof.optimizedProof(latestBlock.stateRoot, false);
 
         //  getting account proof from proxy contract
-        const proxyProvider = new ethers.providers.JsonRpcProvider(chainConfigs?.srcChainUrl);
+        const proxyProvider = new ethers.providers.JsonRpcProvider(chainConfigs?.srcChainRpcUrl);
         const latestProxyChainBlock = await proxyProvider.send('eth_getBlockByNumber', ['latest', false]);
         const proxyChainProof = new GetProof(await proxyProvider.send('eth_getProof', [proxyContract.address, []]));
         const proxyAccountProof = await proxyChainProof.optimizedProof(latestProxyChainBlock.stateRoot, false);

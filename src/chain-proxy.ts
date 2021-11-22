@@ -3,8 +3,9 @@ import { JsonRpcProvider } from '@ethersproject/providers';
 import { ConnectionInfo } from '@ethersproject/web';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumber, BigNumberish, ethers } from 'ethers';
-import { TransactionResponse } from '@ethersproject/abstract-provider';
+import { TransactionReceipt, TransactionResponse } from '@ethersproject/abstract-provider';
 import * as rlp from 'rlp';
+import * as CliProgress from 'cli-progress';
 import { RelayContract, RelayContract__factory } from '../src-gen/types';
 import { PROXY_INTERFACE } from './config';
 import DiffHandler from './diffHandler/DiffHandler';
@@ -16,6 +17,8 @@ import GetProof from './proofHandler/GetProof';
 import { BlockHeader } from './proofHandler/Types';
 import ProxyContractBuilder from './utils/proxy-contract-builder';
 import StorageDiff from './diffHandler/StorageDiff';
+import FileHandler from './utils/fileHandler';
+import ProviderHandler from './utils/providerHandler';
 
 const KEY_VALUE_PAIR_PER_BATCH = 100;
 
@@ -32,13 +35,21 @@ export type DeployingTransation = TransactionResponse & {
 
 export type RPCConfig = {
     gasLimit?: BigNumberish;
+    blockNr?: string | number;
+    targetAccountEncryptedJsonPath?: string;
+    targetAccountPassword?: string;
 };
 
-export type GetDiffMethod = 'srcTx' | 'storage';
+export type GetDiffMethod = 'srcTx' | 'storage' | 'getProof';
 
 export function encodeBlockHeader(blockHeader: BlockHeader): Buffer {
     // needed parameters for block header hash
     // https://ethereum.stackexchange.com/questions/67055/block-header-hash-verification
+    const gasUsed = ethers.BigNumber.from(blockHeader.gasUsed).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.gasUsed).toHexString();
+    const timestamp = ethers.BigNumber.from(blockHeader.timestamp).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.timestamp).toHexString();
+    const number = ethers.BigNumber.from(blockHeader.number).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.number).toHexString();
+    const gasLimit = ethers.BigNumber.from(blockHeader.gasLimit).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.gasLimit).toHexString();
+    const difficulty = ethers.BigNumber.from(blockHeader.difficulty).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.difficulty).toHexString();
     const cleanBlockHeader = [
         blockHeader.parentHash,
         blockHeader.sha3Uncles,
@@ -47,18 +58,23 @@ export function encodeBlockHeader(blockHeader: BlockHeader): Buffer {
         blockHeader.transactionsRoot,
         blockHeader.receiptsRoot,
         blockHeader.logsBloom,
-        ethers.BigNumber.from(blockHeader.difficulty).toHexString(),
-        ethers.BigNumber.from(blockHeader.number).toHexString(),
-        ethers.BigNumber.from(blockHeader.gasLimit).toHexString(),
-        ethers.BigNumber.from(blockHeader.gasUsed).toHexString(),
-        ethers.BigNumber.from(blockHeader.timestamp).toHexString(),
+        difficulty,
+        number,
+        gasLimit,
+        gasUsed,
+        timestamp,
         blockHeader.extraData,
     ];
     if (blockHeader.mixHash && blockHeader.nonce) {
-    // if chain is PoW
+        // if chain is PoW
         cleanBlockHeader.push(blockHeader.mixHash);
         cleanBlockHeader.push(blockHeader.nonce);
     } // else chain is PoA
+    if (blockHeader.baseFeePerGas) {
+        // if EIP 1559 is activated
+        const baseFeePerGas = ethers.BigNumber.from(blockHeader.baseFeePerGas).eq(0) ? '0x' : ethers.BigNumber.from(blockHeader.baseFeePerGas).toHexString();
+        cleanBlockHeader.push(baseFeePerGas);
+    }
     return Buffer.from(rlp.encode(cleanBlockHeader));
 }
 
@@ -71,7 +87,7 @@ export class ChainProxy {
 
     readonly proxyContractAddress: string | undefined;
 
-    private srcContractAddress: string;
+    srcContractAddress: string;
 
     private logicContractAddress: string | undefined;
 
@@ -89,7 +105,7 @@ export class ChainProxy {
 
     private relayContract: RelayContract;
 
-    private deployer: SignerWithAddress;
+    private deployer: SignerWithAddress | ethers.Wallet;
 
     private differ: DiffHandler;
 
@@ -97,25 +113,54 @@ export class ChainProxy {
 
     private initialized: Boolean;
 
-    constructor(contractAddresses: ContractAddressMap, srcProviderConnectionInfo: ConnectionInfo, targetProviderConnectionInfo: ConnectionInfo, targetRPCConfig: RPCConfig) {
+    private batchSize: number;
+
+    private srcBlock: string | number;
+
+    private targetBlock: string | number;
+
+    constructor(contractAddresses: ContractAddressMap, srcProviderConnectionInfo: ConnectionInfo, srcRPCConfig: RPCConfig, targetProviderConnectionInfo: ConnectionInfo, targetRPCConfig: RPCConfig, batch: number = 50) {
         if (contractAddresses.srcContract) {
             this.srcContractAddress = contractAddresses.srcContract;
         }
+        this.batchSize = batch;
         this.logicContractAddress = contractAddresses.logicContract;
         this.relayContractAddress = contractAddresses.relayContract;
         this.proxyContractAddress = contractAddresses.proxyContract;
         this.srcProviderConnectionInfo = srcProviderConnectionInfo;
-        this.srcProvider = new ethers.providers.JsonRpcProvider(this.srcProviderConnectionInfo);
+        const srcProviderHandler = new ProviderHandler(this.srcProviderConnectionInfo);
+        this.srcProvider = srcProviderHandler.getProviderInstance();
         this.targetProviderConnectionInfo = targetProviderConnectionInfo;
-        this.targetProvider = new ethers.providers.JsonRpcProvider(this.targetProviderConnectionInfo);
+        const targetProviderHandler = new ProviderHandler(this.targetProviderConnectionInfo);
+        this.targetProvider = targetProviderHandler.getProviderInstance();
         this.targetRPCConfig = targetRPCConfig;
         this.initialized = false;
         this.migrationState = false;
+        this.srcBlock = srcRPCConfig.blockNr ?? 'latest';
+        this.targetBlock = targetRPCConfig.blockNr ?? 'latest';
+        if (targetRPCConfig.targetAccountEncryptedJsonPath && targetRPCConfig.targetAccountPassword) {
+            const fh = new FileHandler(targetRPCConfig.targetAccountEncryptedJsonPath);
+            const encryptedJson = fh.read();
+            if (!encryptedJson) {
+                logger.error(`Could not access json file at ${targetRPCConfig.targetAccountEncryptedJsonPath}`);
+                process.exit(-1);
+            }
+            logger.debug('Decrypting account json file...');
+            this.deployer = ethers.Wallet.fromEncryptedJsonSync(encryptedJson, targetRPCConfig.targetAccountPassword);
+            logger.debug('Done.');
+            this.deployer = new ethers.Wallet(this.deployer.privateKey, this.targetProvider);
+        } else if (targetRPCConfig.targetAccountEncryptedJsonPath) {
+            logger.error(`No password given to decrypt json file at ${targetRPCConfig.targetAccountEncryptedJsonPath}`);
+            process.exit(-1);
+        }
     }
 
     async init(): Promise<Boolean> {
         try {
-            this.deployer = await SignerWithAddress.create(this.targetProvider.getSigner());
+            if (!this.deployer) {
+                logger.info('No target account provided. Will try to get unlocked account from target chain client.');
+                this.deployer = await SignerWithAddress.create(this.targetProvider.getSigner());
+            }
         } catch (e) {
             logger.error(e);
             return false;
@@ -155,7 +200,7 @@ export class ChainProxy {
         }
 
         // todo batch size in DiffHandler
-        this.differ = new DiffHandler(this.srcProvider, this.targetProvider);
+        this.differ = new DiffHandler(this.srcProvider, this.targetProvider, this.batchSize);
         this.initialized = true;
         return true;
     }
@@ -190,11 +235,11 @@ export class ChainProxy {
             this.relayContract = await relayFactory.deploy();
             logger.info(`Relay contract address: ${this.relayContract.address}`);
         }
-        const keys = await getAllKeys(this.srcContractAddress, this.srcProvider);
         const srcBlockParity = toParityQuantity(srcBlock);
-        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', [srcBlockParity, true]);
+        const keys = await getAllKeys(this.srcContractAddress, this.srcProvider, srcBlockParity, this.batchSize);
+        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', [srcBlockParity, false]);
         // create a proof of the source contract's storage
-        const initialValuesProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, keys]));
+        const initialValuesProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, keys, srcBlockParity]));
 
         // update relay
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
@@ -227,6 +272,8 @@ export class ChainProxy {
         const logicFactory = new ethers.ContractFactory([], logicContractByteCode, this.deployer);
         try {
             const logicContract = await logicFactory.deploy();
+            const gasUsedForDeployment = (await logicContract.deployTransaction.wait()).gasUsed.toNumber();
+            logger.debug(`Gas used for deploying logicContract: ${gasUsedForDeployment}`);
             this.logicContractAddress = logicContract.address;
         } catch (e) {
             logger.error(e);
@@ -251,10 +298,13 @@ export class ChainProxy {
         const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, this.deployer);
         try {
             this.proxyContract = await proxyFactory.deploy();
+            const gasUsedForDeployment = (await this.proxyContract.deployTransaction.wait()).gasUsed.toNumber();
+            logger.debug(`Gas used for deploying proxyContract: ${gasUsedForDeployment}`);
         } catch (e) {
             logger.error(e);
             return false;
         }
+        logger.info(`Proxy contract address: ${this.proxyContract.address}`);
         return true;
     }
 
@@ -269,11 +319,43 @@ export class ChainProxy {
         });
 
         // todo adjust batch according to gas estimations
-        const storageAdds: any = [];
+        // todo add option for adjust key value pair batch
+        logger.info('Adding storage to proxy contract...');
+        const txs: Array<TransactionResponse> = [];
+        const progressBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        progressBar.start(initialValuesProof.storageProof.length, 0);
         while (proxyKeys.length > 0) {
-            storageAdds.push(this.proxyContract.addStorage(proxyKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
+            const currProcessedKeys = (proxyKeys.length - KEY_VALUE_PAIR_PER_BATCH) >= 0 ? KEY_VALUE_PAIR_PER_BATCH : proxyKeys.length;
+            /*
+             * We cannot promise-batch the following request since we don't know in which order they are processed.
+             * If addStorage with a higher nonce is processed earlier than a lower nonce then it creates a problem.
+             */
+            // eslint-disable-next-line no-await-in-loop
+            const promise = await this.proxyContract.addStorage(proxyKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH))
+                .catch((error: any) => {
+                    logger.error(error);
+                    process.exit(-1);
+                });
+            if (!promise) {
+                logger.error('Could not add at least one storage batch.');
+                process.exit(-1);
+            }
+            progressBar.increment(currProcessedKeys);
+            txs.push(promise);
         }
-        await Promise.all(storageAdds);
+        progressBar.stop();
+        logger.info('Done.');
+
+        const txsReceiptPromises: Array<Promise<TransactionReceipt>> = [];
+        let cumulativeGasUsed = 0;
+        txs.forEach((tx) => {
+            txsReceiptPromises.push(tx.wait());
+        });
+        const txsReceipts: Array<TransactionReceipt> = await Promise.all(txsReceiptPromises);
+        txsReceipts.forEach((receipt) => {
+            cumulativeGasUsed += receipt.gasUsed.toNumber();
+        });
+        logger.debug(`Gas used for migrating state in ${txs.length} txs: ${cumulativeGasUsed}`);
         logger.debug('done.');
 
         // validate migration
@@ -282,14 +364,19 @@ export class ChainProxy {
 
         //  getting account proof from proxy contract
         const latestProxyChainBlock = await this.targetProvider.send('eth_getBlockByNumber', ['latest', false]);
-        const proxyChainProof = new GetProof(await this.targetProvider.send('eth_getProof', [this.proxyContract.address, []]));
+        const firstKey = initialValuesProof.storageProof[0] ? ethers.utils.hexZeroPad(initialValuesProof.storageProof[0].key, 32) : ethers.utils.hexZeroPad('0x0', 32);
+        const proxyChainProof = new GetProof(await this.targetProvider.send('eth_getProof', [this.proxyContract.address, [firstKey], 'latest']));
         const proxyAccountProof = await proxyChainProof.optimizedProof(latestProxyChainBlock.stateRoot, false);
 
         //  getting encoded block header
         const encodedBlockHeader = encodeBlockHeader(latestProxyChainBlock);
 
         try {
-            await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), blockNumber, { gasLimit: this.targetRPCConfig.gasLimit });
+            const tx = await this.relayContract.verifyMigrateContract(sourceAccountProof, proxyAccountProof, encodedBlockHeader, this.proxyContract.address, ethers.BigNumber.from(latestProxyChainBlock.number).toNumber(), blockNumber, { gasLimit: this.targetRPCConfig.gasLimit });
+            const receipt = await tx.wait();
+            logger.trace(receipt);
+            const gasUsedForTx = receipt.gasUsed.toNumber();
+            logger.debug(`Gas used for verifying contract migration: ${gasUsedForTx}`);
         } catch (e) {
             logger.error(e);
             return false;
@@ -310,7 +397,7 @@ export class ChainProxy {
         }
     }
 
-    async migrateChangesToProxy(changedKeys: Array<BigNumberish>): Promise<Boolean> {
+    async migrateChangesToProxy(changedKeys: Array<BigNumberish>, targetBlock: string | number = this.targetBlock): Promise<Boolean> {
         if (!this.initialized) {
             logger.error('ChainProxy is not initialized yet.');
             return false;
@@ -325,12 +412,14 @@ export class ChainProxy {
             return false;
         }
 
-        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', ['latest', true]);
+        const parityLatestSrcBlock = toParityQuantity(targetBlock);
+        const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', [parityLatestSrcBlock, true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        const changedKeysProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, changedKeys]));
+        const changedKeysProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, changedKeys, parityLatestSrcBlock]));
 
         const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
+
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
         // update the proxy storage
@@ -339,9 +428,9 @@ export class ChainProxy {
         try {
             txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number, { gasLimit: this.targetRPCConfig.gasLimit });
             receipt = await txResponse.wait();
-            logger.debug(receipt);
+            logger.debug(`Gas used for updating storage ${receipt.gasUsed.toNumber()}`);
         } catch (e) {
-            logger.error('something went wrong');
+            logger.fatal('Could not updateStorage.');
             logger.fatal(e);
             return false;
         }
@@ -356,27 +445,38 @@ export class ChainProxy {
         }
 
         let { srcBlock } = parameters;
+        const { targetBlock } = parameters;
         switch (method) {
             case 'storage':
-                if (!this.proxyContractAddress) {
-                    logger.error('Proxy address not given.');
-                    return undefined;
-                } if (!this.migrationState) {
+                if (this.proxyContractAddress && !this.migrationState) {
                     logger.error('Proxy contract is not initialized yet.');
                     return undefined;
                 }
-                return this.differ.getDiffFromStorage(this.srcContractAddress, this.proxyContractAddress, parameters.srcBlock, parameters.targetBlock);
-            // srcTx is default
+                return this.differ.getDiffFromStorage(this.srcContractAddress, this.proxyContractAddress ?? this.srcContractAddress, parameters.srcBlock, parameters.targetBlock);
+            case 'getProof':
+                if (this.relayContract && this.proxyContract) {
+                    const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
+                    srcBlock = synchedBlockNr.toNumber() + 1;
+                }
+                if (targetBlock) {
+                    const givenTargetBlockNr = await toBlockNumber(targetBlock, this.srcProvider);
+                    if (BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
+                        logger.debug(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr (${targetBlock}).`);
+                        return new StorageDiff([]);
+                    }
+                }
+                return this.differ.getDiffFromProof(this.srcContractAddress, parameters.targetBlock, srcBlock);
+                // srcTx is default
             default:
                 if (this.relayContract && this.proxyContract) {
                     const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
-                    if (srcBlock) {
-                        const givenSrcBlockNr = await toBlockNumber(parameters.srcBlock, this.srcProvider);
-                        if (synchedBlockNr.gte(givenSrcBlockNr)) {
-                            logger.info(`Note: The given starting block nr (--src-BlockNr == ${givenSrcBlockNr}) for getting txs from the source contract is lower than the currently synched block nr of the proxyContract (${synchedBlockNr}). Hence, in the following txs may be displayed that are already synched with the proxy contract.`);
-                        }
-                    } else {
-                        srcBlock = synchedBlockNr.toNumber() + 1;
+                    srcBlock = synchedBlockNr.toNumber() + 1;
+                }
+                if (targetBlock) {
+                    const givenTargetBlockNr = await toBlockNumber(targetBlock, this.srcProvider);
+                    if (BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
+                        logger.debug(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr (${givenTargetBlockNr}).`);
+                        return new StorageDiff([]);
                     }
                 }
                 return this.differ.getDiffFromSrcContractTxs(this.srcContractAddress, parameters.targetBlock, srcBlock);
@@ -404,6 +504,17 @@ export class ChainProxy {
             return BigNumber.from(-1);
         }
 
-        return this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
+        const currNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
+        this.srcBlock = currNr.toNumber();
+        return currNr;
+    }
+
+    async getBlockNumber(number: BigNumberish, provider: 'target' | 'src' = 'src'): Promise<number> {
+        switch (provider) {
+            case 'target':
+                return toBlockNumber(number, this.targetProvider);
+            default:
+                return toBlockNumber(number, this.srcProvider);
+        }
     }
 }

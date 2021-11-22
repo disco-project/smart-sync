@@ -21,11 +21,12 @@ export type Account = {
     codeHash: string;
 };
 export type BlockHeader = {
+    baseFeePerGas?: string;
     difficulty: string;
     extraData: string;
     miner: string;
-    gasLimit: number;
-    gasUsed: number;
+    gasLimit: string;
+    gasUsed: string;
     mixHash?: string;
     transactionsRoot: string;
     receiptsRoot: string;
@@ -35,7 +36,7 @@ export type BlockHeader = {
     parentHash: string;
     sha3Uncles: string;
     stateRoot: string;
-    timestamp: number;
+    timestamp: string;
 };
 /**
  * Represents the result of a [`eth_getProof`](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1186.md) RPC request

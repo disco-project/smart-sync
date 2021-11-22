@@ -42,7 +42,7 @@ describe('Test CLI', async () => {
             process.exit(-1);
         }
         logger.setSettings({ minLevel: 'info', name: 'cli-test.ts' });
-        targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.targetChainUrl || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
+        targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.targetChainRpcUrl || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
         srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.srcBlocknr || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
         differ = new DiffHandler(srcProvider, targetProvider);
         targetDeployer = await SignerWithAddress.create(targetProvider.getSigner());
@@ -75,6 +75,46 @@ describe('Test CLI', async () => {
         logger.setSettings({ name: 'should fork' });
 
         const forkCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} f ${srcContract.address} ${relayContract.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        logger.debug(`Executing:\n${forkCommand}`);
+
+        const output = execSync(forkCommand);
+        logger.debug(`\n${output}`);
+
+        const matcher = output.toString().match(/[\w\W]+Logic contract address: (0x[\w\d]{40})[\w\W]+Address of proxyContract: (0x[\w\d]{40})/);
+
+        expect(matcher).to.not.be.null;
+        if (matcher === null) return false;
+
+        const logicContractAddress = matcher[1];
+        const proxyContractAddress = matcher[2];
+
+        logger.debug(`logicAddress: ${logicContractAddress}, proxyContractAddress: ${proxyContractAddress}`);
+
+        const migrated = await relayContract.getMigrationState(proxyContractAddress);
+        expect(migrated).to.be.true;
+
+        const proxyProof = await targetProvider.send('eth_getProof', [proxyContractAddress, []]);
+        const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
+        const srcStorageRoot = srcProof.storageHash.toLowerCase();
+        expect(proxyStorageRoot).to.equal(srcStorageRoot);
+
+        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContractAddress, srcContract.address);
+        expect(compiledProxy.error).to.be.false;
+        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, targetDeployer);
+        const proxyContract = proxyFactory.attach(proxyContractAddress);
+
+        const newSrcContractAddress = await proxyContract.getSourceAddress();
+        expect(newSrcContractAddress.toLowerCase()).to.equal(srcContract.address.toLowerCase());
+
+        const newLogicContractAddress = await proxyContract.getLogicAddress();
+        return expect(newLogicContractAddress.toLowerCase()).to.equal(logicContractAddress.toLowerCase());
+    });
+
+    it('should fork with targetAccount and password', async () => {
+        logger.setSettings({ name: 'should fork with targetAccount and password' });
+
+        const forkCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} f ${srcContract.address} ${relayContract.address} -c ${TestCLI.defaultTestConfigFile} --target-account-encrypted-json ${TestCLI.targetAccountEncryptedJsonPath} --target-account-password ${TestCLI.targetAccountPassword} -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${forkCommand}`);
 
         const output = execSync(forkCommand);
@@ -166,14 +206,11 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        // get blocknumber before changing src contract
-        const currBlockNr = await srcProvider.getBlockNumber();
-
         // insert some new values
         const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
         expect(changedValues).to.be.true;
 
-        const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${synchCommand}`);
 
         const output = execSync(synchCommand);
@@ -301,7 +338,7 @@ describe('Test CLI', async () => {
             expect(diff.getKeys().length).to.equal(5, 'There is no diff.');
 
             await new Promise((resolve) => {
-                setTimeout(() => resolve(resolve), 3000);
+                setTimeout(() => resolve(resolve), 4000);
             });
 
             const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
@@ -482,7 +519,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --diff-mode storage -c ${TestCLI.defaultTestConfigFile}`;
+        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --diff-mode storage -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${synchContinuousCommand}`);
         const cronJob = spawn(synchContinuousCommand, {
             shell: true,
@@ -765,6 +802,51 @@ describe('Test CLI', async () => {
         realDiffer.removes().forEach((remove: Remove) => {
             if (result === null) return false;
             const regexr = new RegExp(`key[\\w\\W]+:[\\w\\W]+'${remove.key}'[\\w\\W]+value[\\w\\W]+:[\\w\\W]+0`);
+            const currResult = regexr.exec(result[1]);
+            return expect(currResult).to.not.be.null;
+        });
+        return true;
+    });
+
+    it('should get-diff (diff mode = getProof, with changed values)', async () => {
+        logger.setSettings({ name: 'should get-diff w/ getProof' });
+        const mapSize = 10;
+        let initialization: InitializationResult;
+
+        try {
+            initialization = await chainProxy.initializeProxyContract(mapSize, TestCLI.MAX_VALUE);
+            expect(initialization.migrationState).to.be.true;
+        } catch (e) {
+            logger.fatal(e);
+            return false;
+        }
+
+        let diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} --diff-mode getProof -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        logger.debug(`Executing:\n${diffCommand}`);
+        let output = execSync(diffCommand);
+        logger.debug(`\n${output}`);
+        let result = output.toString().match(/[\w\W]+Adds: \n\[\][\w\W]+Changes: \n\[\][\w\W]+Deletions: \n\[\]/);
+        expect(result).to.not.be.null;
+
+        // get blocknumber before changing src contract
+        const currBlockNr = await srcProvider.getBlockNumber();
+
+        // insert some new values
+        const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
+        expect(changedValues).to.be.true;
+
+        diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} --src-blocknr ${currBlockNr} --diff-mode getProof -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        logger.debug(`Executing:\n${diffCommand}`);
+
+        output = execSync(diffCommand);
+        logger.debug(`\n${output}`);
+        result = output.toString().match(/[\w\W]+Changes: \n(\[[\w\W]+\])/);
+        expect(result).to.not.be.null;
+
+        const realDiffer = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr + 1);
+        realDiffer.changes().forEach((change: Change) => {
+            if (result === null) return false;
+            const regexr = new RegExp(`key[\\w\\W]+:[\\w\\W]+'${change.key}'[\\w\\W]+targetValue[\\w\\W]+:[\\w\\W]+'${ethers.utils.hexStripZeros(change.targetValue.toString())}'`);
             const currResult = regexr.exec(result[1]);
             return expect(currResult).to.not.be.null;
         });

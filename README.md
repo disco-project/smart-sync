@@ -234,7 +234,7 @@ $ npm run test
 Or a single test (chains needs to be started manually):
 
 ```bash
-$ npx hardhat test tests/list-storage-test.ts
+$ npx hardhat test test/list-storage-test.ts
 ```
 
 ## Evaluation

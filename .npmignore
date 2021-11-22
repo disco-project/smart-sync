@@ -13,8 +13,7 @@ imgs
 hardhat_scripts
 evaluation
 contracts
-chain
-chain2
+chains
 dist/test
 dist/evaluation
 hardhat.config.ts

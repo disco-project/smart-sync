@@ -1,5 +1,6 @@
 import { Block, TransactionResponse, TransactionReceipt } from '@ethersproject/abstract-provider';
 import { JsonRpcProvider } from '@ethersproject/providers';
+import * as CliProgress from 'cli-progress';
 import { logger } from './logger';
 import { findDeploymentBlock, toBlockNumber } from './utils';
 
@@ -25,9 +26,12 @@ class TransactionHandler {
 
     private provider: JsonRpcProvider;
 
-    constructor(contractAddress: string, provider: JsonRpcProvider) {
+    private batch: number;
+
+    constructor(contractAddress: string, provider: JsonRpcProvider, batch: number = 50) {
         this.contractAddress = contractAddress;
         this.provider = provider;
+        this.batch = batch;
     }
 
     async getContractStorageFromTxs(latestBlockNumber: string | number = 'latest', earliest_block_number?: string | number): Promise<{ [ key: string ]: string }> {
@@ -35,7 +39,25 @@ class TransactionHandler {
         const contractStorage: { [key: string]: string } = {};
 
         // getting all tx from srcAddress
-        const txStorages = await Promise.all(txs.map((tx, index) => this.replayTransaction(tx, index)));
+        const txStoragePromises: Array<Promise<undefined | { [ key: string ]: string }>> = [];
+        let txStorages: Array<{ [ key: string ]: string } | undefined> = [];
+
+        logger.debug(`Replaying ${txs.length} transactions...`);
+        const replayBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        replayBar.start(txs.length, 0);
+        while (txs.length > 0) {
+            const currTx = txs.pop();
+            if (currTx) {
+                txStoragePromises.push(this.replayTransaction(currTx));
+                if (txStoragePromises.length >= this.batch) {
+                    // eslint-disable-next-line no-await-in-loop
+                    txStorages = txStorages.concat(await Promise.all(txStoragePromises));
+                    replayBar.increment(this.batch);
+                }
+            }
+        }
+        replayBar.stop();
+        logger.debug('Done.');
         txStorages.forEach((storage) => {
             if (storage) {
                 logger.debug('srcTx txStorage: ', storage);
@@ -49,7 +71,7 @@ class TransactionHandler {
         return contractStorage;
     }
 
-    async replayTransaction(transaction: string, id: number): Promise<undefined | { [ key: string ]: string }> {
+    async replayTransaction(transaction: string): Promise<undefined | { [ key: string ]: string }> {
         try {
             const response: ParityResponseData = await this.provider.send('trace_replayTransaction', [transaction, ['stateDiff']]);
             // Ensure the state has been changed
@@ -71,7 +93,6 @@ class TransactionHandler {
                     return obj;
                 }
             }
-            logger.debug(id, ' closed');
         } catch (err) {
             logger.error(err);
         }
@@ -95,39 +116,114 @@ class TransactionHandler {
         }
 
         // gather all transactions
-        const blockPromises: Array<Promise<Block>> = [];
+        logger.info(`Getting ${latest - earliest + 1} blocks...`);
+        const blockBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        blockBar.start(latest - earliest + 1, 0);
+        let blockPromises: Array<Promise<Block>> = [];
+        let blocks: Array<Block> = [];
         for (let i = earliest; i <= latest; i += 1) {
             blockPromises.push(this.provider.getBlock(i));
+            if (blockPromises.length >= this.batch) {
+                blockPromises.forEach((blockPromise) => {
+                    blockPromise.catch((error) => {
+                        logger.error(error);
+                        process.exit(-1);
+                    });
+                });
+                // eslint-disable-next-line no-await-in-loop
+                blocks = blocks.concat(await Promise.all(blockPromises));
+                blockPromises = [];
+                blockBar.increment(this.batch);
+            }
         }
-
-        let blocks = await Promise.all(blockPromises);
+        if (blockPromises.length > 0) {
+            blocks = blocks.concat(await Promise.all(blockPromises));
+            blockBar.increment(blockPromises.length);
+        }
+        blockBar.stop();
+        logger.info('Done.');
         blocks = blocks.filter((value) => (!!value));
-        const transactionPromises: Array<Promise<TransactionResponse>> = [];
-        blocks.forEach(({ transactions }) => {
-            transactions.forEach((txHash) => {
-                transactionPromises.push(this.provider.getTransaction(txHash));
-            });
-        });
 
-        const transactions = await Promise.all(transactionPromises);
-        const receiptPromises: Array<Promise<TransactionReceipt>> = [];
+        const transactionBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        let transactionPromises: Array<Promise<TransactionResponse>> = [];
+        let transactionHashes: Array<string> = [];
+        blocks.forEach(({ transactions }) => {
+            transactionHashes = transactionHashes.concat(transactions);
+        });
+        let transactions: Array<TransactionResponse> = [];
+        logger.info(`Getting ${transactionHashes.length} transactions...`);
+        transactionBar.start(transactionHashes.length, 0);
+        while (transactionHashes.length > 0) {
+            const currTx = transactionHashes.pop();
+            if (currTx) {
+                const txPromise = this.provider.getTransaction(currTx);
+                txPromise.catch((error) => {
+                    logger.error(error);
+                    process.exit(-1);
+                });
+                transactionPromises.push(txPromise);
+                if (transactionPromises.length >= this.batch) {
+                    // eslint-disable-next-line no-await-in-loop
+                    transactions = transactions.concat(await Promise.all(transactionPromises));
+                    transactionPromises = [];
+                    transactionBar.increment(this.batch);
+                }
+            }
+        }
+        if (transactionPromises.length > 0) {
+            transactions = transactions.concat(await Promise.all(transactionPromises));
+            transactionBar.increment(transactionPromises.length);
+        }
+        transactionBar.stop();
+        logger.info('Done.');
+
+        logger.info('Getting receipts and related txs...');
+        const receiptBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
+        let receiptPromises: Array<Promise<TransactionReceipt>> = [];
+        const receiptHashes: Array<string> = [];
+        let receipts: Array<TransactionReceipt> = [];
+        receiptBar.start(transactions.length, 0);
         transactions.forEach((tx) => {
             if (tx.to) {
                 if (tx.to.toUpperCase() === contractAddress) {
                     relatedTransactions.push(tx.hash);
+                    receiptBar.increment();
                 }
             } else {
-                receiptPromises.push(this.provider.getTransactionReceipt(tx.hash));
+                receiptHashes.push(tx.hash);
             }
         });
+        while (receiptHashes.length > 0) {
+            const currReceiptHash = receiptHashes.pop();
+            if (currReceiptHash) {
+                receiptPromises.push(this.provider.getTransactionReceipt(currReceiptHash));
+                if (receiptPromises.length >= this.batch) {
+                    receiptPromises.forEach((receiptPromise) => {
+                        receiptPromise.catch((error) => {
+                            logger.error(error);
+                            process.exit(-1);
+                        });
+                    });
+                    // eslint-disable-next-line no-await-in-loop
+                    receipts = receipts.concat(await Promise.all(receiptPromises));
+                    receiptPromises = [];
+                    receiptBar.increment(this.batch);
+                }
+            }
+        }
+        if (receiptPromises.length > 0) {
+            receipts = receipts.concat(await Promise.all(receiptPromises));
+            receiptBar.increment(receiptPromises.length);
+        }
 
-        const receipts = await Promise.all(receiptPromises);
         receipts.forEach((receipt) => {
             if (receipt.contractAddress && receipt.contractAddress.toUpperCase() === contractAddress) {
                 relatedTransactions.push(receipt.transactionHash);
-                logger.debug('receipt address: ', receipt.contractAddress);
+                receiptBar.increment();
             }
         });
+        receiptBar.stop();
+        logger.info('Done.');
 
         return relatedTransactions;
     }

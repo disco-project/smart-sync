@@ -1,8 +1,8 @@
 {
-    "srcChainUrl": "http://localhost:8545",
-    "targetChainUrl": "http://localhost:8547",
+    "srcChainRpcUrl": "http://localhost:8545",
+    "targetChainRpcUrl": "http://localhost:8547",
     "connectionTimeout": "36000",
     "logLevel": "info",
     "targetBlocknr": "latest",
-    "gasLimit": 1000000000
+    "gasLimit": 8000000
 }
