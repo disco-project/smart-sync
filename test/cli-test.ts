@@ -9,7 +9,9 @@ import { Contract } from '@ethersproject/contracts';
 import { SIGTERM } from 'constants';
 import { logger } from '../src/utils/logger';
 import { PROXY_INTERFACE } from '../src/config';
-import { InitializationResult, TestChainProxy, TestCLI } from './test-utils';
+import {
+    buildCLICommand, InitializationResult, TestChainProxy, TestCLI,
+} from './test-utils';
 import {
     RelayContract__factory, MappingContract, MappingContract__factory, RelayContract,
 } from '../src-gen/types';
@@ -71,50 +73,10 @@ describe('Test CLI', async () => {
     afterEach(async () => {
     });
 
-    it('should fork', async () => {
-        logger.setSettings({ name: 'should fork' });
-
-        const forkCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} f ${srcContract.address} ${relayContract.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
-        logger.debug(`Executing:\n${forkCommand}`);
-
-        const output = execSync(forkCommand);
-        logger.debug(`\n${output}`);
-
-        const matcher = output.toString().match(/[\w\W]+Logic contract address: (0x[\w\d]{40})[\w\W]+Address of proxyContract: (0x[\w\d]{40})/);
-
-        expect(matcher).to.not.be.null;
-        if (matcher === null) return false;
-
-        const logicContractAddress = matcher[1];
-        const proxyContractAddress = matcher[2];
-
-        logger.debug(`logicAddress: ${logicContractAddress}, proxyContractAddress: ${proxyContractAddress}`);
-
-        const migrated = await relayContract.getMigrationState(proxyContractAddress);
-        expect(migrated).to.be.true;
-
-        const proxyProof = await targetProvider.send('eth_getProof', [proxyContractAddress, []]);
-        const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
-        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
-        const srcStorageRoot = srcProof.storageHash.toLowerCase();
-        expect(proxyStorageRoot).to.equal(srcStorageRoot);
-
-        const compiledProxy = await ProxyContractBuilder.compiledAbiAndBytecode(relayContract.address, logicContractAddress, srcContract.address);
-        expect(compiledProxy.error).to.be.false;
-        const proxyFactory = new ethers.ContractFactory(PROXY_INTERFACE, compiledProxy.bytecode, targetDeployer);
-        const proxyContract = proxyFactory.attach(proxyContractAddress);
-
-        const newSrcContractAddress = await proxyContract.getSourceAddress();
-        expect(newSrcContractAddress.toLowerCase()).to.equal(srcContract.address.toLowerCase());
-
-        const newLogicContractAddress = await proxyContract.getLogicAddress();
-        return expect(newLogicContractAddress.toLowerCase()).to.equal(logicContractAddress.toLowerCase());
-    });
-
     it('should fork with targetAccount and password', async () => {
         logger.setSettings({ name: 'should fork with targetAccount and password' });
 
-        const forkCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} f ${srcContract.address} ${relayContract.address} -c ${TestCLI.defaultTestConfigFile} --target-account-encrypted-json ${TestCLI.targetAccountEncryptedJsonPath} --target-account-password ${TestCLI.targetAccountPassword} -l ${logger.settings.minLevel}`;
+        const forkCommand = buildCLICommand('f', `${srcContract.address} ${relayContract.address}`, true, logger.settings.minLevel);
         logger.debug(`Executing:\n${forkCommand}`);
 
         const output = execSync(forkCommand);
@@ -154,7 +116,7 @@ describe('Test CLI', async () => {
     it('should fork without relayContract', async () => {
         logger.setSettings({ name: 'should fork without relayContract' });
 
-        const forkCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} f ${srcContract.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const forkCommand = buildCLICommand('f', srcContract.address, true, logger.settings.minLevel);
         logger.debug(`Executing:\n${forkCommand}`);
 
         const output = execSync(forkCommand);
@@ -210,7 +172,7 @@ describe('Test CLI', async () => {
         const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
         expect(changedValues).to.be.true;
 
-        const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const synchCommand = buildCLICommand('s', initialization.proxyContract.address, true, logger.settings.minLevel);
         logger.debug(`Executing:\n${synchCommand}`);
 
         const output = execSync(synchCommand);
@@ -239,7 +201,7 @@ describe('Test CLI', async () => {
         // get blocknumber before changing src contract
         const currBlockNr = await srcProvider.getBlockNumber();
 
-        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const synchContinuousCommand = buildCLICommand('c', `${initialization.proxyContract.address} "*/2 * * * * *"`, true, logger.settings.minLevel, `--src-blocknr ${currBlockNr + 1}`);
         logger.debug(`Executing:\n${synchContinuousCommand}`);
         const cronJob = spawn(synchContinuousCommand, {
             shell: true,
@@ -299,7 +261,7 @@ describe('Test CLI', async () => {
         // get blocknumber before changing src contract
         const currBlockNr = await srcProvider.getBlockNumber();
 
-        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const synchContinuousCommand = buildCLICommand('c', `${initialization.proxyContract.address} "*/2 * * * * *"`, true, logger.settings.minLevel, `--src-blocknr ${currBlockNr + 1}`);
         logger.debug(`Executing:\n${synchContinuousCommand}`);
         const cronJob = spawn(synchContinuousCommand, {
             shell: true,
@@ -373,7 +335,7 @@ describe('Test CLI', async () => {
         const changedValues = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);
         expect(changedValues.success).to.be.true;
 
-        const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const synchCommand = buildCLICommand('s', initialization.proxyContract.address, true, logger.settings.minLevel, `--src-blocknr ${currBlockNr + 1}`);
         logger.debug(`Executing:\n${synchCommand}`);
 
         const output = execSync(synchCommand);
@@ -406,7 +368,7 @@ describe('Test CLI', async () => {
         const changedValues = await chainProxy.deleteValueAtIndex(0);
         expect(changedValues).to.be.true;
 
-        const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const synchCommand = buildCLICommand('s', initialization.proxyContract.address, true, logger.settings.minLevel, `--src-blocknr ${currBlockNr + 1}`);
         logger.debug(`Executing:\n${synchCommand}`);
 
         const output = execSync(synchCommand);
@@ -436,7 +398,7 @@ describe('Test CLI', async () => {
         const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
         expect(changedValues).to.be.true;
 
-        const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} --diff-mode storage -c ${TestCLI.defaultTestConfigFile}`;
+        const synchCommand = buildCLICommand('s', initialization.proxyContract.address, true, logger.settings.minLevel, '--diff-mode storage');
         logger.debug(`Executing:\n${synchCommand}`);
 
         const output = execSync(synchCommand);
@@ -462,7 +424,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/3 * * * * *" --diff-mode storage -c ${TestCLI.defaultTestConfigFile}`;
+        const synchContinuousCommand = buildCLICommand('c', `${initialization.proxyContract.address} "*/3 * * * * *"`, true, logger.settings.minLevel, '--diff-mode storage');
         logger.debug(`Executing:\n${synchContinuousCommand}`);
         const cronJob = spawn(synchContinuousCommand, {
             shell: true,
@@ -519,7 +481,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        const synchContinuousCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} c ${initialization.proxyContract.address} "*/2 * * * * *" --diff-mode storage -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const synchContinuousCommand = buildCLICommand('c', `${initialization.proxyContract.address} "*/3 * * * * *"`, true, logger.settings.minLevel, '--diff-mode storage');
         logger.debug(`Executing:\n${synchContinuousCommand}`);
         const cronJob = spawn(synchContinuousCommand, {
             shell: true,
@@ -590,7 +552,7 @@ describe('Test CLI', async () => {
         const changedValues = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);
         expect(changedValues.success).to.be.true;
 
-        const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} --diff-mode storage -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const synchCommand = buildCLICommand('s', initialization.proxyContract.address, true, logger.settings.minLevel, '--diff-mode storage');
         logger.debug(`Executing:\n${synchCommand}`);
 
         const output = execSync(synchCommand);
@@ -620,7 +582,7 @@ describe('Test CLI', async () => {
         const changedValues = await chainProxy.deleteValueAtIndex(0);
         expect(changedValues).to.be.true;
 
-        const synchCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} s ${initialization.proxyContract.address} --diff-mode storage -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const synchCommand = buildCLICommand('s', initialization.proxyContract.address, true, logger.settings.minLevel, '--diff-mode storage');
         logger.debug(`Executing:\n${synchCommand}`);
 
         const output = execSync(synchCommand);
@@ -647,7 +609,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        let stateCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} status ${cleanSlateProxy.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        let stateCommand = buildCLICommand('status', cleanSlateProxy.address, false, logger.settings.minLevel);
         logger.debug(`Executing:\n${stateCommand}`);
         let output = execSync(stateCommand);
 
@@ -665,7 +627,7 @@ describe('Test CLI', async () => {
             process.exit(-1);
         }
 
-        stateCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} status ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        stateCommand = buildCLICommand('status', initialization.proxyContract.address, false, logger.settings.minLevel);
         logger.debug(`Executing:\n${stateCommand}`);
         output = execSync(stateCommand);
 
@@ -686,7 +648,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        let diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        let diffCommand = buildCLICommand('diff', `${srcContract.address} ${initialization.proxyContract.address}`, false, logger.settings.minLevel);
         logger.debug(`Executing:\n${diffCommand}`);
         let output = execSync(diffCommand);
         logger.debug(`\n${output}`);
@@ -700,7 +662,7 @@ describe('Test CLI', async () => {
         const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
         expect(changedValues).to.be.true;
 
-        diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        diffCommand = buildCLICommand('diff', srcContract.address, false, logger.settings.minLevel, `--src-blocknr ${currBlockNr + 1}`);
         logger.debug(`Executing:\n${diffCommand}`);
 
         output = execSync(diffCommand);
@@ -731,7 +693,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        let diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        let diffCommand = buildCLICommand('diff', `${srcContract.address} ${initialization.proxyContract.address}`, false, logger.settings.minLevel);
         logger.debug(`Executing:\n${diffCommand}`);
         let output = execSync(diffCommand);
         logger.debug(`\n${output}`);
@@ -745,7 +707,7 @@ describe('Test CLI', async () => {
         const addedValue = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);
         expect(addedValue.success).to.be.true;
 
-        diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        diffCommand = buildCLICommand('diff', srcContract.address, false, logger.settings.minLevel, `--src-blocknr ${currBlockNr + 1}`);
         logger.debug(`Executing:\n${diffCommand}`);
 
         output = execSync(diffCommand);
@@ -776,7 +738,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        let diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        let diffCommand = buildCLICommand('diff', `${srcContract.address} ${initialization.proxyContract.address}`, false, logger.settings.minLevel);
         logger.debug(`Executing:\n${diffCommand}`);
         let output = execSync(diffCommand);
         logger.debug(`\n${output}`);
@@ -790,7 +752,7 @@ describe('Test CLI', async () => {
         const deletedValue = await chainProxy.deleteValueAtIndex(0);
         expect(deletedValue).to.be.true;
 
-        diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} --src-blocknr ${currBlockNr + 1} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        diffCommand = buildCLICommand('diff', srcContract.address, false, logger.settings.minLevel, `--src-blocknr ${currBlockNr + 1}`);
         logger.debug(`Executing:\n${diffCommand}`);
 
         output = execSync(diffCommand);
@@ -821,7 +783,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        let diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} --diff-mode getProof -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        let diffCommand = buildCLICommand('diff', `${srcContract.address} ${initialization.proxyContract.address}`, false, logger.settings.minLevel, '--diff-mode getProof');
         logger.debug(`Executing:\n${diffCommand}`);
         let output = execSync(diffCommand);
         logger.debug(`\n${output}`);
@@ -835,7 +797,7 @@ describe('Test CLI', async () => {
         const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
         expect(changedValues).to.be.true;
 
-        diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} --src-blocknr ${currBlockNr} --diff-mode getProof -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        diffCommand = buildCLICommand('diff', srcContract.address, false, logger.settings.minLevel, `--src-blocknr ${currBlockNr} --diff-mode getProof`);
         logger.debug(`Executing:\n${diffCommand}`);
 
         output = execSync(diffCommand);
@@ -866,7 +828,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        let diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} --diff-mode storage -l ${logger.settings.minLevel}`;
+        let diffCommand = buildCLICommand('diff', `${srcContract.address} ${initialization.proxyContract.address}`, false, logger.settings.minLevel, '--diff-mode storage');
         logger.debug(`Executing:\n${diffCommand}`);
         let output = execSync(diffCommand);
         logger.debug(`\n${output}`);
@@ -877,7 +839,7 @@ describe('Test CLI', async () => {
         const changedValues = await chainProxy.changeValues(10, TestCLI.MAX_VALUE);
         expect(changedValues).to.be.true;
 
-        diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} --diff-mode storage -l ${logger.settings.minLevel}`;
+        diffCommand = buildCLICommand('diff', `${srcContract.address} ${initialization.proxyContract.address}`, false, logger.settings.minLevel, '--diff-mode storage');
         logger.debug(`Executing:\n${diffCommand}`);
 
         output = execSync(diffCommand);
@@ -908,7 +870,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        let diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} --diff-mode storage -l ${logger.settings.minLevel}`;
+        let diffCommand = buildCLICommand('diff', `${srcContract.address} ${initialization.proxyContract.address}`, false, logger.settings.minLevel, '--diff-mode storage');
         logger.debug(`Executing:\n${diffCommand}`);
         let output = execSync(diffCommand);
         logger.debug(`\n${output}`);
@@ -922,7 +884,7 @@ describe('Test CLI', async () => {
         const addedValue = await chainProxy.addValueAtIndex(4, TestCLI.MAX_VALUE);
         expect(addedValue.success).to.be.true;
 
-        diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} --diff-mode storage -l ${logger.settings.minLevel}`;
+        diffCommand = buildCLICommand('diff', `${srcContract.address} ${initialization.proxyContract.address}`, false, logger.settings.minLevel, '--diff-mode storage');
         logger.debug(`Executing:\n${diffCommand}`);
 
         output = execSync(diffCommand);
@@ -953,7 +915,7 @@ describe('Test CLI', async () => {
             return false;
         }
 
-        let diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} --diff-mode storage -l ${logger.settings.minLevel}`;
+        let diffCommand = buildCLICommand('diff', `${srcContract.address} ${initialization.proxyContract.address}`, false, logger.settings.minLevel, '--diff-mode storage');
         logger.debug(`Executing:\n${diffCommand}`);
         let output = execSync(diffCommand);
         logger.debug(`\n${output}`);
@@ -964,7 +926,7 @@ describe('Test CLI', async () => {
         const deletedValue = await chainProxy.deleteValueAtIndex(0);
         expect(deletedValue).to.be.true;
 
-        diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${initialization.proxyContract.address} ${srcContract.address} --src-chain-rpc-url ${chainConfigs?.targetChainRpcUrl} --target-chain-rpc-url ${chainConfigs?.srcChainRpcUrl} --target-blocknr latest -c ${TestCLI.defaultTestConfigFile} --diff-mode storage -l ${logger.settings.minLevel}`;
+        diffCommand = buildCLICommand('diff', `${initialization.proxyContract.address} ${srcContract.address}`, false, logger.settings.minLevel, `--diff-mode storage --src-chain-rpc-url ${chainConfigs?.targetChainRpcUrl} --target-chain-rpc-url ${chainConfigs?.srcChainRpcUrl} --target-blocknr latest`);
         logger.debug(`Executing:\n${diffCommand}`);
 
         output = execSync(diffCommand);
@@ -998,7 +960,7 @@ describe('Test CLI', async () => {
 
         const latestBlock = await relayContract.getCurrentBlockNumber(initialization.proxyContract.address);
         logger.debug(`Latest block before exec command: ${latestBlock}`);
-        const stateCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} blocknr ${initialization.proxyContract.address} -c ${TestCLI.defaultTestConfigFile} -l ${logger.settings.minLevel}`;
+        const stateCommand = buildCLICommand('blocknr', initialization.proxyContract.address, false, logger.settings.minLevel);
         logger.debug(`Executing:\n${stateCommand}`);
         const output = execSync(stateCommand);
         logger.debug(output.toString());

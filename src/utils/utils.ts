@@ -5,6 +5,7 @@ import { Input } from 'rlp';
 import { logger } from './logger';
 
 export const BLOCKNUMBER_TAGS = ['latest', 'earliest', 'pending'];
+export const DEBUG_TAGS = ['silly', 'trace', 'debug'];
 
 export namespace EVMOpcodes {
     export const contractByteCodeDeploymentPreamble = '608060405234801561001057600080fd5b50';
@@ -30,6 +31,10 @@ export function toParityQuantity(val: BigNumberish): string {
         return val;
     }
     return ethers.BigNumber.from(val).toHexString();
+}
+
+export function isDebug(val: string): Boolean {
+    return DEBUG_TAGS.indexOf(val) > -1;
 }
 
 export async function toBlockNumber(val: BigNumberish, provider: JsonRpcProvider): Promise<number> {
