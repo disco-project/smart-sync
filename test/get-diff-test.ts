@@ -49,7 +49,7 @@ describe('Get contract storage diff', () => {
         const blockNum = tx.blockNumber ?? await provider.getBlockNumber();
         // compare the second latest block against the block
         // that includes the tx that set the value of storage key 0
-        let diff = await differ.getDiffFromStorage(storageSrc.address, storageSrc.address, 'latest', blockNum - 1);
+        let diff = await differ.getDiffFromStorage(storageSrc.address, storageSrc.address, blockNum - 1, 'latest');
         // the diff includes an additional key
         expect(diff.diffs.length).to.equal(1);
         const adds = diff.adds();
@@ -58,7 +58,7 @@ describe('Get contract storage diff', () => {
 
         // comparing the latest block against the second latest ('latest' - 1)
         // results in a diff with a removed key
-        diff = await differ.getDiffFromStorage(storageSrc.address, storageSrc.address, blockNum - 1, 'latest');
+        diff = await differ.getDiffFromStorage(storageSrc.address, storageSrc.address, 'latest', blockNum - 1);
         expect(diff.diffs.length).to.equal(1);
         const removes = diff.removes();
         expect(removes.length).to.equal(1);
@@ -113,7 +113,7 @@ describe('Get contract storage diff', () => {
         const tx = await storageSrc.setA(42);
         const blockNum = tx.blockNumber ?? await provider.getBlockNumber();
 
-        const diff = await differ.getDiffFromSrcContractTxs(storageSrc.address, blockNum, blockNum);
+        const diff = await differ.getDiffFromSrcContractTxs(storageSrc.address, 'latest', blockNum);
         expect(diff.diffs.length).to.equal(1);
         const changed = diff.changes();
         expect(changed.length).to.equal(1);

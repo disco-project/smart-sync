@@ -368,7 +368,11 @@ stateDiff
         };
         const batchSize = adjustedOptions.batchSize ? BigNumber.from(adjustedOptions.batchSize).toNumber() : 50;
         const chainProxy = new ChainProxy(contractAddressMap, srcConnectionInfo, srcRPCConfig, targetConnectionInfo, targetRPCConfig, batchSize);
-        await chainProxy.init();
+        if (adjustedOptions.diffMode === 'srcTx') {
+            await chainProxy.init();
+        } else {
+            await chainProxy.lightInit();
+        }
 
         const diff = await chainProxy.getDiff((adjustedOptions.diffMode ?? 'srcTx') as GetDiffMethod, { srcBlock: adjustedOptions.srcBlocknr, targetBlock: adjustedOptions.targetBlocknr });
 

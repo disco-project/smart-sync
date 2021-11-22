@@ -11,7 +11,7 @@ import { PROXY_INTERFACE } from './config';
 import DiffHandler from './diffHandler/DiffHandler';
 import { logger } from './utils/logger';
 import {
-    getAllKeys, toParityQuantity, toBlockNumber, createDeployingByteCode,
+    getAllKeys, toParityQuantity, toBlockNumber, createDeployingByteCode, BLOCKNUMBER_TAGS,
 } from './utils/utils';
 import GetProof from './proofHandler/GetProof';
 import { BlockHeader } from './proofHandler/Types';
@@ -202,6 +202,13 @@ export class ChainProxy {
         // todo batch size in DiffHandler
         this.differ = new DiffHandler(this.srcProvider, this.targetProvider, this.batchSize);
         this.initialized = true;
+        return true;
+    }
+
+    async lightInit() {
+        this.differ = new DiffHandler(this.srcProvider, this.targetProvider, this.batchSize);
+        this.initialized = true;
+        this.migrationState = true;
         return true;
     }
 
@@ -460,7 +467,7 @@ export class ChainProxy {
                 }
                 if (targetBlock) {
                     const givenTargetBlockNr = await toBlockNumber(targetBlock, this.srcProvider);
-                    if (BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
+                    if (srcBlock && BLOCKNUMBER_TAGS.indexOf(srcBlock) < 0 && BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
                         logger.debug(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr (${targetBlock}).`);
                         return new StorageDiff([]);
                     }
@@ -469,12 +476,13 @@ export class ChainProxy {
                 // srcTx is default
             default:
                 if (this.relayContract && this.proxyContract) {
+                    logger.info('here');
                     const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
                     srcBlock = synchedBlockNr.toNumber() + 1;
                 }
                 if (targetBlock) {
                     const givenTargetBlockNr = await toBlockNumber(targetBlock, this.srcProvider);
-                    if (BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
+                    if (srcBlock && BLOCKNUMBER_TAGS.indexOf(srcBlock) < 0 && BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
                         logger.debug(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr (${givenTargetBlockNr}).`);
                         return new StorageDiff([]);
                     }

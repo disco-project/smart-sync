@@ -964,7 +964,7 @@ describe('Test CLI', async () => {
         const deletedValue = await chainProxy.deleteValueAtIndex(0);
         expect(deletedValue).to.be.true;
 
-        diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${srcContract.address} ${initialization.proxyContract.address} --src-blocknr latest -c ${TestCLI.defaultTestConfigFile} --diff-mode storage -l ${logger.settings.minLevel}`;
+        diffCommand = `${TestCLI.tsNodeExec} ${TestCLI.cliExec} diff ${initialization.proxyContract.address} ${srcContract.address} --src-chain-rpc-url ${chainConfigs?.targetChainRpcUrl} --target-chain-rpc-url ${chainConfigs?.srcChainRpcUrl} --target-blocknr latest -c ${TestCLI.defaultTestConfigFile} --diff-mode storage -l ${logger.settings.minLevel}`;
         logger.debug(`Executing:\n${diffCommand}`);
 
         output = execSync(diffCommand);

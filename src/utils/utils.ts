@@ -4,7 +4,7 @@ import { JsonRpcProvider } from '@ethersproject/providers';
 import { Input } from 'rlp';
 import { logger } from './logger';
 
-const BLOCKNUMBER_TAGS = ['latest', 'earliest', 'pending'];
+export const BLOCKNUMBER_TAGS = ['latest', 'earliest', 'pending'];
 
 export namespace EVMOpcodes {
     export const contractByteCodeDeploymentPreamble = '608060405234801561001057600080fd5b50';
