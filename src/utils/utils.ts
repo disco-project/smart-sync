@@ -5,7 +5,6 @@ import { Input } from 'rlp';
 import { logger } from './logger';
 
 export const BLOCKNUMBER_TAGS = ['latest', 'earliest', 'pending'];
-
 export const DEBUG_TAGS = ['silly', 'trace', 'debug'];
 
 export namespace EVMOpcodes {

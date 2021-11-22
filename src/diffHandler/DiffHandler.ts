@@ -168,9 +168,11 @@ class DiffHandler {
             // eslint-disable-next-line no-await-in-loop
             const currTxs = await Promise.all(txs.splice(0, this.batchSize).map((tx) => srcTxHandler.replayTransaction(tx)));
             txStorages = txStorages.concat(currTxs);
+
             progressBar?.increment(currTxs.length);
         }
         progressBar?.stop();
+
         txStorages.forEach((storage) => {
             if (storage) {
                 logger.debug('srcTx txStorage: ', storage);
