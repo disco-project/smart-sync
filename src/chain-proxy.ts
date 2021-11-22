@@ -217,7 +217,7 @@ export class ChainProxy {
      * @param srcBlock block from where to migrate src contract from
      * @returns bool indicating if migration was sucessfull or not
      */
-    async migrateSrcContract(srcBlock: BigNumberish = 'latest'): Promise<Boolean> {
+    async migrateSrcContract(srcBlock: BigNumberish = 'latest', key_value_pair_per_batch?: number): Promise<Boolean> {
         if (!this.initialized) {
             logger.error('ChainProxy is not initialized yet.');
             return false;
@@ -260,7 +260,7 @@ export class ChainProxy {
         if (!result) return false;
 
         // migrate storage
-        result = await this.initialStorageMigration(initialValuesProof, latestBlock.stateRoot, latestBlock.number);
+        result = await this.initialStorageMigration(initialValuesProof, latestBlock.stateRoot, latestBlock.number, key_value_pair_per_batch);
         if (!result) return false;
 
         logger.info(`Address of proxyContract: ${this.proxyContract.address}`);
@@ -315,7 +315,7 @@ export class ChainProxy {
         return true;
     }
 
-    private async initialStorageMigration(initialValuesProof: GetProof, stateRoot: string, blockNumber: string): Promise<boolean> {
+    private async initialStorageMigration(initialValuesProof: GetProof, stateRoot: string, blockNumber: string, key_value_pair_per_batch: number = KEY_VALUE_PAIR_PER_BATCH): Promise<boolean> {
         // migrate storage
         logger.debug('migrating storage');
         const proxyKeys: Array<String> = [];
@@ -332,13 +332,13 @@ export class ChainProxy {
         const progressBar = new CliProgress.SingleBar({}, CliProgress.Presets.shades_classic);
         progressBar.start(initialValuesProof.storageProof.length, 0);
         while (proxyKeys.length > 0) {
-            const currProcessedKeys = (proxyKeys.length - KEY_VALUE_PAIR_PER_BATCH) >= 0 ? KEY_VALUE_PAIR_PER_BATCH : proxyKeys.length;
+            const currProcessedKeys = (proxyKeys.length - key_value_pair_per_batch) >= 0 ? key_value_pair_per_batch : proxyKeys.length;
             /*
              * We cannot promise-batch the following request since we don't know in which order they are processed.
              * If addStorage with a higher nonce is processed earlier than a lower nonce then it creates a problem.
              */
             // eslint-disable-next-line no-await-in-loop
-            const promise = await this.proxyContract.addStorage(proxyKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), proxyValues.splice(0, KEY_VALUE_PAIR_PER_BATCH))
+            const promise = await this.proxyContract.addStorage(proxyKeys.splice(0, key_value_pair_per_batch), proxyValues.splice(0, key_value_pair_per_batch))
                 .catch((error: any) => {
                     logger.error(error);
                     process.exit(-1);
