@@ -1,7 +1,9 @@
 import { JsonRpcProvider } from '@ethersproject/providers';
 import * as CliProgress from 'cli-progress';
 import { logger } from './logger';
-import { findDeploymentBlock, isDebug, toBlockNumber, toParityQuantity } from './utils';
+import {
+    findDeploymentBlock, isDebug, toBlockNumber, toParityQuantity,
+} from './utils';
 
 type KeyObject = {
     '*'?: {
