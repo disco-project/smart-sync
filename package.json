@@ -37,6 +37,7 @@
     "cli-progress": "^3.9.1",
     "commander": "^8.1.0",
     "csv-stringify": "^5.6.4",
+    "csv-parse": "^5.0.1",
     "ethers": "^5.4.6",
     "hardhat": "^2.6.1",
     "merkle-patricia-tree": "^4.2.1",

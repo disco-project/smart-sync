@@ -38,7 +38,7 @@ class ProofPathBuilder {
      * @param node a hex string with '0x' prefix
      * @returns boolean
      */
-    equals(node: string): Boolean {
+    nodeEquals(node: string): Boolean {
         return `0x${rlp.encode(this.root).toString('hex')}` === node;
     }
 
@@ -162,7 +162,6 @@ class ProofPathBuilder {
                 }
                 return [];
             });
-
             return rlp.encode([[this.root], nodes]);
         }
 
@@ -182,8 +181,8 @@ export function addDeletedValue(parentNode: ParentNode, storageProof: StoragePro
         return undefined;
     }
     const path = ethers.utils.keccak256(ethers.utils.hexZeroPad(storageProof.key, 32));
-    let pathPtr = 2;
-    for (let i = 0; i < storageProof.proof.length - 1; i += 1) {
+    let pathPtr = 2; // starts at 2 because of '0x'
+    for (let i = 0; i < storageProof.proof.length; i += 1) {
         const node = rlp.decode(storageProof.proof[i]) as Buffer[];
         if (node.length === 17) pathPtr += 1;
         else if (node.length === 2) {
@@ -206,8 +205,9 @@ export function addDeletedValue(parentNode: ParentNode, storageProof: StoragePro
         // eslint-disable-next-line no-bitwise
         adjustedPath[0] = (3 << 4) + (adjustedPath[0] % 16);
     }
+    logger.debug(adjustedPath);
     const artificialNode = [adjustedPath, Buffer.from([0x0])];
-    const pathNibble = parseInt(path[pathPtr], 16);
+    const pathNibble = parseInt(path[pathPtr - 1], 16);
     parentNode.children[pathNibble] = new LeafNode(artificialNode, storageProof.key);
     return parentNode.children[pathNibble] as LeafNode ?? undefined;
 }

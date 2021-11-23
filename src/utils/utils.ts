@@ -93,9 +93,9 @@ export async function findDeploymentBlock(contractAddress: string, provider: Jso
  * @param batchSize how many keys to retrieve per request [parity_liststoragekeys](https://openethereum.github.io/JSONRPC-parity-module#parity_liststoragekeys)
  * @returns all the storage keys of the contract with `address` at block `blockNum`
  */
-export async function getAllKeys(contractAddress: string, provider: JsonRpcProvider, blockNum: number | string = 'latest', batchSize: number = 50): Promise<BigNumberish[]> {
-    const keys: Array<BigNumberish> = [];
-    let batch: Array<BigNumberish> = [];
+export async function getAllKeys(contractAddress: string, provider: JsonRpcProvider, blockNum: number | string = 'latest', batchSize: number = 50): Promise<string[]> {
+    const keys: Array<string> = [];
+    let batch: Array<string> = [];
     let batchCounter = 1;
     const blockNumParity = toParityQuantity(blockNum);
     /* eslint-disable no-await-in-loop */
@@ -105,11 +105,15 @@ export async function getAllKeys(contractAddress: string, provider: JsonRpcProvi
         batch = await provider.send('parity_listStorageKeys', [
             contractAddress, batchSize * batchCounter, offset, blockNumParity,
         ]);
+        if (batch === null) {
+            logger.error(`Could not get keys for ${contractAddress}. Is it deployed at the node at ${provider.connection.url}?`);
+            throw new Error();
+        }
         keys.push(...batch);
         batchCounter += 1;
     } while (batch.length >= batchSize);
     /* eslint-enable no-await-in-loop */
-    return keys;
+    return keys.map((key) => ethers.utils.hexZeroPad(key, 32));
 }
 
 export function hexToAscii(str1) {
