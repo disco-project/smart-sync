@@ -76,7 +76,7 @@ describe('Extension Validation', async () => {
         expect(rlpOptimized).to.not.be.undefined;
         expect(rlpOptimized).to.not.be.null;
         if (!rlpOptimized) process.exit(-1);
-        expect(ethers.utils.keccak256(rlpOptimized)).to.equal('0x56058e12a3cd40a2bb799c6f297535d7da47185263d82d5d1e760df9eb65b8cd');
+        expect(ethers.utils.keccak256(rlpOptimized)).to.equal('0x347dd5dcd50fcfd4e7b75e53773090b1858836c56aba706c498e507f98fd9843');
     });
 
     it('proxyContract should accept proof with extensions in it and create an optimized proof with an extension node as root', async () => {
@@ -118,6 +118,6 @@ describe('Extension Validation', async () => {
         expect(rlpOptimized).to.not.be.undefined;
         expect(rlpOptimized).to.not.be.null;
         if (!rlpOptimized) process.exit(-1);
-        expect(ethers.utils.keccak256(rlpOptimized)).to.equal('0x1af21a373943b987bcbf3fdcbbb249ec3c6ec3f4074bc554b0a766deeb1bf677');
+        expect(ethers.utils.keccak256(rlpOptimized)).to.equal('0x76ad60aeb4c00a38141a5818a1a108af1dc6e487931b87c38116aba683f5067e');
     });
 });

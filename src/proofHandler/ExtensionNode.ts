@@ -1,13 +1,14 @@
 import * as rlp from 'rlp';
+import { logger } from '../utils/logger';
 // eslint-disable-next-line import/no-cycle
-import { EmbeddedNode } from './Types';
+import BranchNode from './BranchNode';
 
 class ExtensionNode {
-    node: Buffer[];
+    node: Array<Buffer> | Buffer;
 
-    child: EmbeddedNode | undefined;
+    child?: BranchNode;
 
-    constructor(node: Buffer[], child: EmbeddedNode | undefined) {
+    constructor(node: Array<Buffer> | Buffer, child?: BranchNode) {
         this.node = node;
         this.child = child;
     }
@@ -21,9 +22,20 @@ class ExtensionNode {
         return `0x${rlp.encode(this.node).toString('hex')}` === node;
     }
 
+    childEquals(node: Buffer): Boolean {
+        if (this.node instanceof Buffer) {
+            return false;
+        }
+        if (!(this.node[1] instanceof Buffer)) {
+            logger.error(`You want to compare ${this.node[1]} with ${Buffer}`);
+            return false;
+        }
+        return this.node[1].equals(node);
+    }
+
     encode() {
         if (!this.child) return undefined;
-        return [[this.node], [this.child.encode()]];
+        return [this.node, [this.child.encode()]];
     }
 }
 

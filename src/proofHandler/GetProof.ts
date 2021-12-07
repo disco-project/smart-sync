@@ -142,7 +142,7 @@ class GetProof implements IGetProof {
      */
     optimizedStorageProof() {
         let pathNodes: ProofPathBuilder | undefined;
-        let rootNode;
+        let rootNode: string;
         this.storageProof.forEach((storageProof) => {
             let parentNode: ParentNode | undefined;
             // loop over all proof nodes
@@ -160,15 +160,16 @@ class GetProof implements IGetProof {
                         pathNodes = new ProofPathBuilder(node);
                     }
                     rootNode = proofNode;
+                    parentNode = pathNodes;
+                    // skip root if not a proof for deleted value at root branch
+                    if (i !== (storageProof.proof.length - 1) || node.length === 2) return;
                 }
                 if (rootNode === proofNode) {
-                    // skip root if not a proof for deleted value at root branch
                     parentNode = pathNodes;
                     if (i !== (storageProof.proof.length - 1)) return;
                 }
                 if (!pathNodes || !parentNode) {
-                    // todo apparently possible
-                    this.logger.debug('not possible.');
+                    this.logger.error('not possible.');
                     process.exit(-1);
                 }
                 if (node.length === 17) {
