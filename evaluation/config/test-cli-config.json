@@ -4,6 +4,6 @@
     "connectionTimeout": "36000",
     "logLevel": "info",
     "targetBlocknr": "latest",
-    "gasLimit": 8000000,
+    "gasLimit": 80000000,
     "keyValuePairPerBatch": 100
 }

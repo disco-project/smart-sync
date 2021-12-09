@@ -440,8 +440,7 @@ export class TestChainProxy {
         let txResponse;
         let receipt;
         try {
-            const neededGas = await this.proxyContract.estimateGas.updateStorage(rlpProof, latestBlock.number);
-            txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number, { gasLimit: neededGas.add(Math.round(neededGas.toNumber() * 0.1)) });
+            txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number, { gasLimit: this.httpConfig.gasLimit });
             receipt = await txResponse.wait();
         } catch (e: any) {
             logger.error('something went wrong');
