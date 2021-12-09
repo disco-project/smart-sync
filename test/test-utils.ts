@@ -22,6 +22,7 @@ const KEY_VALUE_PAIR_PER_BATCH = 100;
 export namespace TestCLI {
     export const tsNodeExec = './node_modules/ts-node/dist/bin-transpile.js';
     export const cliExec = './src/cli/cross-chain-cli.ts';
+    export const defaultEvaluationConfigFile = './evaluation/config/test-cli-config.json';
     export const defaultTestConfigFile = './test/config/test-cli-config.json';
     export const targetAccountEncryptedJsonPath = './test/config/encryptedAccount.json';
     export const targetAccountPassword = 'dev';
@@ -439,7 +440,8 @@ export class TestChainProxy {
         let txResponse;
         let receipt;
         try {
-            txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number);
+            const neededGas = await this.proxyContract.estimateGas.updateStorage(rlpProof, latestBlock.number);
+            txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number, { gasLimit: neededGas.add(Math.round(neededGas.toNumber() * 0.1)) });
             receipt = await txResponse.wait();
         } catch (e: any) {
             logger.error('something went wrong');

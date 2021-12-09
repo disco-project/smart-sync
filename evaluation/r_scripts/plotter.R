@@ -1,8 +1,9 @@
 install.packages("tidyverse")
 library(tidyverse)
-setwd('/home/leo/disco/git/cross-chain-contracts/storage/evaluation/csv-files/')
+setwd('/home/leo/disco/git/smart-sync/evaluation/csv-files/')
 scale_individual_values <- 1e3
 scale_multiple_values <- 1e6
+scale_sec <- 1e3
 
 # 1. Multiple Values
 multipleValues <- list.files(pattern = "+measurements-multiple-deep-values-with-map-sizes-1-to-1000.csv")
@@ -160,8 +161,8 @@ createdPlot +
   ylab('Gas used (Thousand)')
 
 # 4. Multiple Random Values
-multipleValues <- list.files(pattern = "+measurements-multiple-values-random-with-map-sizes-1-to-1000.csv")
-data <- read.csv(multipleValues[0], header=TRUE)
+multipleValues <- list.files(pattern = "+measurements-multiple-values-random-with-map-sizes-1-1000.csv")
+data <- read.csv(multipleValues[2], header=TRUE)
 map_size_10 <- data[data[,1] == 10,]
 map_size_100 <- data[data[,1] == 100,]
 map_size_1000 <- data[data[,1] == 1000,]
@@ -174,3 +175,27 @@ createdPlot +
   ggtitle('Gas cost for updating random multiple storage values') +
   xlab('#values') +
   ylab('Gas used (Million)')
+createdPlot <- ggplot() +
+  geom_line(data = map_size_10, mapping = aes(changed_value_count, changeMigrationTime/scale_sec, color = as.character(mapSize))) +
+  geom_line(data = map_size_100, mapping = aes(changed_value_count, changeMigrationTime/scale_sec, color = as.character(mapSize))) +
+  geom_line(data = map_size_1000, mapping = aes(changed_value_count, changeMigrationTime/scale_sec, color = as.character(mapSize)))
+createdPlot + 
+  labs(color = 'Storage size')+
+  ggtitle('Time in sec for updating random multiple storage values') +
+  xlab('#values') +
+  ylab('Time (sec)')
+
+multipleValues <- list.files(pattern = "+measurements-update-one-value-per-mpt-height-with-map-sizes-1-to-1000.csv")
+data <- read.csv(multipleValues[2], header=TRUE)
+map_size_10 <- data[data[,1] == 10,]
+map_size_100 <- data[data[,1] == 100,]
+map_size_1000 <- data[data[,1] == 1000,]
+createdPlot <- ggplot() +
+  geom_line(data = map_size_10, mapping = aes(value_mpt_depth, changeMigrationTime/scale_sec, color = as.character(mapSize))) +
+  geom_line(data = map_size_100, mapping = aes(value_mpt_depth, changeMigrationTime/scale_sec, color = as.character(mapSize))) +
+  geom_line(data = map_size_1000, mapping = aes(value_mpt_depth, changeMigrationTime/scale_sec, color = as.character(mapSize)))
+createdPlot + 
+  labs(color = 'Storage size')+
+  ggtitle('Time in sec for updating storage values on different mt depths') +
+  xlab('mt depth') +
+  ylab('Time (sec)')

@@ -22,6 +22,7 @@ export interface CSVDataTemplateMultipleValues {
     max_mpt_depth: number;
     used_gas: number;
     sequential: Boolean;
+    changeMigrationTime: number;
 }
 
 export interface CSVDataTemplatePerMTHeight {
@@ -29,6 +30,7 @@ export interface CSVDataTemplatePerMTHeight {
     value_mpt_depth: number | undefined;
     max_mpt_depth: number;
     used_gas: number;
+    changeMigrationTime: number;
 }
 
 export class CSVManager<T> {

@@ -46,6 +46,11 @@ module.exports = (grunt) => {
         child_process.execSync('docker-compose up -d', { cwd: CHAIN_DIR });
     });
 
+    grunt.registerTask('start-chains-evaluation', 'Startup chain', () => {
+        grunt.verbose.write('Starting test chains...');
+        child_process.execSync('docker-compose -f evaluation-docker-compose.yml up -d', { cwd: CHAIN_DIR });
+    });
+
     grunt.registerTask('stop-chains', 'Stopping chain', () => {
         let container;
         let container2;
@@ -134,7 +139,7 @@ module.exports = (grunt) => {
         grunt.task.run('compile-contracts');
         grunt.task.run('eslint');
         grunt.task.run('stop-chains');
-        grunt.task.run('start-chains');
+        grunt.task.run('start-chains-evaluation');
         grunt.task.run('evaluate');
         grunt.task.run('stop-chains');
     });
