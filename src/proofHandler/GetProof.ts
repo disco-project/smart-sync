@@ -176,7 +176,7 @@ class GetProof implements IGetProof {
                     if (i === storageProof.proof.length - 1) {
                         // terminating
                         this.logger.debug('terminating branch');
-                        if (!parentNode.equals(storageProof.proof[i])) parentNode = pathNodes.addBranch(node, parentNode, storageProof.key);
+                        if (!parentNode.nodeEquals(storageProof.proof[i])) parentNode = pathNodes.addBranch(node, parentNode, undefined);
                         if (storageProof.value === '0x0' && parentNode) {
                             this.logger.debug('inserting leaf for deleted value');
                             addDeletedValue(parentNode, storageProof);

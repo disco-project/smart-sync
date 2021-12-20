@@ -520,7 +520,7 @@ describe('Test CLI', async () => {
             expect(diff.getKeys().length).to.equal(5, 'There is no diff.');
 
             await new Promise((resolve) => {
-                setTimeout(() => resolve(resolve), 3000);
+                setTimeout(() => resolve(resolve), 5000);
             });
 
             const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);

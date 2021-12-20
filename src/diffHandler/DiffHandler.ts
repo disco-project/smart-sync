@@ -1,7 +1,6 @@
 import { ethers } from 'ethers';
 import assert from 'assert';
 import { JsonRpcProvider } from '@ethersproject/providers';
-import { BigNumberish, BigNumber } from '@ethersproject/bignumber';
 import * as CliProgress from 'cli-progress';
 import {
     getAllKeys, isDebug, toBlockNumber, toParityQuantity,
@@ -93,14 +92,14 @@ class DiffHandler {
             return new StorageDiff([]);
         }
 
-        const toKeys: Array<BigNumberish> = await getAllKeys(processedParameters.targetAddress, this.targetProvider, processedParameters.targetBlock, this.batchSize);
-        const fromKeys: Array<BigNumberish> = await getAllKeys(processedParameters.srcAddress, this.srcProvider, processedParameters.srcBlock, this.batchSize);
+        const toKeys: Array<string> = await getAllKeys(processedParameters.targetAddress, this.targetProvider, processedParameters.targetBlock, this.batchSize);
+        const fromKeys: Array<string> = await getAllKeys(processedParameters.srcAddress, this.srcProvider, processedParameters.srcBlock, this.batchSize);
 
         const diffs: StorageKeyDiff[] = [];
 
         /* eslint-disable no-await-in-loop */
         for (let i = 0; i < fromKeys.length; i += 1) {
-            const key: BigNumberish = fromKeys[i];
+            const key: string = fromKeys[i];
             const index: number = toKeys.indexOf(key);
             if (index !== -1) {
                 toKeys.splice(index, 1);
@@ -168,11 +167,9 @@ class DiffHandler {
             // eslint-disable-next-line no-await-in-loop
             const currTxs = await Promise.all(txs.splice(0, this.batchSize).map((tx) => srcTxHandler.replayTransaction(tx)));
             txStorages = txStorages.concat(currTxs);
-
             progressBar?.increment(currTxs.length);
         }
         progressBar?.stop();
-
         txStorages.forEach((storage) => {
             if (storage) {
                 logger.debug('srcTx txStorage: ', storage);
@@ -208,10 +205,10 @@ class DiffHandler {
         return new StorageDiff(diffs);
     }
 
-    async getDiffFromProof(srcAddress: string, latestSrcBlock: string | number, earliestSrcBlock: string | number): Promise<StorageDiff> {
+    async getDiffFromProof(srcAddress: string, targetAddress: string = srcAddress, latestSrcBlock: string | number, earliestSrcBlock: string | number): Promise<StorageDiff> {
         let processedParameters: ProcessedParameters;
         try {
-            processedParameters = await processParameters(srcAddress, this.srcProvider, earliestSrcBlock, srcAddress, this.srcProvider, latestSrcBlock);
+            processedParameters = await processParameters(srcAddress, this.srcProvider, earliestSrcBlock, targetAddress, this.targetProvider, latestSrcBlock);
         } catch (e) {
             logger.error(e);
             return new StorageDiff([]);
@@ -220,18 +217,18 @@ class DiffHandler {
         const diffs: StorageKeyDiff[] = [];
 
         const oldKeys = await getAllKeys(srcAddress, this.srcProvider, processedParameters.srcBlock);
-        const newKeys = await getAllKeys(srcAddress, this.srcProvider, processedParameters.targetBlock);
+        const newKeys = await getAllKeys(targetAddress, this.targetProvider, processedParameters.targetBlock);
 
         const paritySrcBlock = toParityQuantity(processedParameters.srcBlock);
         const parityTargetBlock = toParityQuantity(processedParameters.targetBlock);
         const oldProof = new GetProof(await this.srcProvider.send('eth_getProof', [srcAddress, oldKeys, paritySrcBlock]));
-        const newProof = new GetProof(await this.srcProvider.send('eth_getProof', [srcAddress, newKeys, parityTargetBlock]));
+        const newProof = new GetProof(await this.targetProvider.send('eth_getProof', [targetAddress, newKeys, parityTargetBlock]));
 
         /* eslint-disable no-await-in-loop */
         for (let i = 0; i < newKeys.length; i += 1) {
-            const key: BigNumberish = newKeys[i];
-            const index: number = oldProof.storageProof.findIndex((storageProof) => BigNumber.from(key).eq(storageProof.key));
-            const newStorageProof = newProof.storageProof.find((storageProof) => BigNumber.from(key).eq(storageProof.key));
+            const key: string = newKeys[i];
+            const index: number = oldProof.storageProof.findIndex((storageProof) => key === ethers.utils.hexZeroPad(storageProof.key, 32));
+            const newStorageProof = newProof.storageProof.find((storageProof) => key === ethers.utils.hexZeroPad(storageProof.key, 32));
             if (!newStorageProof) {
                 logger.error(`Could not find storage proof for key ${key}`);
                 // eslint-disable-next-line no-continue
@@ -251,7 +248,7 @@ class DiffHandler {
         // keys that are present in block `srcBlock` but not in `targetBlock`.
         /* eslint-disable no-restricted-syntax */
         for (const proof of oldProof.storageProof) {
-            diffs.push(new Remove(proof.key, proof.value));
+            diffs.push(new Remove(ethers.utils.hexZeroPad(proof.key, 32), proof.value));
         }
         return new StorageDiff(diffs);
     }

@@ -221,8 +221,6 @@ describe('Deploy proxy and logic contract', async () => {
 
         proof = new GetProof(await provider.send('eth_getProof', [srcContract.address, keys]));
 
-        // Note that the respective block is not added to the realy contract here
-
         // compute the optimized storage proof
         const rlpOptimized = proof.optimizedStorageProof();
         // ensure that the old contract state equals the last synced storage hash

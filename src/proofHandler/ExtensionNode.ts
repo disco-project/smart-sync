@@ -17,7 +17,7 @@ class ExtensionNode {
      * @param node a hex string with '0x' prefix
      * @returns boolean
      */
-    equals(node: string): Boolean {
+    nodeEquals(node: string): Boolean {
         return `0x${rlp.encode(this.node).toString('hex')}` === node;
     }
 
