@@ -22,6 +22,10 @@ class ExtensionNode {
         return `0x${rlp.encode(this.node).toString('hex')}` === node;
     }
 
+    getSharedNibbles(): string {
+        return (this.node as Array<Buffer>)[0].toString('hex');
+    }
+
     childEquals(node: Buffer): Boolean {
         if (this.node instanceof Buffer) {
             return false;

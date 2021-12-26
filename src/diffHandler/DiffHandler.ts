@@ -89,7 +89,7 @@ class DiffHandler {
             processedParameters = await processParameters(srcAddress, this.srcProvider, srcBlock, targetAddress, this.targetProvider, targetBlock);
         } catch (e) {
             logger.error(e);
-            return new StorageDiff([]);
+            return new StorageDiff([], [], []);
         }
 
         const toKeys: Array<string> = await getAllKeys(processedParameters.targetAddress, this.targetProvider, processedParameters.targetBlock, this.batchSize);
@@ -121,7 +121,7 @@ class DiffHandler {
         }
         /* eslint-enable no-await-in-loop */
         /* eslint-enable no-restricted-syntax */
-        return new StorageDiff(diffs);
+        return new StorageDiff(diffs, fromKeys, toKeys);
     }
 
     /**
@@ -142,7 +142,7 @@ class DiffHandler {
             processedParameters = await processParameters(srcAddress, this.srcProvider, earliestSrcBlock, srcAddress, this.srcProvider, latestSrcBlock);
         } catch (e) {
             logger.error(e);
-            return new StorageDiff([]);
+            return new StorageDiff([], [], []);
         }
 
         const diffs: StorageKeyDiff[] = [];
@@ -202,7 +202,8 @@ class DiffHandler {
             }
         });
 
-        return new StorageDiff(diffs);
+        // todo need to add the toKeys array (if it is needed)
+        return new StorageDiff(diffs, oldKeys, []);
     }
 
     async getDiffFromProof(srcAddress: string, latestSrcBlock: string | number, earliestSrcBlock: string | number, targetAddress: string = srcAddress): Promise<StorageDiff> {
@@ -211,7 +212,7 @@ class DiffHandler {
             processedParameters = await processParameters(srcAddress, this.srcProvider, earliestSrcBlock, targetAddress, this.targetProvider, latestSrcBlock);
         } catch (e) {
             logger.error(e);
-            return new StorageDiff([]);
+            return new StorageDiff([], [], []);
         }
 
         const diffs: StorageKeyDiff[] = [];
@@ -250,7 +251,7 @@ class DiffHandler {
         for (const proof of oldProof.storageProof) {
             diffs.push(new Remove(ethers.utils.hexZeroPad(proof.key, 32), proof.value));
         }
-        return new StorageDiff(diffs);
+        return new StorageDiff(diffs, oldKeys, newKeys);
     }
 }
 

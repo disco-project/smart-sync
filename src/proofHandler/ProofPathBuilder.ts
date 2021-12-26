@@ -102,6 +102,7 @@ class ProofPathBuilder {
         return undefined;
     }
 
+    // todo put this functionality into the node classes themselves (Branch, Extension, and Leaf)
     insert(node, parentNode: ParentNode, storageKey: string | undefined, isLeaf: Boolean): EmbeddedNode | undefined | null {
         const nodeRef = hexStringToBuffer(ethers.utils.keccak256(rlp.encode(node)));
         // const parentRef = ethers.utils.keccak256(rlp.encode(parentNode));

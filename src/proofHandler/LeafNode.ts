@@ -21,9 +21,7 @@ class LeafNode {
     }
 
     encode() {
-        // todo implement the array also here!
-        // return [this.storageKeys.map((key) => ethers.utils.hexZeroPad(key, 32)), this.node[0], this.node[1]];
-        return [ethers.utils.hexZeroPad(this.storageKeys[0], 32), this.node[0], this.node[1]];
+        return [this.storageKeys.map((storageKey) => ethers.utils.hexZeroPad(storageKey, 32)), this.node[0], this.node[1]];
     }
 }
 

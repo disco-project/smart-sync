@@ -72,11 +72,12 @@ describe('Extension Validation', async () => {
 
         const proof = new GetProof(await provider.send('eth_getProof', [srcContract.address, keys]));
 
-        const rlpOptimized = proof.optimizedStorageProof();
+        const rlpOptimized = await proof.optimizedStorageProof([]);
         expect(rlpOptimized).to.not.be.undefined;
         expect(rlpOptimized).to.not.be.null;
         if (!rlpOptimized) process.exit(-1);
-        expect(ethers.utils.keccak256(rlpOptimized)).to.equal('0x347dd5dcd50fcfd4e7b75e53773090b1858836c56aba706c498e507f98fd9843');
+        // todo check for extension node at root instead of hash
+        expect(ethers.utils.keccak256(rlpOptimized)).to.equal('0x2829d0a86c592741a6ba0f14decb48a8344c9e791b1cb8dc0a5cf68e125ef59e');
     });
 
     it('proxyContract should accept proof with extensions in it and create an optimized proof with an extension node as root', async () => {
@@ -114,10 +115,11 @@ describe('Extension Validation', async () => {
         const diff = await differ.getDiffFromStorage(srcContract.address, proxyContract.address);
         expect(diff.isEmpty()).to.be.true;
 
-        const rlpOptimized = proof.optimizedStorageProof();
+        const rlpOptimized = await proof.optimizedStorageProof([]);
         expect(rlpOptimized).to.not.be.undefined;
         expect(rlpOptimized).to.not.be.null;
         if (!rlpOptimized) process.exit(-1);
-        expect(ethers.utils.keccak256(rlpOptimized)).to.equal('0x76ad60aeb4c00a38141a5818a1a108af1dc6e487931b87c38116aba683f5067e');
+        // todo check for extension node at root instead of hash
+        expect(ethers.utils.keccak256(rlpOptimized)).to.equal('0x85d573333fa3b30be3498ea3b98794c5317119c4381b4f7afa45e61190b36314');
     });
 });

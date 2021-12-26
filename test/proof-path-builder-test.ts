@@ -26,7 +26,7 @@ describe('Proof Path Builder Tests', () => {
         }
         provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
         deployer = await SignerWithAddress.create(provider.getSigner());
-        logger.setSettings({ minLevel: 'info', name: 'get-diff-test.ts' });
+        logger.setSettings({ minLevel: 'info', name: 'proof-path-builder-test.ts' });
     });
 
     beforeEach(async () => {
@@ -93,7 +93,7 @@ describe('Proof Path Builder Tests', () => {
             return;
         }
         oldState.forEach((pair) => {
-            const index = newState.findIndex((newPair) => ethers.utils.hexZeroPad(pair[0], 32) === ethers.utils.hexZeroPad(newPair[0], 32) && ethers.utils.hexZeroPad(pair[1], 32) === ethers.utils.hexZeroPad(newPair[1], 32));
+            const index = newState.findIndex((newPair) => ethers.utils.hexZeroPad(pair[0], 32) === ethers.utils.hexZeroPad(newPair[0], 32));
             if (index < 0) {
                 newKeys.push(pair[0]);
                 newValues.push(ethers.utils.hexZeroPad('0x0', 32));
@@ -106,7 +106,7 @@ describe('Proof Path Builder Tests', () => {
             expect(false);
             return;
         }
-        await chainProxy.migrateChangesToProxy(changedKeys?.getKeys());
+        await chainProxy.migrateChangesToProxy(changedKeys?.getKeys(), []);
 
         const proxyProof = await chainProxy.targetProvider.send('eth_getProof', [chainProxy.proxyContractAddress, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
@@ -115,12 +115,6 @@ describe('Proof Path Builder Tests', () => {
         expect(proxyStorageRoot).to.equal(srcStorageRoot);
     });
 
-    // todo: create a test that checks a proof path build in the following case
-    // a key is added for which the previous proof didn't have a branch at the end, but an actual value.
-    // meaning that for this new key either a new branch is added or an extension.
-    // proof path build will probably create the proof path, but ProxyContract will throw an error since it wants to go further?
-    // example: contract: 0x2C2f7e7C5604D162d75641256b80F1Bf6f4dC796, prevBlock: 0xCE8BA3, nextblock: 0xCE8BA4
-    // key: 0x5857adf0ef631bf34a7cf6d423f9fda175ad30c980599dbaab9413746fef901b
     it('Should build right proof after value that changes the merkle treee', async () => {
         const csvManagerOld = new CSVManager<{ key: string, value: string }>('early_pairs_for_change_mt_through_add_13535603.csv', 'test/storageKeyValuePairs');
         const csvManagerNew = new CSVManager<{ key: string, value: string }>('latest_pairs_for_change_mt_through_add_13536164.csv', 'test/storageKeyValuePairs');
@@ -141,9 +135,9 @@ describe('Proof Path Builder Tests', () => {
         while (oldKeys.length > 0) {
             await storageSrc.setStorageKey(oldKeys.splice(0, 50), oldValues.splice(0, 50), { gasLimit: BigNumber.from(chainConfigs?.gasLimit).toNumber() });
         }
-        logger.info(`srcContractAddress: ${storageSrc.address}`);
+        logger.debug(`srcContractAddress: ${storageSrc.address}`);
         await chainProxy.migrateSrcContract('latest');
-        // todo check if the storage is the same
+
         let changedKeys = await chainProxy.getDiff('srcTx', { targetBlock: 'latest' });
         if (!changedKeys) {
             logger.error('Could not get changed keys');
@@ -156,7 +150,7 @@ describe('Proof Path Builder Tests', () => {
             return;
         }
         oldState.forEach((pair) => {
-            const index = newState.findIndex((newPair) => ethers.utils.hexZeroPad(pair[0], 32) === ethers.utils.hexZeroPad(newPair[0], 32) && ethers.utils.hexZeroPad(pair[1], 32) === ethers.utils.hexZeroPad(newPair[1], 32));
+            const index = newState.findIndex((newPair) => ethers.utils.hexZeroPad(pair[0], 32) === ethers.utils.hexZeroPad(newPair[0], 32));
             if (index < 0) {
                 newKeys.push(pair[0]);
                 newValues.push(ethers.utils.hexZeroPad('0x0', 32));
@@ -169,7 +163,7 @@ describe('Proof Path Builder Tests', () => {
             expect(false);
             return;
         }
-        await chainProxy.migrateChangesToProxy(changedKeys?.getKeys());
+        await chainProxy.migrateChangesToProxy(changedKeys?.getKeys(), changedKeys.fromKeys);
 
         const proxyProof = await chainProxy.targetProvider.send('eth_getProof', [chainProxy.proxyContractAddress, []]);
         const proxyStorageRoot = proxyProof.storageHash.toLowerCase();

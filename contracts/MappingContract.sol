@@ -7,6 +7,20 @@ contract MappingContract {
 
     constructor() {
     }
+    
+    /**
+    * @dev Set a list of storage keys
+    */
+    function setStorageKey(bytes32[] memory keys, bytes32[] memory values) public {
+        for (uint i = 0; i < keys.length; i++) {
+            // store the value in the right slot
+            bytes32 slot = keys[i];
+            bytes32 value = values[i];
+            assembly {
+                sstore(slot, value)
+            }
+        }
+    }
 
     function insert(uint _key, uint _value) public {
         map[_key] = _value;

@@ -20,6 +20,10 @@ export default {
   defaultNetwork: "disco",
   networks: {
     hardhat: {
+        accounts: [{
+            privateKey: '0x2f6b8e2dc397013c43281c30e01bd6b67625031b2607b48fd72cc8c9aba08a3a',
+            balance: '10000000000000000000000'
+        }]
     },
     disco: {
       url: "http://127.0.0.1:8545",

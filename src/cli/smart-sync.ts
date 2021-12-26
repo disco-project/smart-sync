@@ -71,7 +71,6 @@ function commonOptions(command: Command): Command {
 }
 
 /**
- *
  * @param filePath path to config file that needs to be extracted
  * @param options config object that overrides the config file
  * @returns config object
@@ -186,7 +185,7 @@ continuousSynch
                 }
 
                 // eslint-disable-next-line no-await-in-loop
-                const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), (adjustedOptions.diffMode === 'srcTx') ? adjustedOptions.targetBlocknr : adjustedOptions.srcBlocknr);
+                const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), changedKeys.fromKeys, (adjustedOptions.diffMode === 'srcTx') ? adjustedOptions.targetBlocknr : adjustedOptions.srcBlocknr);
                 if (synchronized) {
                     logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
                 } else {
@@ -480,7 +479,7 @@ synchronize
             }
 
             // eslint-disable-next-line no-await-in-loop
-            const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), (adjustedOptions.diffMode === 'srcTx') ? adjustedOptions.targetBlocknr : adjustedOptions.srcBlocknr);
+            const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), changedKeys.fromKeys, (adjustedOptions.diffMode === 'srcTx') ? adjustedOptions.targetBlocknr : adjustedOptions.srcBlocknr);
             if (synchronized) {
                 logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
             } else {
