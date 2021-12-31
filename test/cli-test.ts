@@ -45,7 +45,7 @@ describe('Test CLI', async () => {
         }
         logger.setSettings({ minLevel: 'info', name: 'cli-test.ts' });
         targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.targetChainRpcUrl || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
-        srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.srcBlocknr || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
+        srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.srcChainRpcUrl || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
         differ = new DiffHandler(srcProvider, targetProvider);
         targetDeployer = await SignerWithAddress.create(targetProvider.getSigner());
         srcDeployer = await SignerWithAddress.create(srcProvider.getSigner());

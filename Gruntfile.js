@@ -1,4 +1,6 @@
 const child_process = require('child_process');
+const fs = require('fs');
+const YAML = require('yaml');
 const CHAIN_DOCKER_NAME = 'crossChainContracts_test_chain';
 const CONFIG_CHAIN_DIR = 'chain1-data';
 const CHAIN_DIR = './chains';
@@ -68,6 +70,39 @@ module.exports = (grunt) => {
         child_process.execSync(`rm -rf ${CHAIN_DIR}/${CONFIG_CHAIN_DIR_2}`);
         grunt.verbose.ok();
     });
+
+    grunt.registerTask('update-ports', 'Updates test chain ports', () => {
+        let port = 9545;
+        let targetPort = 9547;
+        let filePath = grunt.option('test-config-path') || './test/config/test-cli-config.json';
+        const fileContent = fs.readFileSync(filePath);
+        const config = JSON.parse(fileContent);
+        if (grunt.option('test-chain-port')) {
+            // change ports in all affected files according to given parameter
+            port = parseInt(grunt.option('test-chain-port'));
+            targetPort = port + 2;
+            // change test config
+            let url = config['srcChainRpcUrl'].match(/(https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256})((\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*))|(:(\d+)))/)[1];
+            config['srcChainRpcUrl'] = `${url}:${port}`;
+            url = config['targetChainRpcUrl'].match(/(https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256})((\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*))|(:(\d+)))/)[1];
+            config['targetChainRpcUrl'] = `${url}:${targetPort}`;
+            // write to file
+            fs.writeFileSync(filePath, JSON.stringify(config, null, 4));
+        } else {
+            // extract the current port from test config file
+            port = parseInt(config['srcChainRpcUrl'].match(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}((\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*))|(:(\d+)))/)[6]) || port;
+            targetPort = parseInt(config['targetChainRpcUrl'].match(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}((\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*))|(:(\d+)))/)[6]) || port;
+        }
+        // change chains/docker-compose.yml
+        const dockerComposeFileContent = fs.readFileSync(grunt.option('docker-compose-path') || './chains/docker-compose.yml');
+        const dockerComposeConfig = YAML.parse(dockerComposeFileContent.toString());
+        dockerComposeConfig['services']['chain']['ports'][0] = `${port}:8545`;
+        dockerComposeConfig['services']['chain']['ports'][1] = `${port + 1}:8546`;
+        dockerComposeConfig['services']['chain2']['ports'][0] = `${targetPort}:8545`;
+        dockerComposeConfig['services']['chain2']['ports'][1] = `${targetPort + 1}:8546`;
+        // write back to file
+        fs.writeFileSync(grunt.option('docker-compose-path') || './chains/docker-compose.yml', YAML.stringify(dockerComposeConfig, { indent: 4 }));
+    });
     
     grunt.registerTask('compile-project', 'Generate js-files', () => {
         grunt.task.run('clean');
@@ -113,6 +148,7 @@ module.exports = (grunt) => {
         grunt.task.run('compile-contracts');
         grunt.task.run('eslint');
         grunt.task.run('stop-chains');
+        grunt.task.run('update-ports');
         grunt.task.run('start-chains');
         grunt.task.run('test');
         grunt.task.run('stop-chains');
@@ -125,6 +161,7 @@ module.exports = (grunt) => {
         }
         grunt.task.run('eslint');
         grunt.task.run('stop-chains');
+        grunt.task.run('update-ports');
         grunt.task.run('start-chains');
         grunt.task.run('mochaTest');
         grunt.task.run('stop-chains');
@@ -134,6 +171,7 @@ module.exports = (grunt) => {
         grunt.task.run('compile-contracts');
         grunt.task.run('eslint');
         grunt.task.run('stop-chains');
+        grunt.task.run('update-ports');
         grunt.task.run('start-chains');
         grunt.task.run('evaluate');
         grunt.task.run('stop-chains');
