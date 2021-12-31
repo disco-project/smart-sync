@@ -1,7 +1,7 @@
 import { Contract } from '@ethersproject/contracts';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { BigNumberish, ethers } from 'ethers';
+import { BigNumber, BigNumberish, ethers } from 'ethers';
 import { Trie } from 'merkle-patricia-tree/dist/baseTrie';
 import { TLogLevelName } from 'tslog';
 import { MappingContract, RelayContract } from '../src-gen/types';
@@ -16,6 +16,7 @@ import GetProof, { encodeAccount, formatProofNodes } from '../src/proofHandler/G
 import { Account, StorageProof } from '../src/proofHandler/Types';
 import { encodeBlockHeader } from '../src/chain-proxy';
 import { TxContractInteractionOptions } from '../src/cli/smart-sync';
+import { CSVManager } from '../evaluation/eval-utils';
 
 const KEY_VALUE_PAIR_PER_BATCH = 100;
 
@@ -32,8 +33,8 @@ export namespace TestCLI {
 export interface InitializationResult {
     migrationState: Boolean;
     proxyContract: Contract;
-    values: Array<number>;
-    keys: Array<number>;
+    values: Array<number | string>;
+    keys: Array<number | string>;
     max_mpt_depth: number;
     min_mpt_depth: number;
     initialValuesProof: GetProof;
@@ -114,9 +115,9 @@ export async function verifyEthGetProof(proof: GetProof, root: string | Buffer):
 }
 
 export class TestChainProxy {
-    readonly values: Array<number> = [];
+    readonly values: Array<number | string> = [];
 
-    readonly keys: Array<number> = [];
+    readonly keys: Array<number | string> = [];
 
     private proxyContract: Contract;
 
@@ -159,8 +160,7 @@ export class TestChainProxy {
         this.migrationState = false;
     }
 
-    async initializeProxyContract(map_size: number, max_value: number): Promise<InitializationResult> {
-        // insert some random values
+    async insertRandomValues(map_size: number, max_value: number) {
         const srcKeys: Array<number> = [];
         const srcValues: Array<number> = [];
         for (let i = 0; i < map_size; i += 1) {
@@ -171,7 +171,53 @@ export class TestChainProxy {
             this.values.push(value);
         }
         await this.insertValues(srcKeys, srcValues);
+    }
 
+    async insertValuesFromCSV(path: string, fileName: string) {
+        const csvManager = new CSVManager<{ key: string, value: string }>(fileName, path);
+        const oldState = csvManager.readFromFile();
+        const srcKeys: Array<string> = [];
+        const srcValues: Array<string> = [];
+        oldState.forEach((pair: [key: string, value: string]) => {
+            srcKeys.push(ethers.utils.hexZeroPad(pair[0], 32));
+            srcValues.push(ethers.utils.hexZeroPad(pair[1], 32));
+            this.keys.push(ethers.utils.hexZeroPad(pair[0], 32));
+            this.values.push(ethers.utils.hexZeroPad(pair[1], 32));
+        });
+        await this.setStorageKeys(srcKeys, srcValues);
+    }
+
+    async changeValuesThroughCSV(srcPath: string, srcFileName: string, targetPath: string, targetFileName: string) {
+        const csvManagerOld = new CSVManager<{ key: string, value: string }>(srcFileName, srcPath);
+        const csvManagerNew = new CSVManager<{ key: string, value: string }>(targetFileName, targetPath);
+        const oldState = csvManagerOld.readFromFile();
+        const newState: Array<string> = csvManagerNew.readFromFile();
+        const newKeys: Array<string> = [];
+        const newValues: Array<string> = [];
+        newState.forEach((pair) => {
+            newKeys.push(ethers.utils.hexZeroPad(pair[0], 32));
+            newValues.push(ethers.utils.hexZeroPad(pair[1], 32));
+        });
+        oldState.forEach((pair) => {
+            const index = newState.findIndex((newPair) => ethers.utils.hexZeroPad(pair[0], 32) === ethers.utils.hexZeroPad(newPair[0], 32));
+            if (index < 0) {
+                newKeys.push(pair[0]);
+                newValues.push(ethers.utils.hexZeroPad('0x0', 32));
+            }
+        });
+        await this.setStorageKeys(newKeys, newValues);
+    }
+
+    async setStorageKeys(keys: Array<string>, values: Array<string>) {
+        while (keys.length > 0) {
+            await this.srcContract.setStorageKey(keys.splice(0, 50), values.splice(0, 50), { gasLimit: BigNumber.from(this.httpConfig.gasLimit).toNumber() });
+        }
+    }
+
+    async initializeProxyContract(map_size?: number, max_value?: number): Promise<InitializationResult> {
+        if (map_size && max_value) {
+            await this.insertRandomValues(map_size, max_value);
+        }
         const keys = await getAllKeys(this.srcContract.address, this.srcProvider);
         const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', ['latest', true]);
         // create a proof of the source contract's storage
@@ -238,6 +284,7 @@ export class TestChainProxy {
 
         //  validating
         const migrationValidated = await this.relayContract.getMigrationState(this.proxyContract.address);
+
         this.migrationState = migrationValidated;
         return {
             max_mpt_depth: this.max_mpt_depth,
@@ -295,8 +342,8 @@ export class TestChainProxy {
             return false;
         }
 
-        const usedKeys: Array<number> = [];
-        const srcKeys: Array<number> = [];
+        const usedKeys: Array<number | string> = [];
+        const srcKeys: Array<number | string> = [];
         const srcValues: Array<number> = [];
         for (let i = 0; i < valueCount; i += 1) {
             const value = Math.floor(Math.random() * max_value);
@@ -322,7 +369,7 @@ export class TestChainProxy {
             return false;
         }
 
-        const srcKeys: Array<number> = [];
+        const srcKeys: Array<number | string> = [];
         const srcValues: Array<number> = [];
         for (let i = 0; i < valueCount; i += 1) {
             const value = Math.floor(Math.random() * max_value);
@@ -332,7 +379,7 @@ export class TestChainProxy {
         return this.insertValues(srcKeys, srcValues);
     }
 
-    private async insertValues(srcKeys: Array<number>, srcValues: Array<number>): Promise<Boolean> {
+    private async insertValues(srcKeys: Array<number | string>, srcValues: Array<number>): Promise<Boolean> {
         const promises: Promise<any>[] = [];
         while (srcKeys.length > 0) {
             promises.push(this.srcContract.insertMultiple(srcKeys.splice(0, KEY_VALUE_PAIR_PER_BATCH), srcValues.splice(0, KEY_VALUE_PAIR_PER_BATCH)));
@@ -439,7 +486,7 @@ export class TestChainProxy {
         let txResponse;
         let receipt;
         try {
-            txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number);
+            txResponse = await this.proxyContract.updateStorage(rlpProof, latestBlock.number, { gasLimit: this.httpConfig.gasLimit });
             receipt = await txResponse.wait();
         } catch (e: any) {
             logger.error('something went wrong');
