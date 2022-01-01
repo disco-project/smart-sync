@@ -231,6 +231,7 @@ To run all the tests run (requires a running ethereum node, see [hardhat.config.
 $ npm run test
 ```
 
+### Adjusting ports of the test chains
 If you want to adjust the ports of the test chains, you just have to change them in the test-config file located at `test/config/test-cli-config.json`. Our scripts will then adjust the ports for the docker containers automatically when you run the command from above. 
 
 Alternatively, you can adjust them over the optional parameter `test-chain-port` inside our Grunt task. With `test-config-path` you can even change the test config file path if you changed the location:
@@ -239,6 +240,13 @@ Alternatively, you can adjust them over the optional parameter `test-chain-port`
 $ npx grunt full-pipeline-test --test-chain-port=9545 --test-config-path=./test/config/test-cli-config.json
 ```
 
+If you just want to adjust the ports without triggering the tests, execute the following:
+
+```bash
+$ npx grunt update-ports --test-chain-port=9545
+```
+
+### Running single tests
 You can also run single tests (chains need to be started manually):
 
 ```bash
