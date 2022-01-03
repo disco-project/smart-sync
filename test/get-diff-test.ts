@@ -5,7 +5,7 @@ import { BigNumber, ethers } from 'ethers';
 import DiffHandler from '../src/diffHandler/DiffHandler';
 import { SimpleStorage, SimpleStorage__factory } from '../src-gen/types';
 import { logger } from '../src/utils/logger';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 import FileHandler from '../src/utils/fileHandler';
 import { TestCLI } from './test-utils';
 

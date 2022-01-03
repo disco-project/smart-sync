@@ -14,7 +14,7 @@ import DiffHandler from '../src/diffHandler/DiffHandler';
 import { logger } from '../src/utils/logger';
 import StorageDiff from '../src/diffHandler/StorageDiff';
 import FileHandler from '../src/utils/fileHandler';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 
 const MAX_VALUE = 1000000;
 

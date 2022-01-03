@@ -5,7 +5,7 @@ import { BigNumber, ethers } from 'ethers';
 import { SimpleStorage, SimpleStorage__factory } from '../src-gen/types';
 import { TestCLI, verifyEthGetProof } from './test-utils';
 import GetProof from '../src/proofHandler/GetProof';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 import FileHandler from '../src/utils/fileHandler';
 import { logger } from '../src/utils/logger';
 

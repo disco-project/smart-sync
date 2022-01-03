@@ -6,7 +6,7 @@ import { SimpleStorage, SimpleStorage__factory } from '../src-gen/types';
 import { verifyEthGetProof, TestCLI } from './test-utils';
 import GetProof from '../src/proofHandler/GetProof';
 import FileHandler from '../src/utils/fileHandler';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 import { logger } from '../src/utils/logger';
 
 describe('Storage', async () => {
