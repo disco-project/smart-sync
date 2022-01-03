@@ -2,9 +2,10 @@
 
 ## Installation CLI
 
-Download the tarballed npm package on our [GitHub Respository](https://github.com/disco-project/cross-chain-contracts) and execute the following
+To globally install the latest package of smart-sync cli, run:
+
 ```
-$ npm i {CROSS_CHAIN_CLI_NPM_PACKAGE} -g
+$ npm i smart-sync -g
 ```
 
 To compile the project yourself and install it, see section [Getting started (Dev)](#getting-started-dev)
@@ -15,7 +16,7 @@ To execute tests, please refer to the [test](#tests) section.
 
 ## Usage 
 
-### fork
+### Smart Contract Fork
 
 ```bash 
 $ smart-sync help fork
@@ -40,7 +41,7 @@ Example usage:
 $ smart-sync fork 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a
 ```
 
-### synchronize
+### Synchronizing a Smart Contract
 
 ```bash
 $ smart-sync help synchronize
@@ -67,7 +68,7 @@ Example usage:
 $ smart-sync s 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a --target-blockNr 450
 ```
 
-### continuous-synch
+### Continuously synchronizing Smart Contracts
 ```bash
 $ smart-sync continuous-synch --help
 Usage: smart-sync continuous-synch|c [options] <proxy_contract_address> <period>
@@ -97,7 +98,7 @@ Example usage:
 $ smart-sync c 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a "*/2 * * * *"
 ```
 
-### migration-status
+### Retrieve migration status
 ```bash
 $ smart-sync help migration-status
 Usage: smart-sync migration-status|status [options] <proxy_contract_address>
@@ -117,7 +118,7 @@ Example usage:
 ``` bash
 $ smart-sync status 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a
 ```
-### get-curr-blocknr
+### Get currrent block number
 ```bash
 $ smart-sync help get-curr-blocknr
 Usage: smart-sync get-curr-blocknr|blocknr [options] <proxy_contract_address>
@@ -138,7 +139,7 @@ Example usage:
 $ smart-sync blocknr 0x20a508640B446990c781Cd541B9a2828ACA3a350
 ```
 
-### state-diff
+### Retrieve state diff
 ```bash
 $ smart-sync help state-diff
 Usage: smart-sync state-diff|diff [options] <source_contract_address> [proxy_contract_address]
@@ -177,7 +178,7 @@ $ npm i --development
 To execute the compile-pipeline of this project run:
 
 ```bash
-npx grunt compile-project
+$ npx grunt compile-project
 ```
 
 This cleans the dist folder, compiles the contracts, lints the src files and executes tsc. If you want to execute those steps individually see `npx grunt --help` for all available individual commands:
@@ -207,7 +208,7 @@ test | Run tests
 ### Install CLI
 To compile and install the CLI run:
 ```bash
-npx grunt install
+$ npx grunt install
 ```
 ## Chain
 Generally, you don't need to start the chain individually since its already started if you execute the command:
