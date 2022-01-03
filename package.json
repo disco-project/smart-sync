@@ -1,5 +1,5 @@
 {
-  "name": "@disco-project/smart-sync",
+  "name": "smart-sync",
   "version": "0.3.0",
   "description": "",
   "repository": {
@@ -22,7 +22,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "author": "",
-  "license": "ISC",
+  "license": "GPL-3.0",
   "dependencies": {
     "@ethersproject/abstract-provider": "^5.3.0",
     "@ethersproject/bignumber": "^5.3.0",
