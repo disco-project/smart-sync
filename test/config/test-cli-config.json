@@ -1,6 +1,6 @@
 {
-    "srcChainRpcUrl": "http://localhost:8545",
-    "targetChainRpcUrl": "http://localhost:8547",
+    "srcChainRpcUrl": "http://localhost:9550",
+    "targetChainRpcUrl": "http://localhost:9552",
     "connectionTimeout": "36000",
     "logLevel": "info",
     "targetBlocknr": "latest",
