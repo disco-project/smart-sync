@@ -1,14 +1,14 @@
 {
-  "name": "@disco-project/cross-chain-cli",
-  "version": "0.2.0",
+  "name": "@disco-project/smart-sync",
+  "version": "0.3.0",
   "description": "",
   "repository": {
-    "url": "git@github.com:disco-project/cross-chain-contracts.git"
+    "url": "git@github.com:disco-project/smart-sync.git"
   },
-  "main": "./dist/src/cli/cross-chain-cli.js",
+  "main": "./dist/src/cli/smart-sync.js",
   "types": "./dist/src/**/*.d.ts",
   "bin": {
-    "cross-chain-cli": "./bin/cross-chain-cli"
+    "smart-sync": "./bin/smart-sync"
   },
   "files": [
     "dist/**/*"

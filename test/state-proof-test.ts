@@ -6,7 +6,7 @@ import { BigNumber, ethers } from 'ethers';
 import { SimpleStorage, SimpleStorage__factory } from '../src-gen/types';
 import * as utils from '../src/utils/utils';
 import GetProof from '../src/proofHandler/GetProof';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 import FileHandler from '../src/utils/fileHandler';
 import { TestCLI } from './test-utils';
 import { logger } from '../src/utils/logger';

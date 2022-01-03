@@ -11,7 +11,7 @@ import {
     MappingContract__factory,
     RelayContract,
 } from '../src-gen/types';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 import FileHandler from '../src/utils/fileHandler';
 
 const MAX_VALUE = 1000000;

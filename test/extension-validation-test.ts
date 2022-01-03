@@ -13,7 +13,7 @@ import GetProof from '../src/proofHandler/GetProof';
 import ProxyContractBuilder from '../src/utils/proxy-contract-builder';
 import FileHandler from '../src/utils/fileHandler';
 import { TestCLI } from './test-utils';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 
 describe('Extension Validation', async () => {
     let deployer: SignerWithAddress;

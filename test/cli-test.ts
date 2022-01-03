@@ -21,7 +21,7 @@ import Change from '../src/diffHandler/Change';
 import Add from '../src/diffHandler/Add';
 import Remove from '../src/diffHandler/Remove';
 import FileHandler from '../src/utils/fileHandler';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 
 describe('Test CLI', async () => {
     let targetDeployer: SignerWithAddress;

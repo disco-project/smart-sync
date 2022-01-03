@@ -10,7 +10,7 @@ import {
 import { logger } from '../src/utils/logger';
 import { getAllKeys } from '../src/utils/utils';
 import GetProof from '../src/proofHandler/GetProof';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 import FileHandler from '../src/utils/fileHandler';
 
 const MAX_VALUE = 1000000;
