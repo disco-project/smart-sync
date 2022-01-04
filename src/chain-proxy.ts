@@ -468,7 +468,7 @@ export class ChainProxy {
                         return new StorageDiff([]);
                     }
                 }
-                return this.differ.getDiffFromProof(this.srcContractAddress, this.proxyContractAddress ?? this.srcContractAddress, parameters.targetBlock, srcBlock);
+                return this.differ.getDiffFromProof(this.srcContractAddress, parameters.targetBlock, srcBlock, this.proxyContractAddress ?? this.srcContractAddress);
                 // srcTx is default
             default:
                 if (this.relayContract && this.proxyContract) {

@@ -1,4 +1,4 @@
-import stringify from 'csv-stringify';
+import { stringify } from 'csv-stringify';
 import { parse } from 'csv-parse/sync';
 import { BigNumberish, ethers } from 'ethers';
 import fs from 'fs';

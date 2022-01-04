@@ -443,7 +443,7 @@ export class TestChainProxy {
             receipt = await txResponse.wait();
         } catch (e: any) {
             logger.error('something went wrong');
-            const regexr = new RegExp(/Reverted 0x(.*)/);
+            const regexr = /Reverted 0x(.*)/;
             const checker = regexr.exec(e.data);
             if (checker) {
                 logger.error(`'${hexToAscii(checker[1])}'`);

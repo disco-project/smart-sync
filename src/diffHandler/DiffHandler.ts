@@ -205,7 +205,7 @@ class DiffHandler {
         return new StorageDiff(diffs);
     }
 
-    async getDiffFromProof(srcAddress: string, targetAddress: string = srcAddress, latestSrcBlock: string | number, earliestSrcBlock: string | number): Promise<StorageDiff> {
+    async getDiffFromProof(srcAddress: string, latestSrcBlock: string | number, earliestSrcBlock: string | number, targetAddress: string = srcAddress): Promise<StorageDiff> {
         let processedParameters: ProcessedParameters;
         try {
             processedParameters = await processParameters(srcAddress, this.srcProvider, earliestSrcBlock, targetAddress, this.targetProvider, latestSrcBlock);

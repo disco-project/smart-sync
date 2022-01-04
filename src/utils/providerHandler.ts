@@ -13,7 +13,7 @@ class ProviderHandler {
 
     getProviderInstance(): ethers.providers.JsonRpcProvider {
         // check if http/https was given
-        const regexHTTP = new RegExp(/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}((\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*))|(:\d+))/);
+        const regexHTTP = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}((\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*))|(:\d+))/;
         const match = regexHTTP.exec(this.connectionInfo.url);
         if (match === null) {
             switch (this.connectionInfo.url as SupportedProviders) {
