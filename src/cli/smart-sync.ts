@@ -13,6 +13,7 @@ import {
 import FileHandler from '../utils/fileHandler';
 import { logger } from '../utils/logger';
 import { isDebug, toBlockNumber } from '../utils/utils';
+import { version as appVersion } from '../../package.json';
 
 const DEFAULT_CONFIG_FILE_PATH = `${__dirname}/../../config/cli-config.json`;
 const program = new Command();
@@ -88,7 +89,7 @@ function overrideFileOptions<T>(filePath: string, options: ConfigTypish): T {
 
 // general information
 program
-    .version('0.2.0')
+    .version(appVersion)
     .description('cross chain contracts CLI');
 
 // continuous state update command
