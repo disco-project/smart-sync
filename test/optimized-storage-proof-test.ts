@@ -42,6 +42,6 @@ describe('Test storage proof optimization', async () => {
         ]);
 
         const proof = new GetProof(await provider.send('eth_getProof', [storage.address, keys]));
-        proof.optimizedStorageProof();
+        await proof.optimizedStorageProof([]);
     });
 });

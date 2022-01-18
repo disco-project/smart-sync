@@ -333,7 +333,7 @@ export class ChainProxy {
              * If addStorage with a higher nonce is processed earlier than a lower nonce then it creates a problem.
              */
             // eslint-disable-next-line no-await-in-loop
-            const promise = await this.proxyContract.addStorage(proxyKeys.splice(0, key_value_pair_per_batch), proxyValues.splice(0, key_value_pair_per_batch))
+            const promise = await this.proxyContract.addStorage(proxyKeys.splice(0, key_value_pair_per_batch), proxyValues.splice(0, key_value_pair_per_batch), { gasLimit: this.targetRPCConfig.gasLimit })
                 .catch((error: any) => {
                     logger.error(error);
                     process.exit(-1);
@@ -399,7 +399,12 @@ export class ChainProxy {
         }
     }
 
-    async migrateChangesToProxy(changedKeys: Array<BigNumberish>, targetBlock: string | number = this.targetBlock): Promise<Boolean> {
+    /**
+    * @param changedKeys: array of keys that changed and need to be migrated
+    * @param unchangedKeys: array of keys that did not change and might be needed for building correct optimized proof
+    * @param targetBlock: block number of the source contract that the proxy contract is migrated to
+    */
+    async migrateChangesToProxy(changedKeys: Array<BigNumberish>, unchangedKeys: Array<string>, targetBlock: string | number = this.targetBlock): Promise<Boolean> {
         if (!this.initialized) {
             logger.error('ChainProxy is not initialized yet.');
             return false;
@@ -418,9 +423,8 @@ export class ChainProxy {
         const latestBlock = await this.srcProvider.send('eth_getBlockByNumber', [parityLatestSrcBlock, true]);
 
         // create a proof of the source contract's storage for all the changed keys
-        const changedKeysProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, changedKeys, parityLatestSrcBlock]));
-
-        const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot);
+        const changedKeysProof = new GetProof(await this.srcProvider.send('eth_getProof', [this.srcContractAddress, changedKeys, parityLatestSrcBlock]), this.srcProvider);
+        const rlpProof = await changedKeysProof.optimizedProof(latestBlock.stateRoot, true, unchangedKeys);
 
         await this.relayContract.addBlock(latestBlock.stateRoot, latestBlock.number);
 
@@ -465,14 +469,13 @@ export class ChainProxy {
                     const givenTargetBlockNr = await toBlockNumber(targetBlock, this.srcProvider);
                     if (srcBlock && BLOCKNUMBER_TAGS.indexOf(srcBlock) < 0 && BigNumber.from(srcBlock).gt(givenTargetBlockNr) && !this.proxyContractAddress) {
                         logger.debug(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr (${targetBlock}).`);
-                        return new StorageDiff([]);
+                        return new StorageDiff([], [], []);
                     }
                 }
                 return this.differ.getDiffFromProof(this.srcContractAddress, parameters.targetBlock, srcBlock, this.proxyContractAddress ?? this.srcContractAddress);
                 // srcTx is default
             default:
                 if (this.relayContract && this.proxyContract) {
-                    logger.info('here');
                     const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
                     srcBlock = synchedBlockNr.toNumber() + 1;
                 }
@@ -480,7 +483,7 @@ export class ChainProxy {
                     const givenTargetBlockNr = await toBlockNumber(targetBlock, this.srcProvider);
                     if (srcBlock && BLOCKNUMBER_TAGS.indexOf(srcBlock) < 0 && BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
                         logger.debug(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr (${givenTargetBlockNr}).`);
-                        return new StorageDiff([]);
+                        return new StorageDiff([], [], []);
                     }
                 }
                 return this.differ.getDiffFromSrcContractTxs(this.srcContractAddress, parameters.targetBlock, srcBlock);

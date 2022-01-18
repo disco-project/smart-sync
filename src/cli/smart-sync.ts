@@ -13,6 +13,7 @@ import {
 import FileHandler from '../utils/fileHandler';
 import { logger } from '../utils/logger';
 import { isDebug, toBlockNumber } from '../utils/utils';
+import { version as appVersion } from '../../package.json';
 
 const DEFAULT_CONFIG_FILE_PATH = `${__dirname}/../../config/cli-config.json`;
 const program = new Command();
@@ -71,7 +72,6 @@ function commonOptions(command: Command): Command {
 }
 
 /**
- *
  * @param filePath path to config file that needs to be extracted
  * @param options config object that overrides the config file
  * @returns config object
@@ -89,7 +89,7 @@ function overrideFileOptions<T>(filePath: string, options: ConfigTypish): T {
 
 // general information
 program
-    .version('0.2.0')
+    .version(appVersion)
     .description('cross chain contracts CLI');
 
 // continuous state update command
@@ -186,7 +186,7 @@ continuousSynch
                 }
 
                 // eslint-disable-next-line no-await-in-loop
-                const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), (adjustedOptions.diffMode === 'srcTx') ? adjustedOptions.targetBlocknr : adjustedOptions.srcBlocknr);
+                const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), changedKeys.fromKeys, (adjustedOptions.diffMode === 'srcTx') ? adjustedOptions.targetBlocknr : adjustedOptions.srcBlocknr);
                 if (synchronized) {
                     logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
                 } else {
@@ -480,7 +480,7 @@ synchronize
             }
 
             // eslint-disable-next-line no-await-in-loop
-            const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), (adjustedOptions.diffMode === 'srcTx') ? adjustedOptions.targetBlocknr : adjustedOptions.srcBlocknr);
+            const synchronized = await chainProxy.migrateChangesToProxy(changedKeys.getKeys(), changedKeys.fromKeys, (adjustedOptions.diffMode === 'srcTx') ? adjustedOptions.targetBlocknr : adjustedOptions.srcBlocknr);
             if (synchronized) {
                 logger.info('Synchronization of the following keys successful:', changedKeys.getKeys());
             } else {

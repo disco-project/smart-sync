@@ -2,13 +2,13 @@ import * as rlp from 'rlp';
 import { ethers } from 'ethers';
 
 class LeafNode {
-    storageKey: Buffer;
+    storageKeys: Array<string>;
 
-    node: Buffer;
+    node: Array<Buffer> | Buffer;
 
-    constructor(node, storageKey) {
+    constructor(node: Array<Buffer> | Buffer, storageKeys: Array<string>) {
         this.node = node;
-        this.storageKey = storageKey;
+        this.storageKeys = storageKeys;
     }
 
     /**
@@ -16,12 +16,12 @@ class LeafNode {
      * @param node a hex string with '0x' prefix
      * @returns true if this node equals the rlp-encoded hex string, false otherwise
      */
-    equals(node: string): Boolean {
+    nodeEquals(node: string): Boolean {
         return `0x${rlp.encode(this.node).toString('hex')}` === node;
     }
 
     encode() {
-        return [ethers.utils.hexZeroPad(this.storageKey, 32), this.node[0], this.node[1]];
+        return [this.storageKeys.map((storageKey) => ethers.utils.hexZeroPad(storageKey, 32)), this.node[0], this.node[1]];
     }
 }
 

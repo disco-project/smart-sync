@@ -222,7 +222,7 @@ describe('Deploy proxy and logic contract', async () => {
         proof = new GetProof(await provider.send('eth_getProof', [srcContract.address, keys]));
 
         // compute the optimized storage proof
-        const rlpOptimized = proof.optimizedStorageProof();
+        const rlpOptimized = await proof.optimizedStorageProof([]);
         // ensure that the old contract state equals the last synced storage hash
         const [oldHash, newHash] = await proxyContract.computeRoots(rlpOptimized);
         expect(oldHash).to.not.equal(newHash);

@@ -348,6 +348,38 @@ describe('Test CLI', async () => {
         return expect(proxyStorageRoot).to.equal(srcStorageRoot);
     });
 
+    it('should synch (diff mode = srcTx, added values changing merkle tree structure)', async () => {
+        logger.setSettings({ name: 'should synch w/ srcTx, added values changing MT' });
+        let initialization: InitializationResult;
+
+        try {
+            await chainProxy.insertValuesFromCSV('test/storageKeyValuePairs', 'early_pairs_for_change_mt_through_add_13535603.csv');
+            initialization = await chainProxy.initializeProxyContract();
+            expect(initialization.migrationState).to.be.true;
+        } catch (e) {
+            logger.fatal(e);
+            return false;
+        }
+
+        // get blocknumber before changing src contract
+        const currBlockNr = await srcProvider.getBlockNumber();
+
+        // insert some new values
+        await chainProxy.changeValuesThroughCSV('test/storageKeyValuePairs', 'early_pairs_for_change_mt_through_add_13535603.csv', 'test/storageKeyValuePairs', 'latest_pairs_for_change_mt_through_add_13536164.csv');
+
+        const synchCommand = buildCLICommand('s', initialization.proxyContract.address, true, logger.settings.minLevel, `--src-blocknr ${currBlockNr + 1}`);
+        logger.debug(`Executing:\n${synchCommand}`);
+
+        const output = execSync(synchCommand);
+        logger.debug(`\n${output}`);
+
+        const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);
+        const proxyStorageRoot = proxyProof.storageHash.toLowerCase();
+        const srcProof = await srcProvider.send('eth_getProof', [srcContract.address, []]);
+        const srcStorageRoot = srcProof.storageHash.toLowerCase();
+        return expect(proxyStorageRoot).to.equal(srcStorageRoot);
+    });
+
     it('should synch (diff mode = srcTx, deleted values but not changing merkle tree structure)', async () => {
         logger.setSettings({ name: 'should synch w/ srcTx, deleted values' });
         const mapSize = 6;

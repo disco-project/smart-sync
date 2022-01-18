@@ -7,8 +7,19 @@ import { DiffKind, StorageKeyDiff } from './Types';
 class StorageDiff {
     public diffs: StorageKeyDiff[];
 
-    constructor(diffs: StorageKeyDiff[]) {
+    public fromKeys: Array<string>;
+
+    public toKeys: Array<string>;
+
+    /**
+    * @Param diffs: key/value differences between two contract states
+    * @param fromKeys: all keys from one contract state
+    * @param toKeys: all keys from contract state that is compared to fromKeys contract state
+    */
+    constructor(diffs: StorageKeyDiff[], fromKeys: Array<string>, toKeys: Array<string>) {
         this.diffs = diffs;
+        this.fromKeys = fromKeys;
+        this.toKeys = toKeys;
     }
 
     /**
