@@ -29,10 +29,10 @@ describe('get-mt-for-map-sizes-1-1000', async () => {
     let chainProxy: TestChainProxy;
 
     before(async () => {
-        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        const fh = new FileHandler(TestCLI.defaultEvaluationConfigFile);
         chainConfigs = fh.getJSON<TxContractInteractionOptions>();
         if (!chainConfigs) {
-            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            logger.error(`No config available under ${TestCLI.defaultEvaluationConfigFile}`);
             process.exit(-1);
         }
         srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });

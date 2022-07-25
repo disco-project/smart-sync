@@ -34,10 +34,10 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
     let currBlockNr: number;
 
     before(async () => {
-        const fh = new FileHandler(TestCLI.defaultTestConfigFile);
+        const fh = new FileHandler(TestCLI.defaultEvaluationConfigFile);
         chainConfigs = fh.getJSON<TxContractInteractionOptions>();
         if (!chainConfigs) {
-            logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
+            logger.error(`No config available under ${TestCLI.defaultEvaluationConfigFile}`);
             process.exit(-1);
         }
         srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
@@ -80,10 +80,12 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
 
         // migrate changes to proxy contract
         // get the diff set, the storage keys for the changed values
+        const start = (new Date()).getTime();
         const diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
         const changedKeys: Array<BigNumberish> = diff.getKeys();
         logger.debug(changedKeys);
         const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
+        const timer = (new Date()).getTime() - start;
         expect(migrationResult.migrationResult).to.be.true;
         if (!migrationResult.receipt) {
             logger.fatal('No receipt provided');
@@ -97,6 +99,7 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
             used_gas: migrationResult.receipt.gasUsed.toNumber(),
             max_mpt_depth: initialization.max_mpt_depth,
             value_mpt_depth: 1,
+            changeMigrationTime: timer,
         });
     });
 
@@ -112,11 +115,12 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
 
             // migrate changes to proxy contract
             // get the diff set, the storage keys for the changed values
+            const start = (new Date()).getTime();
             const diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
             const changedKeys: Array<BigNumberish> = diff.getKeys();
             logger.debug(changedKeys);
-            currBlockNr = await srcProvider.getBlockNumber() + 1;
             const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
+            const timer = (new Date()).getTime() - start;
             expect(migrationResult.migrationResult).to.be.true;
             if (!migrationResult.receipt) {
                 logger.fatal('No receipt provided');
@@ -131,6 +135,7 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
                 value_mpt_depth: i,
+                changeMigrationTime: timer,
             });
         }
     });
@@ -163,11 +168,12 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
 
             // migrate changes to proxy contract
             // get the diff set, the storage keys for the changed values
+            const start = (new Date()).getTime();
             const diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
             const changedKeys: Array<BigNumberish> = diff.getKeys();
             logger.debug(changedKeys);
-            currBlockNr = await srcProvider.getBlockNumber() + 1;
             const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
+            const timer = (new Date()).getTime() - start;
             expect(migrationResult.migrationResult).to.be.true;
             if (!migrationResult.receipt) {
                 logger.fatal('No receipt provided');
@@ -182,6 +188,7 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
                 value_mpt_depth: i,
+                changeMigrationTime: timer,
             });
         }
     });
@@ -198,11 +205,12 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
 
             // migrate changes to proxy contract
             // get the diff set, the storage keys for the changed values
+            const start = (new Date()).getTime();
             const diff: StorageDiff = await differ.getDiffFromSrcContractTxs(srcContract.address, 'latest', currBlockNr);
             const changedKeys: Array<BigNumberish> = diff.getKeys();
             logger.debug(changedKeys);
-            currBlockNr = await srcProvider.getBlockNumber() + 1;
             const migrationResult = await chainProxy.migrateChangesToProxy(changedKeys);
+            const timer = (new Date()).getTime() - start;
             expect(migrationResult.migrationResult).to.be.true;
             if (!migrationResult.receipt) {
                 logger.fatal('No receipt provided');
@@ -217,6 +225,7 @@ describe('update-one-value-per-mpt-height-with-map-sizes-1-to-1000', async () =>
                 used_gas: migrationResult.receipt.gasUsed.toNumber(),
                 max_mpt_depth: initialization.max_mpt_depth,
                 value_mpt_depth: i,
+                changeMigrationTime: timer,
             });
         }
     });

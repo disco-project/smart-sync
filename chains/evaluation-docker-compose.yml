@@ -1,0 +1,33 @@
+version: '3.7'
+services:
+  chain:
+    container_name: crossChainContracts_test_chain
+    image: openethereum/openethereum
+    volumes:
+      - ./:/home/openethereum/.local/share/openethereum
+    command: >
+      --config /home/openethereum/.local/share/openethereum/evaluation-config.toml 
+      --base-path /home/openethereum/.local/share/openethereum/chain1-data 
+      --keys-path /home/openethereum/.local/share/openethereum/keys
+      --tracing on
+    ports:
+      - 8545:8545
+      - 8546:8546
+      - 30303:30303
+      - 30303:30303/udp
+  chain2:
+    container_name: crossChainContracts_test_chain_2
+    image: openethereum/openethereum
+    volumes:
+      - ./:/home/openethereum/.local/share/openethereum
+    command: >
+      --config /home/openethereum/.local/share/openethereum/evaluation-config.toml 
+      --base-path /home/openethereum/.local/share/openethereum/chain2-data 
+      --keys-path /home/openethereum/.local/share/openethereum/keys
+      --ports-shift 2
+      --tracing on
+    ports:
+      - 8547:8547
+      - 8548:8548
+      - 30304:30303
+      - 30304:30303/udp

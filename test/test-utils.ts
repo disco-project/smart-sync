@@ -23,6 +23,7 @@ const KEY_VALUE_PAIR_PER_BATCH = 100;
 export namespace TestCLI {
     export const tsNodeExec = './node_modules/ts-node/dist/bin-transpile.js';
     export const cliExec = './src/cli/smart-sync.ts';
+    export const defaultEvaluationConfigFile = './evaluation/config/test-cli-config.json';
     export const defaultTestConfigFile = './test/config/test-cli-config.json';
     export const targetAccountEncryptedJsonPath = './test/config/encryptedAccount.json';
     export const targetAccountPassword = 'dev';
