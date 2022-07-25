@@ -2,9 +2,10 @@
 
 ## Installation CLI
 
-Download the tarballed npm package on our [GitHub Respository](https://github.com/disco-project/cross-chain-contracts) and execute the following
+To globally install the latest package of smart-sync cli, run:
+
 ```
-$ npm i {CROSS_CHAIN_CLI_NPM_PACKAGE} -g
+$ npm i smart-sync -g
 ```
 
 To compile the project yourself and install it, see section [Getting started (Dev)](#getting-started-dev)
@@ -15,11 +16,11 @@ To execute tests, please refer to the [test](#tests) section.
 
 ## Usage 
 
-### fork
+### Smart Contract Fork
 
 ```bash 
-$ cross-chain-cli help fork
-Usage: cross-chain-cli fork|f [options] <src_contract_address> [relay_contract_address]
+$ smart-sync help fork
+Usage: smart-sync fork|f [options] <src_contract_address> [relay_contract_address]
 
 Migrates a given contract address to a target chain and deploys a proxy contract. If no relay contract is provided, a relay contract will be deployed too.
 
@@ -37,14 +38,14 @@ Options:
 ```
 Example usage:
 ```bash
-$ cross-chain-cli fork 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a
+$ smart-sync fork 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a
 ```
 
-### synchronize
+### Synchronizing a Smart Contract
 
 ```bash
-$ cross-chain-cli help synchronize
-Usage: cross-chain-cli synchronize|s [options] <proxy_contract_address>
+$ smart-sync help synchronize
+Usage: smart-sync synchronize|s [options] <proxy_contract_address>
 
 Synchronizes the storage of a proxy contract with its source contracts storage up to an optionally provided block nr on the source chain.
 
@@ -64,13 +65,13 @@ Options:
 
 Example usage:
 ```bash
-$ cross-chain-cli s 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a --target-blockNr 450
+$ smart-sync s 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a --target-blockNr 450
 ```
 
-### continuous-synch
+### Continuously synchronizing Smart Contracts
 ```bash
-$ cross-chain-cli continuous-synch --help
-Usage: cross-chain-cli continuous-synch|c [options] <proxy_contract_address> <period>
+$ smart-sync continuous-synch --help
+Usage: smart-sync continuous-synch|c [options] <proxy_contract_address> <period>
 
 Periodically synch state updates.
 
@@ -94,13 +95,13 @@ Options:
 
 Example usage:
 ```bash
-$ cross-chain-cli c 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a "*/2 * * * *"
+$ smart-sync c 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a "*/2 * * * *"
 ```
 
-### migration-status
+### Retrieve migration status
 ```bash
-$ cross-chain-cli help migration-status
-Usage: cross-chain-cli migration-status|status [options] <proxy_contract_address>
+$ smart-sync help migration-status
+Usage: smart-sync migration-status|status [options] <proxy_contract_address>
 
 Checks if the storage root of the proxy contract equals the current storage root of the source contract in the relay contract on the target chain.
 
@@ -115,12 +116,12 @@ Options:
 ```
 Example usage:
 ``` bash
-$ cross-chain-cli status 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a
+$ smart-sync status 0x010A3d554c8d772aAC357e079B4D57B6dA28a43a
 ```
-### get-curr-blocknr
+### Get currrent block number
 ```bash
-$ cross-chain-cli help get-curr-blocknr
-Usage: cross-chain-cli get-curr-blocknr|blocknr [options] <proxy_contract_address>
+$ smart-sync help get-curr-blocknr
+Usage: smart-sync get-curr-blocknr|blocknr [options] <proxy_contract_address>
 
 Get the synched block number of src chain for the provided proxy contract.
 
@@ -135,13 +136,13 @@ Options:
 ```
 Example usage:
 ```bash
-$ cross-chain-cli blocknr 0x20a508640B446990c781Cd541B9a2828ACA3a350
+$ smart-sync blocknr 0x20a508640B446990c781Cd541B9a2828ACA3a350
 ```
 
-### state-diff
+### Retrieve state diff
 ```bash
-$ cross-chain-cli help state-diff
-Usage: cross-chain-cli state-diff|diff [options] <source_contract_address> [proxy_contract_address]
+$ smart-sync help state-diff
+Usage: smart-sync state-diff|diff [options] <source_contract_address> [proxy_contract_address]
 
 Shows the state diff between source contract and proxy contract on target chain. If diff-mode == storage, proxy_contract_address has to be provided.
 
@@ -160,7 +161,7 @@ Options:
 ```
 Example usage:
 ```bash
-$ cross-chain-cli diff 0x20a508640B446990c781Cd541B9a2828ACA3a350 0xf8f22ab160e8a09fbf404a44139d9b5da936e3cb --diff-mode storage --src-blocknr 450
+$ smart-sync diff 0x20a508640B446990c781Cd541B9a2828ACA3a350 0xf8f22ab160e8a09fbf404a44139d9b5da936e3cb --diff-mode storage --src-blocknr 450
 ```
 
 # Getting started (Dev)
@@ -177,7 +178,7 @@ $ npm i --development
 To execute the compile-pipeline of this project run:
 
 ```bash
-npx grunt compile-project
+$ npx grunt compile-project
 ```
 
 This cleans the dist folder, compiles the contracts, lints the src files and executes tsc. If you want to execute those steps individually see `npx grunt --help` for all available individual commands:
@@ -194,9 +195,9 @@ stop-chains | Stopping chain
 compile-project | Generate js-files                                   
 compile-contracts | Generate contract type info                         
 tsc | Compile ts files                                    
-install | Install cross-chain-cli locally                     
-install-global | Install cross-chain-cli globally                    
-pack | npm pack cross-chain-cli                            
+install | Install smart-sync locally                     
+install-global | Install smart-sync globally                    
+pack | npm pack smart-sync                            
 npm-pack | npm packaging command                               
 full-pipeline-test | Testing precompiled *.ts project                    
 full-pipeline-dist-test | Testing compiled *.js project inside dist folder    
@@ -207,7 +208,7 @@ test | Run tests
 ### Install CLI
 To compile and install the CLI run:
 ```bash
-npx grunt install
+$ npx grunt install
 ```
 ## Chain
 Generally, you don't need to start the chain individually since its already started if you execute the command:
@@ -231,7 +232,23 @@ To run all the tests run (requires a running ethereum node, see [hardhat.config.
 $ npm run test
 ```
 
-Or a single test (chains needs to be started manually):
+### Adjusting ports of the test chains
+If you want to adjust the ports of the test chains, you just have to change them in the test-config file located at `test/config/test-cli-config.json`. Our scripts will then adjust the ports for the docker containers automatically when you run the command from above. 
+
+Alternatively, you can adjust them over the optional parameter `test-chain-port` inside our Grunt task. With `test-config-path` you can even change the test config file path if you changed the location:
+
+```bash
+$ npx grunt full-pipeline-test --test-chain-port=9545 --test-config-path=./test/config/test-cli-config.json
+```
+
+If you just want to adjust the ports without triggering the tests, execute the following:
+
+```bash
+$ npx grunt update-ports --test-chain-port=9545
+```
+
+### Running single tests
+You can also run single tests (chains need to be started manually):
 
 ```bash
 $ npx hardhat test test/list-storage-test.ts

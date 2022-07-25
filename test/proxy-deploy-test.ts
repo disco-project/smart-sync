@@ -13,7 +13,7 @@ import GetProof from '../src/proofHandler/GetProof';
 import ProxyContractBuilder from '../src/utils/proxy-contract-builder';
 import { encodeBlockHeader } from '../src/chain-proxy';
 import { TestCLI } from './test-utils';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 import FileHandler from '../src/utils/fileHandler';
 
 describe('Deploy proxy and logic contract', async () => {
@@ -220,8 +220,6 @@ describe('Deploy proxy and logic contract', async () => {
         const keys = diff.getKeys();
 
         proof = new GetProof(await provider.send('eth_getProof', [srcContract.address, keys]));
-
-        // Note that the respective block is not added to the realy contract here
 
         // compute the optimized storage proof
         const rlpOptimized = proof.optimizedStorageProof();

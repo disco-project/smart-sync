@@ -15,14 +15,13 @@ import {
 import GetProof, { encodeAccount, formatProofNodes } from '../src/proofHandler/GetProof';
 import { Account, StorageProof } from '../src/proofHandler/Types';
 import { encodeBlockHeader } from '../src/chain-proxy';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 
 const KEY_VALUE_PAIR_PER_BATCH = 100;
 
 export namespace TestCLI {
     export const tsNodeExec = './node_modules/ts-node/dist/bin-transpile.js';
-    export const cliExec = './src/cli/cross-chain-cli.ts';
-    export const defaultEvaluationConfigFile = './evaluation/config/test-cli-config.json';
+    export const cliExec = './src/cli/smart-sync.ts';
     export const defaultTestConfigFile = './test/config/test-cli-config.json';
     export const targetAccountEncryptedJsonPath = './test/config/encryptedAccount.json';
     export const targetAccountPassword = 'dev';
@@ -444,7 +443,7 @@ export class TestChainProxy {
             receipt = await txResponse.wait();
         } catch (e: any) {
             logger.error('something went wrong');
-            const regexr = new RegExp(/Reverted 0x(.*)/);
+            const regexr = /Reverted 0x(.*)/;
             const checker = regexr.exec(e.data);
             if (checker) {
                 logger.error(`'${hexToAscii(checker[1])}'`);

@@ -1,4 +1,5 @@
-import stringify from 'csv-stringify';
+import { stringify } from 'csv-stringify';
+import { parse } from 'csv-parse/sync';
 import { BigNumberish, ethers } from 'ethers';
 import fs from 'fs';
 import * as rlp from 'rlp';
@@ -40,8 +41,9 @@ export class CSVManager<T> {
 
     private data: Array<T>;
 
-    constructor(fileName: string) {
+    constructor(fileName: string, dir?: string) {
         this.fileName = fileName;
+        this.dir = dir ?? this.dir;
         this.data = [];
     }
 
@@ -63,6 +65,12 @@ export class CSVManager<T> {
             });
             csvStringifier.pipe(writeStream);
         });
+    }
+
+    readFromFile() {
+        const fileContent = fs.readFileSync(`${this.dir}/${this.fileName}`);
+        const parsedContent = parse(fileContent, { columns: false, skipEmptyLines: true, fromLine: 2 });
+        return parsedContent;
     }
 }
 

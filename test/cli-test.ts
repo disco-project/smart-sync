@@ -21,7 +21,7 @@ import Change from '../src/diffHandler/Change';
 import Add from '../src/diffHandler/Add';
 import Remove from '../src/diffHandler/Remove';
 import FileHandler from '../src/utils/fileHandler';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 
 describe('Test CLI', async () => {
     let targetDeployer: SignerWithAddress;
@@ -45,7 +45,7 @@ describe('Test CLI', async () => {
         }
         logger.setSettings({ minLevel: 'info', name: 'cli-test.ts' });
         targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.targetChainRpcUrl || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
-        srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.srcBlocknr || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
+        srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.srcChainRpcUrl || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
         differ = new DiffHandler(srcProvider, targetProvider);
         targetDeployer = await SignerWithAddress.create(targetProvider.getSigner());
         srcDeployer = await SignerWithAddress.create(srcProvider.getSigner());
@@ -520,7 +520,7 @@ describe('Test CLI', async () => {
             expect(diff.getKeys().length).to.equal(5, 'There is no diff.');
 
             await new Promise((resolve) => {
-                setTimeout(() => resolve(resolve), 3000);
+                setTimeout(() => resolve(resolve), 5000);
             });
 
             const proxyProof = await targetProvider.send('eth_getProof', [initialization.proxyContract.address, []]);

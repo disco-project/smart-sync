@@ -85,7 +85,7 @@ export class ChainProxy {
 
     private proxyContract: Contract;
 
-    readonly proxyContractAddress: string | undefined;
+    proxyContractAddress: string | undefined;
 
     srcContractAddress: string;
 
@@ -230,6 +230,7 @@ export class ChainProxy {
             logger.info('No address for relayContract given, deploying new relay contract...');
             const relayFactory = new RelayContract__factory(this.deployer);
             this.relayContract = await relayFactory.deploy();
+            this.relayContractAddress = this.relayContract.address;
             logger.info(`Relay contract address: ${this.relayContract.address}`);
         }
         const srcBlockParity = toParityQuantity(srcBlock);
@@ -301,6 +302,7 @@ export class ChainProxy {
             logger.error(e);
             return false;
         }
+        this.proxyContractAddress = this.proxyContract.address;
         logger.info(`Proxy contract address: ${this.proxyContract.address}`);
         return true;
     }
@@ -454,18 +456,19 @@ export class ChainProxy {
                 }
                 return this.differ.getDiffFromStorage(this.srcContractAddress, this.proxyContractAddress ?? this.srcContractAddress, parameters.srcBlock, parameters.targetBlock);
             case 'getProof':
+                // todo: make this independent from proxyContract (remove this if block)
                 if (this.relayContract && this.proxyContract) {
                     const synchedBlockNr = await this.relayContract.getCurrentBlockNumber(this.proxyContract.address);
                     srcBlock = synchedBlockNr.toNumber() + 1;
                 }
                 if (targetBlock) {
                     const givenTargetBlockNr = await toBlockNumber(targetBlock, this.srcProvider);
-                    if (srcBlock && BLOCKNUMBER_TAGS.indexOf(srcBlock) < 0 && BigNumber.from(srcBlock).gt(givenTargetBlockNr)) {
+                    if (srcBlock && BLOCKNUMBER_TAGS.indexOf(srcBlock) < 0 && BigNumber.from(srcBlock).gt(givenTargetBlockNr) && !this.proxyContractAddress) {
                         logger.debug(`Note: The given starting block nr/ synchronized block nr (--src-BlockNr == ${srcBlock}) is greater than the given target block nr (${targetBlock}).`);
                         return new StorageDiff([]);
                     }
                 }
-                return this.differ.getDiffFromProof(this.srcContractAddress, parameters.targetBlock, srcBlock);
+                return this.differ.getDiffFromProof(this.srcContractAddress, parameters.targetBlock, srcBlock, this.proxyContractAddress ?? this.srcContractAddress);
                 // srcTx is default
             default:
                 if (this.relayContract && this.proxyContract) {

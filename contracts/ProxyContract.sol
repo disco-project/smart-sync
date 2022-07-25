@@ -268,17 +268,21 @@ contract ProxyContract {
             bytes[] memory _oldList = new bytes[](17);
             // loop through every value
             for (uint i = 0; i < 17; i++) {
-                // 1. get new entry for new parent hash calculation
+                // get new entry for new parent hash calculation
                 _newList[i] = lastBranch[i].toRlpBytes();
-                _oldList[i] = _newList[i];
+                _oldList[i] = lastBranch[i].toRlpBytes();
 
-                // 2. get old entry for old parent hash calculation
-                // the value node either holds the [key, value]directly or another proofnode
+                // the value node either holds the [key, value] directly or another proofnode
                 RLPReader.RLPItem[] memory valueNode = RLPReader.toList(latestCommonBranchValues[i]);
                 if (valueNode.length == 3) {
+                    if (valueNode[2].toUint() == uint256(0x0)) {
+                        // deleted value in new parent hash
+                        _newList[i] = RLPWriter.encodeUint(0);
+                    }
+
+                    // get old entry for old parent hash calculation
                     // leaf value, where the is the value of the latest branch node at index i
                     bytes memory encodedList = restoreOldValueState(valueNode);
-                    
                     if (encodedList.length > 32) {
                         bytes32 listHash = keccak256(encodedList);
                         _oldList[i] = RLPWriter.encodeKeccak256Hash(listHash);

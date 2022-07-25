@@ -11,7 +11,7 @@ import {
     MappingContract__factory,
     RelayContract,
 } from '../src-gen/types';
-import { TxContractInteractionOptions } from '../src/cli/cross-chain-cli';
+import { TxContractInteractionOptions } from '../src/cli/smart-sync';
 import FileHandler from '../src/utils/fileHandler';
 
 const MAX_VALUE = 1000000;
@@ -53,9 +53,16 @@ describe('Test scaling of contract', async () => {
             logger.error(`No config available under ${TestCLI.defaultTestConfigFile}`);
             process.exit(-1);
         }
-        chainProxy = new TestChainProxy(srcContract, logicContract, chainConfigs, srcDeployer, targetDeployer,
+        chainProxy = new TestChainProxy(
+            srcContract,
+            logicContract,
+            chainConfigs,
+            srcDeployer,
+            targetDeployer,
             relayContract,
-            srcProvider, targetProvider);
+            srcProvider,
+            targetProvider,
+        );
         logger.debug(`srcContractAddress: ${srcContract.address}, relayContract: ${relayContract.address}`);
     });
 

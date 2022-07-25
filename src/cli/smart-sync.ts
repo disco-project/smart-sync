@@ -368,7 +368,7 @@ stateDiff
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetConnectionInfo: ConnectionInfo = {
-            url: adjustedOptions.targetChainRpcUrl,
+            url: proxyContractAddress ? adjustedOptions.targetChainRpcUrl : adjustedOptions.srcChainRpcUrl,
             timeout: BigNumber.from(adjustedOptions.connectionTimeout).toNumber(),
         };
         const targetRPCConfig: RPCConfig = {

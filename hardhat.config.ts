@@ -1,7 +1,7 @@
 import { task } from "hardhat/config";
 import "@nomiclabs/hardhat-waffle";
 import "@openzeppelin/hardhat-upgrades";
-import "hardhat-typechain";
+import "@typechain/hardhat";
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -23,7 +23,7 @@ export default {
     },
     disco: {
       url: "http://127.0.0.1:8545",
-      gas: 10000000,
+      gas: 1000000,
       timeout: 3600000
     },
     disco2: {
