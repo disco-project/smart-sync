@@ -42,6 +42,7 @@
     "hardhat": "^2.8.0",
     "merkle-patricia-tree": "^4.2.2",
     "node-cron": "^3.0.0",
+    "npx": "^10.2.2",
     "rlp": "^2.2.7",
     "solc": "^0.8.11",
     "solidity-patricia-tree": "^2.0.2",
