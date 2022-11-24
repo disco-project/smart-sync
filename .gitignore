@@ -18,6 +18,7 @@ data/
 .idea/
 target/
 node_modules
-.vscode/
-
 görliTestAccount.json
+
+chains/docker-compose.yml
+test/config/test-cli-config.json
