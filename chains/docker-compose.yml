@@ -11,8 +11,8 @@ services:
             /home/openethereum/.local/share/openethereum/chain1-data  --keys-path
             /home/openethereum/.local/share/openethereum/keys --tracing on
         ports:
-            - 9550:8545
-            - 9551:8546
+            - 9545:8545
+            - 9546:8546
             - 30303:30303
             - 30303:30303/udp
     chain2:
@@ -26,7 +26,7 @@ services:
             /home/openethereum/.local/share/openethereum/chain2-data  --keys-path
             /home/openethereum/.local/share/openethereum/keys --tracing on
         ports:
-            - 9552:8545
-            - 9553:8546
+            - 9545:8545
+            - 9546:8546
             - 30304:30303
             - 30304:30303/udp

@@ -38,6 +38,7 @@
     "commander": "^8.3.0",
     "csv-parse": "^5.0.4",
     "csv-stringify": "^6.0.5",
+    "dotenv": "^16.0.3",
     "ethers": "^5.5.2",
     "hardhat": "^2.8.0",
     "merkle-patricia-tree": "^4.2.2",
