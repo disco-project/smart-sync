@@ -41,8 +41,8 @@ describe('update-multiple-values-random-with-map-sizes-1-1000', async () => {
         }
         srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
         targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.targetChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
-        srcDeployer = await SignerWithAddress.create(srcProvider.getSigner());
-        targetDeployer = await SignerWithAddress.create(targetProvider.getSigner());
+        srcDeployer = new ethers.Wallet(process.env.PRIVATE_KEY, srcProvider); // await SignerWithAddress.create(srcProvider.getSigner());
+        targetDeployer = new ethers.Wallet(process.env.PRIVATE_KEY, targetProvider); // await SignerWithAddress.create(targetProvider.getSigner());
         logger.setSettings({ minLevel: 'info', name: 'update-multiple-values-random-with-map-sizes-1-1000.ts' });
         csvManager = new CSVManager<CSVDataTemplateMultipleValues>('measurements-multiple-values-random-with-map-sizes-1-1000.csv');
         differ = new DiffHandler(srcProvider, targetProvider);

@@ -23,7 +23,7 @@ describe('Storage', async () => {
             process.exit(-1);
         }
         provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
-        deployer = await SignerWithAddress.create(provider.getSigner());
+        deployer = new ethers.Wallet(process.env.PRIVATE_KEY, provider); // await SignerWithAddress.create(provider.getSigner());
         logger.setSettings({ minLevel: 'info', name: 'list-storage-test.ts' });
     });
 

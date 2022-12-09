@@ -1,7 +1,7 @@
 {
-    "srcChainRpcUrl":"https://b28e91d2ad044ec0b1c89db096028236.goerli.rpc.rivet.cloud/",
+    "srcChainRpcUrl": "https://b28e91d2ad044ec0b1c89db096028236.goerli.rpc.rivet.cloud/",
     "targetChainRpcUrl": "https://polygon-mumbai.g.alchemy.com/v2/izk8roTk3konGfjDItgOyvlJJjXDa_cL",
-    "connectionTimeout": "36000",
+    "connectionTimeout": "66000",
     "logLevel": "info",
     "targetBlocknr": "latest",
     "gasLimit": 8000000,

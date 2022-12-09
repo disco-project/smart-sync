@@ -47,14 +47,8 @@ describe('Test CLI', async () => {
         targetProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.targetChainRpcUrl || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
         srcProvider = new ethers.providers.JsonRpcProvider({ url: chainConfigs?.srcChainRpcUrl || TestCLI.DEFAULT_PROVIDER, timeout: BigNumber.from(chainConfigs?.connectionTimeout).toNumber() });
         differ = new DiffHandler(srcProvider, targetProvider);
-
-        const targetSigner = new ethers.Wallet(process.env.PRIVATE_KEY, targetProvider);
-        const srcSigner = new ethers.Wallet(process.env.PRIVATE_KEY, srcProvider);
-        targetSigner.connect(targetProvider);
-        srcSigner.connect(srcProvider);
-
-        targetDeployer = await SignerWithAddress.create(targetProvider.getSigner());
-        srcDeployer = await SignerWithAddress.create(srcProvider.getSigner());
+        targetDeployer = new ethers.Wallet(process.env.PRIVATE_KEY, targetProvider); // await SignerWithAddress.create(targetProvider.getSigner());
+        srcDeployer = new ethers.Wallet(process.env.PRIVATE_KEY, srcProvider); // await SignerWithAddress.create(srcProvider.getSigner());
         factory = new MappingContract__factory(srcDeployer);
     });
 
