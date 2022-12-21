@@ -32,7 +32,7 @@ async function main() {
     await (await simpleStoragePolygon.setA(newValue)).wait();
     const location = ethers.utils.hexConcat([
         ethers.utils.hexZeroPad(polygonSigner.address, 32), 
-        ethers.utils.hexZeroPad('0x01', 32),
+        ethers.utils.hexZeroPad('0x02', 32),
     ]);
     const storageKey = ethers.BigNumber.from(ethers.utils.keccak256(location));
     const storedValue = await polygonProvider.getStorageAt(
@@ -43,4 +43,3 @@ async function main() {
 }
 
 main();
-
