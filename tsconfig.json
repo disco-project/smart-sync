@@ -15,6 +15,6 @@
     
         "files": true
     },
-    "include": ["src/**/*", "./test/**/*", "./test/**/*.json", "./evaluation/**/*", "./config/*.json"],
+    "include": ["demo/**/*", "src/**/*", "./test/**/*", "./test/**/*.json", "./evaluation/**/*", "./config/*.json"],
     "exclude": ["node_modules", "chains", "hardhat_scripts", "src-gen", "**/*.js"]
 }
