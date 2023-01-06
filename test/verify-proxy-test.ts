@@ -23,7 +23,7 @@ describe('Verify State proof', () => {
             process.exit(-1);
         }
         provider = new ethers.providers.JsonRpcProvider({ url: chainConfigs.srcChainRpcUrl, timeout: BigNumber.from(chainConfigs.connectionTimeout).toNumber() });
-        deployer = new ethers.Wallet(process.env.PRIVATE_KEY, provider); // await SignerWithAddress.create(provider.getSigner());
+        deployer = await SignerWithAddress.create(provider.getSigner());
     });
 
     it('Should deploy and return default values', async () => {
