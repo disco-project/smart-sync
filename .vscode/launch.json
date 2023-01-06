@@ -5,6 +5,7 @@
     "version": "0.2.0",
     "configurations": [
 
+
       {
         "name": "TAP: Current TS Test File",
         "runtimeExecutable": "node",
@@ -53,7 +54,21 @@
       {
         "type": "node",
         "request": "launch",
-        "name": "HARDHAT: Current TS Test File",
+        "name": "HARDHAT: hardhat RUN file",
+        "cwd": "${workspaceFolder}",
+        "args": [
+          "${workspaceRoot}/node_modules/npx",
+          "hardhat",
+          "run",
+          "${relativeFile}"
+        ],
+        "console": "integratedTerminal",
+        "internalConsoleOptions": "neverOpen"
+      },
+      {
+        "type": "node",
+        "request": "launch",
+        "name": "HARDHAT: hardhat TEST file",
         "cwd": "${workspaceFolder}",
         "args": [
           "${workspaceRoot}/node_modules/npx",
