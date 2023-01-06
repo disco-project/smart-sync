@@ -266,3 +266,11 @@ Or a specific evaluation (chain needs to be started manually):
 ```bash
 $ npx hardhat test evaluation/update-multiple-values-with-map-sizes-1-1000.ts
 ```
+
+
+## Notes
+
+1. npm i --development
+2. npx grunt compile-project
+tests should pass:
+3. npx grunt full-pipeline-test --test-chain-port=9545 --test-config-path=./test/config/test-cli-config.json
