@@ -1,5 +1,7 @@
 const ethers = require("ethers");
 require("dotenv").config();
+const DEPLOYED_CONTRACT_ADDRESS_GOERLI = process.env.DEPLOYED_CONTRACT_GOERLI
+const DEPLOYED_CONTRACT_ADDRESS_MUMBAI = process.env.DEPLOYED_CONTRACT_MUMBAI
 
 const goerliProvider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL_GOERLI);
 const polygonProvider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL_MUMBAI);
@@ -13,31 +15,15 @@ const SimpleStorageGoerli = new ethers.ContractFactory(abi, bytecode, goerliSign
 const SimpleStoragePolygon = new ethers.ContractFactory(abi, bytecode, polygonSigner);
 
 async function main() {
-    // Goerli
-    // const simpleStorageGoerli = await SimpleStorageGoerli.deploy();
-    // await simpleStorageGoerli.deployed();
-    // const simpleStorageGoerliAddress = simpleStorageGoerli.address;
-    // console.log(simpleStorageGoerli.deployTransaction);
-    // console.log(await simpleStorageGoerli.getA())
-    // console.log(`Deployed Goerli contract at: ${simpleStorageGoerliAddress}`);
-    const goerliAddress = '0x7d57C196D527C50d4E975300EB802F2b6f219559';
     const simpleStorageGoerli = new ethers.Contract(
-        goerliAddress,
+        DEPLOYED_CONTRACT_ADDRESS_GOERLI,
         abi,
         goerliSigner
     );
     console.log((await simpleStorageGoerli.getA()).toString());
 
-    // Polygon
-    // const simpleStoragePolygon = await SimpleStoragePolygon.deploy();
-    // await simpleStoragePolygon.deployed();
-    // const simpleStoragePolygonAddress = simpleStoragePolygon.address;
-    // console.log(`Deployed Polygon Mumbai contract at: ${simpleStoragePolygonAddress}`);
-    const newValue = 1337;
-    // await (await simpleStoragePolygon.setA(newValue)).wait();
-    const polygonAddress = '0x1350463D86472B4BbBfcD4936807168df93Ea639';
     const simpleStoragePolygon = new ethers.Contract(
-        polygonAddress,
+        DEPLOYED_CONTRACT_ADDRESS_MUMBAI,
         abi, 
         polygonSigner
     );
@@ -45,6 +31,7 @@ async function main() {
 
     // the first variable stored by the contact is a
     // so it should be at index 0 in the storage.
+    const newValue = 1337;
     const itemAtStorage = await polygonProvider.getStorageAt(simpleStoragePolygon.address, 0);
     console.log(itemAtStorage, await simpleStoragePolygon.getA())
     console.log(itemAtStorage._hex == await simpleStoragePolygon.getA()); // false because item at storage is padded
